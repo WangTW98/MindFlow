@@ -21,6 +21,7 @@
   },
   "activationEvents": [
     "onView:mindflow.sidebar",
+    "onCommand:mindflow.newFlow",
     "onCommand:mindflow.analyzeDocument",
     "onCommand:mindflow.openFlow",
     "onCustomEditor:mindflow.productFlow",
@@ -107,6 +108,10 @@
       }
     ],
     "commands": [
+      {
+        "command": "mindflow.newFlow",
+        "title": "MindFlow: New Blank Flow"
+      },
       {
         "command": "mindflow.analyzeDocument",
         "title": "MindFlow: Analyze Document"

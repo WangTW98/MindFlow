@@ -22,8 +22,10 @@ declare module "vscode" {
   }
 
   export class Uri {
+    scheme: string;
     fsPath: string;
     static file(path: string): Uri;
+    static parse(value: string): Uri;
     static joinPath(base: Uri, ...pathSegments: string[]): Uri;
     toString(): string;
   }
@@ -37,6 +39,7 @@ declare module "vscode" {
   }
 
   export class WorkspaceEdit {
+    insert(uri: Uri, position: Position, newText: string): void;
     replace(uri: Uri, range: Range, newText: string): void;
   }
 
@@ -143,8 +146,10 @@ declare module "vscode" {
     function asRelativePath(pathOrUri: string | Uri, includeWorkspaceFolder?: boolean): string;
     function openTextDocument(options: { content: string; language?: string }): Thenable<TextDocument>;
     function openTextDocument(path: string): Thenable<TextDocument>;
+    function openTextDocument(uri: Uri): Thenable<TextDocument>;
     function applyEdit(edit: WorkspaceEdit): Thenable<boolean>;
     function onDidChangeTextDocument(listener: (event: TextDocumentChangeEvent) => any): Disposable;
+    function onDidSaveTextDocument(listener: (document: TextDocument) => any): Disposable;
   }
 
   export namespace window {

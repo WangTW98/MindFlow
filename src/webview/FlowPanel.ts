@@ -4,7 +4,7 @@ import type { FlowChangePlan } from "../models/flowChange";
 import type { ProductFlow } from "../models/productFlow";
 import { validateProductFlow } from "../models/productFlow";
 
-type OpenFlowCallback = (flowPath: string) => void;
+type OpenFlowCallback = (flowUri: vscode.Uri) => void;
 
 export class FlowPanel implements vscode.CustomTextEditorProvider {
   public static readonly viewType = "mindflow.productFlow";
@@ -57,7 +57,7 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     _token: vscode.CancellationToken
   ): void {
     const flowPath = document.uri.fsPath;
-    this.onDidOpenFlow(flowPath);
+    this.onDidOpenFlow(document.uri);
     webviewPanel.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "src", "webview", "media")]

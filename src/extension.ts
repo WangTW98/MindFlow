@@ -21,6 +21,7 @@ import {
   type UpdateEdgeDetailsInput,
   type UpdateNodeDetailsInput
 } from "./core/flowEditing";
+import { createEmptyProductFlow } from "./core/emptyFlow";
 import { ArtifactRepository } from "./storage/artifactRepository";
 import { FlowRepository, writeJsonAtomic } from "./storage/flowRepository";
 import { RecentFlowStore } from "./storage/recentFlows";
@@ -35,12 +36,20 @@ let pendingChangePlan: FlowChangePlan | undefined;
 export function activate(context: vscode.ExtensionContext): void {
   const sidebarView = new SidebarView(context, getWorkspaceRoot);
   context.subscriptions.push(
-    FlowPanel.register(context, (flowPath) => {
-      void rememberRecentFlow(context, sidebarView, flowPath);
+    FlowPanel.register(context, (flowUri) => {
+      if (isRealMindFlowUri(flowUri)) {
+        void rememberRecentFlow(context, sidebarView, flowUri.fsPath);
+      }
     }),
     vscode.window.registerWebviewViewProvider(SidebarView.viewId, sidebarView)
   );
   context.subscriptions.push(
+    vscode.workspace.onDidSaveTextDocument((document) => {
+      if (isMindFlowDocument(document)) {
+        void rememberRecentFlow(context, sidebarView, document.uri.fsPath);
+      }
+    }),
+    vscode.commands.registerCommand("mindflow.newFlow", () => newFlow()),
     vscode.commands.registerCommand("mindflow.analyzeDocument", () => analyzeDocument(context, sidebarView)),
     vscode.commands.registerCommand("mindflow.openFlow", (flowPath?: string) => openFlow(context, sidebarView, flowPath)),
     vscode.commands.registerCommand("mindflow.modifyFlowByInstruction", (instruction?: string, nodeId?: string) =>
@@ -90,6 +99,21 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   // No background resources are held.
+}
+
+async function newFlow(): Promise<void> {
+  try {
+    const flow = createEmptyProductFlow();
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.parse("untitled:Untitled.mindflow"));
+    const edit = new vscode.WorkspaceEdit();
+    edit.insert(document.uri, new vscode.Position(0, 0), `${JSON.stringify(flow, null, 2)}\n`);
+    await vscode.workspace.applyEdit(edit);
+    currentFlowPath = undefined;
+    pendingChangePlan = undefined;
+    await vscode.commands.executeCommand("vscode.openWith", document.uri, FlowPanel.viewType);
+  } catch (error) {
+    showError("Create blank MindFlow failed", error);
+  }
 }
 
 async function analyzeDocument(context: vscode.ExtensionContext, sidebarView?: SidebarView): Promise<void> {
@@ -760,6 +784,14 @@ async function rememberRecentFlow(
   currentFlowPath = flowPath;
   await new RecentFlowStore(context.workspaceState).add(flowPath);
   void sidebarView?.refresh();
+}
+
+function isMindFlowDocument(document: vscode.TextDocument): boolean {
+  return isRealMindFlowUri(document.uri) && path.extname(document.uri.fsPath) === ".mindflow";
+}
+
+function isRealMindFlowUri(uri: vscode.Uri): boolean {
+  return uri.scheme === "file" && Boolean(uri.fsPath && path.isAbsolute(uri.fsPath));
 }
 
 function createFlowRepository(): FlowRepository {

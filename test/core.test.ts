@@ -7,6 +7,7 @@ import type * as vscode from "vscode";
 import { MockProvider } from "../src/agents/MockProvider";
 import { applyFlowChangePlan } from "../src/changes/flowChangeApplier";
 import { revertLastChangeSet } from "../src/changes/revertChangeSet";
+import { createEmptyProductFlow } from "../src/core/emptyFlow";
 import {
   createManualEdge,
   createManualNode,
@@ -34,6 +35,18 @@ test("MockProvider analyzes a document into a valid ProductFlow", async () => {
   assert.equal(validation.valid, true, validation.errors.join("\n"));
   assert.ok(flow.nodes.length >= 5);
   assert.ok(flow.edges.length >= 5);
+});
+
+test("Empty ProductFlow starts as a valid blank canvas", () => {
+  const flow = createEmptyProductFlow();
+  const validation = validateProductFlow(flow);
+
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+  assert.equal(flow.nodes.length, 0);
+  assert.equal(flow.edges.length, 0);
+  assert.equal(flow.domains.length, 0);
+  assert.equal(flow.roles.length, 0);
+  assert.equal(flow.appSurfaces?.length, 0);
 });
 
 test("FlowChangePlan inserts a business node between two existing nodes", async () => {
@@ -491,6 +504,7 @@ test("Extension manifest contributes MindFlow activity view and .mindflow custom
   assert.ok(editor.selector?.some((item) => item.filenamePattern === "*.mindflow"));
   assert.equal(editor.selector?.some((item) => String(item.filenamePattern || "").endsWith(".json")), false);
   assert.ok(manifest.activationEvents?.includes("onCommand:mindflow.updateAppSurfacePosition"));
+  assert.ok(manifest.activationEvents?.includes("onCommand:mindflow.newFlow"));
 });
 
 class FakeMemento {

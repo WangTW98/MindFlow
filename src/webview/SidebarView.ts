@@ -25,7 +25,7 @@ export class SidebarView implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (message: SidebarMessage) => {
       switch (message.type) {
         case "newMindFlow":
-          await vscode.commands.executeCommand("mindflow.analyzeDocument");
+          await vscode.commands.executeCommand("mindflow.newFlow");
           break;
         case "openMindFlow":
           await vscode.commands.executeCommand("mindflow.openFlow");
