@@ -13,6 +13,7 @@
   --edge: var(--vscode-charts-blue);
   --inlet: var(--vscode-charts-blue);
   --outlet: var(--vscode-charts-orange);
+  --inspector-width: 380px;
   --group-bg: color-mix(in srgb, var(--vscode-sideBar-background), var(--vscode-editor-background) 30%);
   --card-shadow: 0 10px 24px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
   --card-shadow-strong: 0 18px 38px rgba(0, 0, 0, 0.26), 0 4px 12px rgba(0, 0, 0, 0.14);
@@ -104,7 +105,7 @@ textarea {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 380px;
+  grid-template-columns: 240px minmax(0, 1fr) var(--inspector-width);
   width: 100%;
   height: 100vh;
   min-width: 0;
@@ -114,7 +115,7 @@ textarea {
 }
 
 .app-shell.left-collapsed {
-  grid-template-columns: 0 minmax(0, 1fr) 380px;
+  grid-template-columns: 0 minmax(0, 1fr) var(--inspector-width);
 }
 
 .app-shell.inspector-collapsed {
@@ -904,6 +905,10 @@ small,
   border-radius: 6px;
   background: var(--bg);
   box-shadow: var(--card-shadow);
+}
+
+.app-shell:not(.inspector-collapsed) .product-issue-fab {
+  right: calc(var(--inspector-width) + 16px);
 }
 
 .product-issues-open .product-issue-fab {

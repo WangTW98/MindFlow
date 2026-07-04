@@ -277,7 +277,7 @@
               aria-label="${escapeAttr(`${item.label} ${count} 条`)}"
               aria-pressed="${active ? "true" : "false"}">
               ${renderLucideIcon(item.icon)}
-              <span class="product-issue-badge">${count}</span>
+              ${count > 0 ? `<span class="product-issue-badge">${count}</span>` : ""}
             </button>
           `;
         }).join("")}
