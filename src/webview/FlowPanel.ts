@@ -11,6 +11,8 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
   public static selectedNodeId: string | undefined;
   public static selectedEdgeId: string | undefined;
   public static selectedAppSurfaceId: string | undefined;
+  public static selectedDomainId: string | undefined;
+  public static selectedRoleId: string | undefined;
 
   private static provider: FlowPanel | undefined;
 
@@ -164,21 +166,43 @@ class FlowEditorSession {
         FlowPanel.selectedNodeId = message.nodeId;
         FlowPanel.selectedEdgeId = undefined;
         FlowPanel.selectedAppSurfaceId = undefined;
+        FlowPanel.selectedDomainId = undefined;
+        FlowPanel.selectedRoleId = undefined;
         break;
       case "selectEdge":
         FlowPanel.selectedEdgeId = message.edgeId;
         FlowPanel.selectedNodeId = undefined;
         FlowPanel.selectedAppSurfaceId = undefined;
+        FlowPanel.selectedDomainId = undefined;
+        FlowPanel.selectedRoleId = undefined;
         break;
       case "selectAppSurface":
         FlowPanel.selectedAppSurfaceId = message.appId;
         FlowPanel.selectedNodeId = undefined;
         FlowPanel.selectedEdgeId = undefined;
+        FlowPanel.selectedDomainId = undefined;
+        FlowPanel.selectedRoleId = undefined;
+        break;
+      case "selectDomain":
+        FlowPanel.selectedDomainId = message.domainId;
+        FlowPanel.selectedNodeId = undefined;
+        FlowPanel.selectedEdgeId = undefined;
+        FlowPanel.selectedAppSurfaceId = undefined;
+        FlowPanel.selectedRoleId = undefined;
+        break;
+      case "selectRole":
+        FlowPanel.selectedRoleId = message.roleId;
+        FlowPanel.selectedNodeId = undefined;
+        FlowPanel.selectedEdgeId = undefined;
+        FlowPanel.selectedAppSurfaceId = undefined;
+        FlowPanel.selectedDomainId = undefined;
         break;
       case "clearSelection":
         FlowPanel.selectedNodeId = undefined;
         FlowPanel.selectedEdgeId = undefined;
         FlowPanel.selectedAppSurfaceId = undefined;
+        FlowPanel.selectedDomainId = undefined;
+        FlowPanel.selectedRoleId = undefined;
         break;
       case "modifyInstruction":
         await vscode.commands.executeCommand("mindflow.modifyFlowByInstruction", message.instruction, message.nodeId);
@@ -194,10 +218,18 @@ class FlowEditorSession {
         break;
       case "generateNodePrd":
         FlowPanel.selectedNodeId = message.nodeId;
+        FlowPanel.selectedEdgeId = undefined;
+        FlowPanel.selectedAppSurfaceId = undefined;
+        FlowPanel.selectedDomainId = undefined;
+        FlowPanel.selectedRoleId = undefined;
         await vscode.commands.executeCommand("mindflow.generateNodePrd", message.nodeId);
         break;
       case "generateNodePencil":
         FlowPanel.selectedNodeId = message.nodeId;
+        FlowPanel.selectedEdgeId = undefined;
+        FlowPanel.selectedAppSurfaceId = undefined;
+        FlowPanel.selectedDomainId = undefined;
+        FlowPanel.selectedRoleId = undefined;
         await vscode.commands.executeCommand("mindflow.generateNodePencil", message.nodeId);
         break;
       case "generateFullPrd":
@@ -208,7 +240,10 @@ class FlowEditorSession {
         break;
       case "deleteNode":
         FlowPanel.selectedNodeId = message.nodeId;
+        FlowPanel.selectedEdgeId = undefined;
         FlowPanel.selectedAppSurfaceId = undefined;
+        FlowPanel.selectedDomainId = undefined;
+        FlowPanel.selectedRoleId = undefined;
         await vscode.commands.executeCommand("mindflow.removeNode", message.nodeId);
         break;
       case "syncArtifacts":
@@ -259,6 +294,15 @@ class FlowEditorSession {
         await vscode.commands.executeCommand("mindflow.removeEdge", message.edgeId);
         break;
       case "updateTaxonomy":
+        if (message.request.action === "delete") {
+          if (message.request.kind === "appSurface") {
+            FlowPanel.selectedAppSurfaceId = undefined;
+          } else if (message.request.kind === "domain") {
+            FlowPanel.selectedDomainId = undefined;
+          } else if (message.request.kind === "role") {
+            FlowPanel.selectedRoleId = undefined;
+          }
+        }
         await vscode.commands.executeCommand("mindflow.updateTaxonomy", message.request);
         break;
       default:
@@ -291,7 +335,9 @@ class FlowEditorSession {
       pendingChange: this.pendingChange ?? null,
       selectedNodeId: FlowPanel.selectedNodeId ?? null,
       selectedEdgeId: FlowPanel.selectedEdgeId ?? null,
-      selectedAppSurfaceId: FlowPanel.selectedAppSurfaceId ?? null
+      selectedAppSurfaceId: FlowPanel.selectedAppSurfaceId ?? null,
+      selectedDomainId: FlowPanel.selectedDomainId ?? null,
+      selectedRoleId: FlowPanel.selectedRoleId ?? null
     })};
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
@@ -322,6 +368,8 @@ type WebviewMessage =
   | { type: "selectNode"; nodeId: string }
   | { type: "selectEdge"; edgeId: string }
   | { type: "selectAppSurface"; appId: string }
+  | { type: "selectDomain"; domainId: string }
+  | { type: "selectRole"; roleId: string }
   | { type: "clearSelection" }
   | { type: "modifyInstruction"; instruction: string; nodeId?: string }
   | { type: "applyChangeSet" }

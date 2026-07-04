@@ -21,10 +21,16 @@
   let selectedNodeId = state.selectedNodeId || "";
   let selectedEdgeId = state.selectedEdgeId || "";
   let selectedAppSurfaceId = state.selectedAppSurfaceId || persisted.selectedAppSurfaceId || "";
+  let selectedDomainId = state.selectedDomainId || persisted.selectedDomainId || "";
+  let selectedRoleId = state.selectedRoleId || persisted.selectedRoleId || "";
   let appFilters = readIdSelection(persisted.appFilters, persisted.appFilter);
   let domainFilters = readIdSelection(persisted.domainFilters, persisted.domainFilter);
   let roleFilters = readIdSelection(persisted.roleFilters, persisted.roleFilter);
   let taxonomySelection = readTaxonomySelection(persisted.taxonomySelection);
+  selectedAppSurfaceId ||= taxonomySelection.appSurface;
+  selectedDomainId ||= taxonomySelection.domain;
+  selectedRoleId ||= taxonomySelection.role;
+  let taxonomyPanelsOpen = readTaxonomyPanelsOpen(persisted.taxonomyPanelsOpen);
   let nodeSearch = persisted.nodeSearch || "";
   let leftPanelCollapsed = Boolean(persisted.leftPanelCollapsed);
   let zoom = clamp(Number(persisted.zoom || 1), MIN_ZOOM, MAX_ZOOM);
@@ -40,6 +46,8 @@
   let featureDrag = null;
   let nodeDetailsSaveTimer = null;
   let appSurfaceDetailsSaveTimer = null;
+  let domainDetailsSaveTimer = null;
+  let roleDetailsSaveTimer = null;
   let edgeDetailsSaveTimer = null;
   let edgeDetailsSaveRevision = 0;
   let pendingEdgeDetailsSaves = readPendingEdgeDetailsSaves(persisted.pendingEdgeDetailsSaves);
@@ -56,11 +64,13 @@
     const selectedNode = flow.nodes.find((node) => node.nodeId === selectedNodeId && node.status !== "removed") || null;
     const selectedEdge = flow.edges.find((edge) => edge.edgeId === selectedEdgeId && edge.status === "active") || null;
     const selectedAppSurface = (flow.appSurfaces || []).find((surface) => surface.appId === selectedAppSurfaceId) || null;
+    const selectedDomain = (flow.domains || []).find((domain) => domain.domainId === selectedDomainId) || null;
+    const selectedRole = (flow.roles || []).find((role) => role.roleId === selectedRoleId) || null;
     const activeNodes = flow.nodes.filter((node) => node.status !== "removed");
     const visibleListNodes = activeNodes.filter((node) => matchesNodeSearch(flow, node, nodeSearch));
 
     app.innerHTML = `
-      <main class="app-shell ${leftPanelCollapsed ? "left-collapsed" : ""} ${selectedNode || selectedEdge || selectedAppSurface ? "" : "inspector-collapsed"}">
+      <main class="app-shell ${leftPanelCollapsed ? "left-collapsed" : ""} ${selectedNode || selectedEdge || selectedAppSurface || selectedDomain || selectedRole ? "" : "inspector-collapsed"}">
         <aside class="left-panel">
           <section class="node-sidebar">
             <header class="nodes-toolbar">
@@ -80,15 +90,13 @@
             <div class="node-list" aria-label="节点列表">
               ${visibleListNodes.map((node) => renderNodeListItem(flow, node)).join("") || "<p class=\"empty\">无匹配节点</p>"}
             </div>
-            <div class="filters">
-              <h3>应用端 / 业务域 / 角色</h3>
-              ${renderFilters(flow)}
-            </div>
           </section>
         </aside>
 
         <section class="canvas" id="canvas" tabindex="0">
           ${leftPanelCollapsed ? renderFloatingLeftActions() : ""}
+          ${renderFloatingTaxonomyControls()}
+          ${renderTaxonomyPanels(flow)}
           <svg class="edge-layer" id="edgeLayer"></svg>
           <div class="world" id="world">
             ${renderAppSurfaceSourceCards(flow)}
@@ -98,7 +106,7 @@
         </section>
 
         <aside class="inspector">
-          ${selectedAppSurface ? renderAppSurfaceInspector(flow, selectedAppSurface) : selectedEdge ? renderEdgeInspector(flow, selectedEdge) : selectedNode ? renderNodeInspector(flow, selectedNode) : ""}
+          ${selectedAppSurface ? renderAppSurfaceInspector(flow, selectedAppSurface) : selectedDomain ? renderDomainInspector(selectedDomain) : selectedRole ? renderRoleInspector(flow, selectedRole) : selectedEdge ? renderEdgeInspector(flow, selectedEdge) : selectedNode ? renderNodeInspector(flow, selectedNode) : ""}
         </aside>
       </main>
     `;
@@ -193,6 +201,35 @@
     `;
   }
 
+  function renderFloatingTaxonomyControls() {
+    return `
+      <div class="floating-taxonomy-controls" aria-label="应用端、业务域、角色面板">
+        ${renderTaxonomyToggleButton("appSurface", "应用端", "monitor-smartphone")}
+        ${renderTaxonomyToggleButton("domain", "业务域", "network")}
+        ${renderTaxonomyToggleButton("role", "角色", "users")}
+      </div>
+    `;
+  }
+
+  function renderTaxonomyToggleButton(kind, label, iconName) {
+    const open = taxonomyPanelsOpen[kind] !== false;
+    return `
+      <button type="button" class="icon-button taxonomy-toggle ${open ? "active" : ""}" data-taxonomy-toggle="${escapeAttr(kind)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}" aria-pressed="${open ? "true" : "false"}">
+        ${renderLucideIcon(iconName)}
+      </button>
+    `;
+  }
+
+  function renderTaxonomyPanels(flow) {
+    return `
+      <div class="floating-taxonomy-panels" aria-label="应用端、业务域、角色列表">
+        ${taxonomyPanelsOpen.appSurface === false ? "" : renderManagedList("appSurface", "应用端", flow.appSurfaces || [], "appId", "name", "description", appFilters)}
+        ${taxonomyPanelsOpen.domain === false ? "" : renderManagedList("domain", "业务域", getAvailableDomains(flow), "domainId", "name", "description", domainFilters)}
+        ${taxonomyPanelsOpen.role === false ? "" : renderManagedList("role", "角色", getAvailableRoles(flow), "roleId", "name", "description", roleFilters)}
+      </div>
+    `;
+  }
+
   function renderFloatingLeftActions() {
     return `
       <div class="floating-left-actions" aria-label="节点操作">
@@ -225,9 +262,12 @@
       "panel-left-open": '<rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m14 9 3 3-3 3"></path>',
       "file-text": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path>',
       "grip-vertical": '<circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle>',
+      "monitor-smartphone": '<path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"></path><path d="M10 19v-4"></path><path d="M7 19h5"></path><rect width="6" height="10" x="16" y="12" rx="2"></rect>',
+      network: '<rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path>',
       "pen-line": '<path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>',
       plus: '<path d="M5 12h14"></path><path d="M12 5v14"></path>',
       "trash-2": '<path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
+      users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>',
       x: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>'
     };
     return `<svg class="lucide-icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.x}</svg>`;
@@ -235,16 +275,13 @@
 
   function renderManagedList(kind, label, items, idKey, labelKey, descriptionKey, selectedIds) {
     const selectedSet = new Set(selectedIds || []);
-    const currentId = taxonomySelection[kind] || "";
-    const hasCurrent = currentId && items.some((item) => item[idKey] === currentId);
+    const currentId = getSelectedTaxonomyId(kind);
     return `
-      <section class="managed-list" data-kind="${kind}">
+      <section class="managed-list taxonomy-panel" data-kind="${kind}" data-taxonomy-panel="${kind}">
         <header class="managed-list-head">
           <h4>${label}</h4>
           <div class="tiny-actions">
             ${renderTaxonomyActionButton(kind, "create", "新建", "plus")}
-            ${renderTaxonomyActionButton(kind, "update", "编辑", "pen-line", !hasCurrent)}
-            ${renderTaxonomyActionButton(kind, "delete", "删除", "trash-2", !hasCurrent, "danger-text")}
           </div>
         </header>
         <div class="managed-list-body" role="listbox" aria-label="${escapeAttr(label)}列表">
@@ -273,6 +310,24 @@
         ${renderLucideIcon(iconName)}
       </button>
     `;
+  }
+
+  function getSelectedTaxonomyId(kind) {
+    if (kind === "appSurface") {
+      return selectedAppSurfaceId;
+    }
+    if (kind === "domain") {
+      return selectedDomainId;
+    }
+    return selectedRoleId;
+  }
+
+  function clearAllTaxonomySelections() {
+    return {
+      appSurface: "",
+      domain: "",
+      role: ""
+    };
   }
 
   function getTaxonomySecondaryText(kind, item) {
@@ -438,6 +493,49 @@
         ${renderMultiSelect("appSurfaceDomainIds", "关联业务域", flow.domains || [], "domainId", "name", surface.domainIds || [])}
         ${renderMultiSelect("appSurfaceRoleIds", "关联角色", flow.roles || [], "roleId", "name", surface.roleIds || [])}
         <p class="form-error" id="appSurfaceFormError"></p>
+      </form>
+    `;
+  }
+
+  function renderDomainInspector(domain) {
+    return `
+      <form class="details-form" id="domainDetailsForm">
+        <header class="inspector-head">
+          <div>
+            <h2 id="domainPanelTitle">${escapeHtml(domain.name)}</h2>
+            <code>${escapeHtml(domain.domainId)}</code>
+          </div>
+          ${renderIconButton("closeInspector", "关闭详情", "x")}
+        </header>
+        <label>业务域名称
+          <input id="domainName" value="${escapeAttr(domain.name)}">
+        </label>
+        <label>业务域说明
+          <textarea id="domainDescription" rows="4">${escapeHtml(domain.description || "")}</textarea>
+        </label>
+        <p class="form-error" id="domainFormError"></p>
+      </form>
+    `;
+  }
+
+  function renderRoleInspector(flow, role) {
+    return `
+      <form class="details-form" id="roleDetailsForm">
+        <header class="inspector-head">
+          <div>
+            <h2 id="rolePanelTitle">${escapeHtml(role.name)}</h2>
+            <code>${escapeHtml(role.roleId)}</code>
+          </div>
+          ${renderIconButton("closeInspector", "关闭详情", "x")}
+        </header>
+        <label>角色名称
+          <input id="roleName" value="${escapeAttr(role.name)}">
+        </label>
+        <label>角色说明
+          <textarea id="roleDescription" rows="4">${escapeHtml(role.description || "")}</textarea>
+        </label>
+        ${renderMultiSelect("roleDomainIds", "关联业务域", flow.domains || [], "domainId", "name", role.domainIds || [])}
+        <p class="form-error" id="roleFormError"></p>
       </form>
     `;
   }
@@ -664,6 +762,7 @@
       closeInspectorButton.addEventListener("click", clearSelection);
     }
 
+    bindTaxonomyPanelToggles(document);
     bindTaxonomyControls(document);
 
     bindButton("generateFullPrd", { type: "generateFullPrd" });
@@ -711,6 +810,14 @@
     const appSurfaceForm = document.getElementById("appSurfaceDetailsForm");
     if (appSurfaceForm) {
       bindAppSurfaceInspector(appSurfaceForm);
+    }
+    const domainForm = document.getElementById("domainDetailsForm");
+    if (domainForm) {
+      bindDomainInspector(domainForm);
+    }
+    const roleForm = document.getElementById("roleDetailsForm");
+    if (roleForm) {
+      bindRoleInspector(roleForm);
     }
     const edgeForm = document.getElementById("edgeDetailsForm");
     if (edgeForm) {
@@ -784,6 +891,25 @@
     });
   }
 
+  function bindTaxonomyPanelToggles(root = document) {
+    root.querySelectorAll("[data-taxonomy-toggle]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const kind = button.dataset.taxonomyToggle;
+        if (!kind) {
+          return;
+        }
+        taxonomyPanelsOpen = {
+          ...taxonomyPanelsOpen,
+          [kind]: taxonomyPanelsOpen[kind] === false
+        };
+        persistUiState();
+        render();
+        requestAnimationFrame(() => focusCanvas());
+      });
+    });
+  }
+
   function bindTaxonomyControls(root = document) {
     root.querySelectorAll(".taxonomy-filter-checkbox").forEach((checkbox) => {
       checkbox.addEventListener("change", (event) => {
@@ -795,17 +921,25 @@
     });
 
     root.querySelectorAll(".managed-list-item").forEach((item) => {
-      item.addEventListener("click", () => selectTaxonomyItem(item.dataset.kind, item.dataset.taxonomyId));
+      item.addEventListener("pointerdown", (event) => event.stopPropagation());
+      item.addEventListener("click", (event) => {
+        event.stopPropagation();
+        selectTaxonomyItem(item.dataset.kind, item.dataset.taxonomyId);
+      });
       item.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
+          event.stopPropagation();
           selectTaxonomyItem(item.dataset.kind, item.dataset.taxonomyId);
         }
       });
     });
 
     root.querySelectorAll(".taxonomy-action").forEach((button) => {
-      button.addEventListener("click", () => manageTaxonomy(button.dataset.kind, button.dataset.action));
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        manageTaxonomy(button.dataset.kind, button.dataset.action);
+      });
     });
   }
 
@@ -839,6 +973,32 @@
     });
   }
 
+  function bindDomainInspector(domainForm) {
+    domainForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      commitDomainDetailsChange({ immediate: true });
+    });
+    domainForm.addEventListener("input", () => {
+      commitDomainDetailsChange();
+    });
+    domainForm.addEventListener("change", () => {
+      commitDomainDetailsChange({ immediate: true });
+    });
+  }
+
+  function bindRoleInspector(roleForm) {
+    roleForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      commitRoleDetailsChange({ immediate: true });
+    });
+    roleForm.addEventListener("input", () => {
+      commitRoleDetailsChange();
+    });
+    roleForm.addEventListener("change", () => {
+      commitRoleDetailsChange({ immediate: true });
+    });
+  }
+
   function setFilterSelection(kind, id, checked) {
     const list = getFilterSelection(kind);
     if (checked && !list.includes(id)) {
@@ -866,12 +1026,35 @@
     if (!kind || !id) {
       return;
     }
-    taxonomySelection = {
-      ...taxonomySelection,
-      [kind]: id
-    };
+    if (kind === "appSurface") {
+      selectAppSurface(id);
+      return;
+    }
+    selectedNodeId = "";
+    selectedEdgeId = "";
+    selectedAppSurfaceId = "";
+    if (kind === "domain") {
+      selectedDomainId = id;
+      selectedRoleId = "";
+      taxonomySelection = {
+        appSurface: "",
+        domain: id,
+        role: ""
+      };
+      vscode.postMessage({ type: "selectDomain", domainId: id });
+    } else {
+      selectedDomainId = "";
+      selectedRoleId = id;
+      taxonomySelection = {
+        appSurface: "",
+        domain: "",
+        role: id
+      };
+      vscode.postMessage({ type: "selectRole", roleId: id });
+    }
     persistUiState();
     render();
+    requestAnimationFrame(() => focusCanvas());
   }
 
   function bindEdgeInspector(edgeForm) {
@@ -1143,6 +1326,12 @@
     }
     if (kind === "appSurface" && selectedAppSurfaceId === id) {
       selectedAppSurfaceId = "";
+    }
+    if (kind === "domain" && selectedDomainId === id) {
+      selectedDomainId = "";
+    }
+    if (kind === "role" && selectedRoleId === id) {
+      selectedRoleId = "";
     }
     persistUiState();
   }
@@ -1483,6 +1672,7 @@
       canvas?.contains(element) &&
       !element.closest(".node-card") &&
       !element.closest(".app-surface-card") &&
+      !element.closest(".floating-left-actions, .floating-taxonomy-controls, .floating-taxonomy-panels") &&
       !element.closest("[data-edge-id]") &&
       !element.closest("button, input, textarea, select")
     );
@@ -1494,6 +1684,7 @@
       (event.button !== 0 && event.button !== 1) ||
       event.target.closest(".node-card") ||
       event.target.closest(".app-surface-card") ||
+      event.target.closest(".floating-left-actions, .floating-taxonomy-controls, .floating-taxonomy-panels") ||
       event.target.closest("button, input, textarea, select") ||
       event.target.closest("[data-edge-id]")
     ) {
@@ -1561,10 +1752,18 @@
       return;
     }
     selectedEdgeId = "";
+    selectedDomainId = "";
+    selectedRoleId = "";
     if (kind === "appSurface") {
       selectedNodeId = "";
+      taxonomySelection = {
+        appSurface: id,
+        domain: "",
+        role: ""
+      };
     } else {
       selectedAppSurfaceId = "";
+      taxonomySelection = clearAllTaxonomySelections();
     }
     dragState = {
       pointerId: event.pointerId,
@@ -1626,9 +1825,12 @@
       if (kind === "appSurface") {
         selectedAppSurfaceId = id;
         selectedNodeId = "";
+        selectedDomainId = "";
+        selectedRoleId = "";
         taxonomySelection = {
-          ...taxonomySelection,
-          appSurface: id
+          appSurface: id,
+          domain: "",
+          role: ""
         };
         persistUiState();
         vscode.postMessage({ type: "saveAppSurfacePosition", appId: id, x: pos.x, y: pos.y });
@@ -1636,6 +1838,9 @@
       } else {
         selectedNodeId = id;
         selectedAppSurfaceId = "";
+        selectedDomainId = "";
+        selectedRoleId = "";
+        taxonomySelection = clearAllTaxonomySelections();
         vscode.postMessage({ type: "saveNodePosition", nodeId: id, x: pos.x, y: pos.y });
         vscode.postMessage({ type: "selectNode", nodeId: id });
       }
@@ -1677,6 +1882,7 @@
     if (
       event.target.closest(".node-card") ||
       event.target.closest(".app-surface-card") ||
+      event.target.closest(".floating-left-actions, .floating-taxonomy-controls, .floating-taxonomy-panels") ||
       event.target.closest("[data-edge-id]") ||
       event.target.closest("button, input, textarea, select") ||
       connectionDrag
@@ -1690,6 +1896,9 @@
     selectedNodeId = "";
     selectedEdgeId = "";
     selectedAppSurfaceId = "";
+    selectedDomainId = "";
+    selectedRoleId = "";
+    taxonomySelection = clearAllTaxonomySelections();
     connectingFrom = null;
     vscode.postMessage({ type: "clearSelection" });
     render();
@@ -1706,6 +1915,8 @@
       const node = state.flow.nodes.find((item) => item.nodeId === selectedNodeId);
       if (node && node.status !== "removed") {
         event.preventDefault();
+        clearTimeout(nodeDetailsSaveTimer);
+        nodeDetailsSaveTimer = null;
         const nodeId = selectedNodeId;
         selectedNodeId = "";
         selectedEdgeId = "";
@@ -1715,9 +1926,55 @@
     }
     if (selectedEdgeId) {
       event.preventDefault();
+      clearTimeout(edgeDetailsSaveTimer);
+      edgeDetailsSaveTimer = null;
       const edgeId = selectedEdgeId;
       selectedEdgeId = "";
       vscode.postMessage({ type: "removeEdge", edgeId });
+      return;
+    }
+    if (selectedAppSurfaceId) {
+      event.preventDefault();
+      deleteSelectedTaxonomy("appSurface", selectedAppSurfaceId);
+      return;
+    }
+    if (selectedDomainId) {
+      event.preventDefault();
+      deleteSelectedTaxonomy("domain", selectedDomainId);
+      return;
+    }
+    if (selectedRoleId) {
+      event.preventDefault();
+      deleteSelectedTaxonomy("role", selectedRoleId);
+    }
+  }
+
+  function deleteSelectedTaxonomy(kind, id) {
+    if (!kind || !id) {
+      return;
+    }
+    cancelPendingTaxonomyDetailsSave(kind);
+    clearTaxonomySelection(kind, id);
+    selectedNodeId = "";
+    selectedEdgeId = "";
+    selectedAppSurfaceId = "";
+    selectedDomainId = "";
+    selectedRoleId = "";
+    connectingFrom = null;
+    vscode.postMessage({ type: "updateTaxonomy", request: { kind, action: "delete", id } });
+    render();
+  }
+
+  function cancelPendingTaxonomyDetailsSave(kind) {
+    if (kind === "appSurface") {
+      clearTimeout(appSurfaceDetailsSaveTimer);
+      appSurfaceDetailsSaveTimer = null;
+    } else if (kind === "domain") {
+      clearTimeout(domainDetailsSaveTimer);
+      domainDetailsSaveTimer = null;
+    } else if (kind === "role") {
+      clearTimeout(roleDetailsSaveTimer);
+      roleDetailsSaveTimer = null;
     }
   }
 
@@ -1809,6 +2066,122 @@
     });
   }
 
+  function commitDomainDetailsChange(options = {}) {
+    if (!selectedDomainId) {
+      return;
+    }
+    const domainId = selectedDomainId;
+    const item = collectDomainDetailsPatch();
+    applyDomainDetailsLocally(domainId, item);
+    refreshDomainViews();
+    if (options.immediate) {
+      postDomainDetails(domainId, item);
+      return;
+    }
+    clearTimeout(domainDetailsSaveTimer);
+    domainDetailsSaveTimer = setTimeout(() => postDomainDetails(domainId, item), 250);
+  }
+
+  function collectDomainDetailsPatch() {
+    return {
+      domainId: selectedDomainId,
+      name: document.getElementById("domainName").value,
+      description: document.getElementById("domainDescription").value
+    };
+  }
+
+  function postDomainDetails(domainId, item) {
+    clearTimeout(domainDetailsSaveTimer);
+    domainDetailsSaveTimer = null;
+    vscode.postMessage({
+      type: "updateTaxonomy",
+      request: {
+        kind: "domain",
+        action: "update",
+        id: domainId,
+        item
+      }
+    });
+  }
+
+  function applyDomainDetailsLocally(domainId, item) {
+    const domain = (state.flow.domains || []).find((candidate) => candidate.domainId === domainId);
+    if (!domain) {
+      return;
+    }
+    domain.name = item.name.trim() || domain.name;
+    domain.description = item.description.trim();
+  }
+
+  function refreshDomainViews() {
+    const title = document.getElementById("domainPanelTitle");
+    const domain = (state.flow.domains || []).find((candidate) => candidate.domainId === selectedDomainId);
+    if (title && domain) {
+      title.textContent = domain.name;
+    }
+    refreshTaxonomyPanels();
+    refreshCanvasAndNodeList();
+  }
+
+  function commitRoleDetailsChange(options = {}) {
+    if (!selectedRoleId) {
+      return;
+    }
+    const roleId = selectedRoleId;
+    const item = collectRoleDetailsPatch();
+    applyRoleDetailsLocally(roleId, item);
+    refreshRoleViews();
+    if (options.immediate) {
+      postRoleDetails(roleId, item);
+      return;
+    }
+    clearTimeout(roleDetailsSaveTimer);
+    roleDetailsSaveTimer = setTimeout(() => postRoleDetails(roleId, item), 250);
+  }
+
+  function collectRoleDetailsPatch() {
+    return {
+      roleId: selectedRoleId,
+      name: document.getElementById("roleName").value,
+      description: document.getElementById("roleDescription").value,
+      domainIds: collectMultiSelect("roleDomainIds")
+    };
+  }
+
+  function postRoleDetails(roleId, item) {
+    clearTimeout(roleDetailsSaveTimer);
+    roleDetailsSaveTimer = null;
+    vscode.postMessage({
+      type: "updateTaxonomy",
+      request: {
+        kind: "role",
+        action: "update",
+        id: roleId,
+        item
+      }
+    });
+  }
+
+  function applyRoleDetailsLocally(roleId, item) {
+    const role = (state.flow.roles || []).find((candidate) => candidate.roleId === roleId);
+    if (!role) {
+      return;
+    }
+    role.name = item.name.trim() || role.name;
+    role.description = item.description.trim();
+    role.domainIds = item.domainIds;
+  }
+
+  function refreshRoleViews() {
+    const title = document.getElementById("rolePanelTitle");
+    const role = (state.flow.roles || []).find((candidate) => candidate.roleId === selectedRoleId);
+    if (title && role) {
+      title.textContent = role.name;
+    }
+    refreshTaxonomyPanels();
+    refreshCanvasAndNodeList();
+  }
+
   function applyAppSurfaceDetailsLocally(appId, item) {
     const surface = (state.flow.appSurfaces || []).find((candidate) => candidate.appId === appId);
     if (!surface) {
@@ -1827,7 +2200,7 @@
     if (title && surface) {
       title.textContent = surface.name;
     }
-    refreshFiltersPanel();
+    refreshTaxonomyPanels();
     const world = document.getElementById("world");
     if (world) {
       seedAppSurfacePositions(state.flow);
@@ -1839,13 +2212,17 @@
     }
   }
 
-  function refreshFiltersPanel() {
-    const filters = document.querySelector(".filters");
-    if (!filters) {
+  function refreshTaxonomyPanels() {
+    const panels = document.querySelector(".floating-taxonomy-panels");
+    if (!panels) {
       return;
     }
-    filters.innerHTML = `<h3>应用端 / 业务域 / 角色</h3>${renderFilters(state.flow)}`;
-    bindTaxonomyControls(filters);
+    panels.innerHTML = `
+      ${taxonomyPanelsOpen.appSurface === false ? "" : renderManagedList("appSurface", "应用端", state.flow.appSurfaces || [], "appId", "name", "description", appFilters)}
+      ${taxonomyPanelsOpen.domain === false ? "" : renderManagedList("domain", "业务域", getAvailableDomains(state.flow), "domainId", "name", "description", domainFilters)}
+      ${taxonomyPanelsOpen.role === false ? "" : renderManagedList("role", "角色", getAvailableRoles(state.flow), "roleId", "name", "description", roleFilters)}
+    `;
+    bindTaxonomyControls(panels);
   }
 
   function submitEdgeDetails(options = {}) {
@@ -2041,6 +2418,9 @@
     selectedNodeId = nodeId;
     selectedEdgeId = "";
     selectedAppSurfaceId = "";
+    selectedDomainId = "";
+    selectedRoleId = "";
+    taxonomySelection = clearAllTaxonomySelections();
     vscode.postMessage({ type: "selectNode", nodeId });
     render();
     requestAnimationFrame(() => {
@@ -2055,6 +2435,9 @@
     selectedEdgeId = edgeId;
     selectedNodeId = "";
     selectedAppSurfaceId = "";
+    selectedDomainId = "";
+    selectedRoleId = "";
+    taxonomySelection = clearAllTaxonomySelections();
     vscode.postMessage({ type: "selectEdge", edgeId });
     render();
     requestAnimationFrame(() => focusCanvas());
@@ -2064,9 +2447,12 @@
     selectedAppSurfaceId = appId;
     selectedNodeId = "";
     selectedEdgeId = "";
+    selectedDomainId = "";
+    selectedRoleId = "";
     taxonomySelection = {
-      ...taxonomySelection,
-      appSurface: appId
+      appSurface: appId,
+      domain: "",
+      role: ""
     };
     persistUiState();
     vscode.postMessage({ type: "selectAppSurface", appId });
@@ -2492,6 +2878,12 @@
     if (selectedAppSurfaceId && !(flow.appSurfaces || []).some((surface) => surface.appId === selectedAppSurfaceId)) {
       selectedAppSurfaceId = "";
     }
+    if (selectedDomainId && !(flow.domains || []).some((domain) => domain.domainId === selectedDomainId)) {
+      selectedDomainId = "";
+    }
+    if (selectedRoleId && !(flow.roles || []).some((role) => role.roleId === selectedRoleId)) {
+      selectedRoleId = "";
+    }
   }
 
   function isNodeRelated(node) {
@@ -2652,6 +3044,14 @@
     };
   }
 
+  function readTaxonomyPanelsOpen(value) {
+    return {
+      appSurface: value?.appSurface !== false,
+      domain: value?.domain !== false,
+      role: value?.role !== false
+    };
+  }
+
   function makeClientId(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   }
@@ -2662,7 +3062,10 @@
       domainFilters,
       roleFilters,
       taxonomySelection,
+      taxonomyPanelsOpen,
       selectedAppSurfaceId,
+      selectedDomainId,
+      selectedRoleId,
       nodeSearch,
       leftPanelCollapsed,
       zoom,

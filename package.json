@@ -4,6 +4,10 @@
   "description": "Analyze product documents into editable product-flow JSON, generate PRDs and Pencil design specs, and keep artifacts synchronized.",
   "version": "0.1.0",
   "publisher": "mindflow",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WangTW98/MindFlow.git"
+  },
   "license": "UNLICENSED",
   "engines": {
     "vscode": "^1.92.0"

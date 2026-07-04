@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.0.0",
   "flowId": "flow_example-requirements-md_f04201",
-  "revision": 7,
+  "revision": 18,
   "title": "多应用端采购协同平台需求示例",
   "sourceDocumentId": "/Users/wang/Documents/MindFlow/samples/example-requirements.md",
   "sourceSummary": "基于示例需求生成的多应用端采购协同平台产品流程。",
   "createdAt": "2026-07-04T18:03:20.124Z",
-  "updatedAt": "2026-07-04T19:03:18.047Z",
+  "updatedAt": "2026-07-04T21:56:38.611Z",
   "domains": [
     {
       "domainId": "domain_plan",
@@ -117,7 +117,7 @@
   "appSurfaces": [
     {
       "appId": "app_admin",
-      "name": "管理后台",
+      "name": "管理后台1",
       "type": "admin",
       "description": "采购专员、采购经理、财务和系统管理员使用的运营后台。",
       "domainIds": [
@@ -131,7 +131,13 @@
         "role_purchase_manager",
         "role_finance",
         "role_system_admin"
-      ]
+      ],
+      "view": {
+        "position": {
+          "x": -484,
+          "y": -9
+        }
+      }
     },
     {
       "appId": "app_supplier_portal",
@@ -145,7 +151,13 @@
       "roleIds": [
         "role_supplier_sales",
         "role_supplier_admin"
-      ]
+      ],
+      "view": {
+        "position": {
+          "x": -412,
+          "y": 262
+        }
+      }
     },
     {
       "appId": "app_mobile_approval",
@@ -159,7 +171,13 @@
         "role_purchase_manager",
         "role_finance",
         "role_general_manager"
-      ]
+      ],
+      "view": {
+        "position": {
+          "x": -467,
+          "y": 481
+        }
+      }
     },
     {
       "appId": "app_public_site",
@@ -171,7 +189,13 @@
       ],
       "roleIds": [
         "role_guest_supplier"
-      ]
+      ],
+      "view": {
+        "position": {
+          "x": -437,
+          "y": 778
+        }
+      }
     }
   ],
   "nodes": [
@@ -179,11 +203,11 @@
       "nodeId": "page_page-2d4715_2d4715",
       "stableKey": "fc54e42883f4",
       "status": "active",
-      "version": 1,
+      "version": 2,
       "title": "采购工作台",
       "pageType": "workspace",
       "appSurfaceIds": [
-        "app_admin"
+        "app_supplier_portal"
       ],
       "domainIds": [
         "domain_plan",
@@ -226,21 +250,21 @@
       ],
       "elements": [
         {
-          "elementId": "el_element-bc9fc7_a9811e",
+          "elementId": "el_element-bc9fc7_30d382",
           "name": "需求池列表",
           "type": "table",
           "description": "展示待采购需求。",
           "required": true
         },
         {
-          "elementId": "el_element-4114e4_d00f0a",
+          "elementId": "el_element-4114e4_a83836",
           "name": "新建计划按钮",
           "type": "button",
           "description": "进入采购计划新建页。",
           "required": false
         },
         {
-          "elementId": "el_element-7bb9b1_650236",
+          "elementId": "el_element-7bb9b1_fe9f93",
           "name": "待处理任务",
           "type": "list",
           "description": "展示待发布询价和待发起审批事项。",
@@ -249,7 +273,7 @@
       ],
       "actions": [
         {
-          "actionId": "act_action-4114e4_d00f0a",
+          "actionId": "act_action-4114e4_a83836",
           "label": "新建计划按钮",
           "type": "user",
           "result": "进入采购计划新建页。"
@@ -291,7 +315,8 @@
           "x": 60,
           "y": 60
         }
-      }
+      },
+      "updatedByChangeSetId": "manual"
     },
     {
       "nodeId": "page_page-3f602d_3f602d",
@@ -692,7 +717,7 @@
       "nodeId": "page_page-14ec50_14ec50",
       "stableKey": "a83f6f734458",
       "status": "active",
-      "version": 1,
+      "version": 3,
       "title": "报价填写页",
       "pageType": "form",
       "appSurfaceIds": [
@@ -741,41 +766,63 @@
               "required": false
             }
           ]
+        },
+        {
+          "groupId": "group_mr6wba5s_lg1mg",
+          "name": "新功能分组",
+          "type": "section",
+          "description": "",
+          "items": [
+            {
+              "itemId": "item_mr6wbcdw_tw9ob",
+              "name": "新功能项",
+              "type": "text",
+              "description": "",
+              "required": false
+            }
+          ]
         }
       ],
       "elements": [
         {
-          "elementId": "el_element-ac89c1_d25f0e",
+          "elementId": "el_element-ac89c1_0ca436",
           "name": "报价金额",
           "type": "currency",
           "description": "填写报价金额。",
           "required": true
         },
         {
-          "elementId": "el_element-dc961a_c28bbd",
+          "elementId": "el_element-dc961a_b50336",
           "name": "交付周期",
           "type": "input",
           "description": "填写承诺交付周期。",
           "required": true
         },
         {
-          "elementId": "el_element-76a3cb_36830a",
+          "elementId": "el_element-76a3cb_b6ea70",
           "name": "资质文件",
           "type": "upload",
           "description": "上传资质材料。",
           "required": true
         },
         {
-          "elementId": "el_element-b92635_4f7aa7",
+          "elementId": "el_element-b92635_481029",
           "name": "提交报价按钮",
           "type": "button",
           "description": "提交报价到管理后台。",
+          "required": false
+        },
+        {
+          "elementId": "el_element-97fb34_5b7500",
+          "name": "新功能项",
+          "type": "text",
+          "description": "",
           "required": false
         }
       ],
       "actions": [
         {
-          "actionId": "act_action-b92635_4f7aa7",
+          "actionId": "act_action-b92635_481029",
           "label": "提交报价按钮",
           "type": "user",
           "result": "提交报价到管理后台。"
@@ -814,10 +861,11 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 1500,
-          "y": 60
+          "x": 1484,
+          "y": -256
         }
-      }
+      },
+      "updatedByChangeSetId": "manual"
     },
     {
       "nodeId": "page_page-5c8a02_5c8a02",
@@ -2382,18 +2430,19 @@
       },
       "action": "提交报价",
       "trigger": "提交报价",
-      "type": "submit",
+      "type": "interaction",
       "appSurfaceIds": [
+        "app_admin",
         "app_supplier_portal",
-        "app_admin"
+        "app_mobile_approval"
       ],
       "domainIds": [
-        "domain_supplier",
-        "domain_sourcing"
+        "domain_sourcing",
+        "domain_supplier"
       ],
       "roleIds": [
-        "role_supplier_sales",
-        "role_buyer"
+        "role_buyer",
+        "role_supplier_sales"
       ],
       "sourceRefs": [
         {
@@ -2402,7 +2451,8 @@
           "excerpt": "报价填写页 -> 报价对比页"
         }
       ],
-      "confidence": 0.76
+      "confidence": 0.76,
+      "updatedByChangeSetId": "manual"
     },
     {
       "edgeId": "edge_580df8e4da",
@@ -2950,6 +3000,122 @@
           "sourceId": "manual",
           "label": "MindFlow manual edge",
           "excerpt": "page_page-dd6d12_dd6d12 -> 采购公告列表"
+        }
+      ],
+      "confidence": 1,
+      "updatedByChangeSetId": "manual"
+    },
+    {
+      "edgeId": "edge_dba52d020b",
+      "status": "active",
+      "fromNodeId": "app_admin",
+      "toNodeId": "page_page-2d4715_2d4715",
+      "from": {
+        "kind": "appSurface",
+        "nodeId": "app_admin",
+        "appId": "app_admin"
+      },
+      "to": {
+        "kind": "node",
+        "nodeId": "page_page-2d4715_2d4715"
+      },
+      "action": "手动连接",
+      "trigger": "手动连接",
+      "type": "navigate",
+      "appSurfaceIds": [
+        "app_admin"
+      ],
+      "domainIds": [
+        "domain_plan",
+        "domain_sourcing",
+        "domain_contract_archive",
+        "domain_admin"
+      ],
+      "roleIds": [
+        "role_buyer",
+        "role_purchase_manager",
+        "role_finance",
+        "role_system_admin"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "管理后台 -> page_page-2d4715_2d4715"
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "edgeId": "edge_32a1e75519",
+      "status": "active",
+      "fromNodeId": "page_page-2d4715_2d4715",
+      "toNodeId": "page_page-b6d354_b6d354",
+      "from": {
+        "kind": "node",
+        "nodeId": "page_page-2d4715_2d4715"
+      },
+      "to": {
+        "kind": "node",
+        "nodeId": "page_page-b6d354_b6d354"
+      },
+      "action": "手动连接",
+      "trigger": "手动连接",
+      "type": "interaction",
+      "appSurfaceIds": [
+        "app_admin"
+      ],
+      "domainIds": [
+        "domain_plan",
+        "domain_sourcing"
+      ],
+      "roleIds": [
+        "role_buyer"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "page_page-2d4715_2d4715 -> page_page-b6d354_b6d354"
+        }
+      ],
+      "confidence": 1,
+      "updatedByChangeSetId": "manual"
+    },
+    {
+      "edgeId": "edge_4ed25a19cd",
+      "status": "active",
+      "fromNodeId": "page_page-3f602d_3f602d",
+      "toNodeId": "page_page-4975e3_4975e3",
+      "from": {
+        "kind": "node",
+        "nodeId": "page_page-3f602d_3f602d"
+      },
+      "to": {
+        "kind": "node",
+        "nodeId": "page_page-4975e3_4975e3"
+      },
+      "action": "手动连接",
+      "trigger": "手动连接",
+      "type": "interaction",
+      "appSurfaceIds": [
+        "app_admin",
+        "app_supplier_portal"
+      ],
+      "domainIds": [
+        "domain_plan",
+        "domain_supplier"
+      ],
+      "roleIds": [
+        "role_buyer",
+        "role_supplier_sales",
+        "role_supplier_admin"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "page_page-3f602d_3f602d -> page_page-4975e3_4975e3"
         }
       ],
       "confidence": 1,

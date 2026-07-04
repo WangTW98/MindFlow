@@ -3,7 +3,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { createAgentProvider, configureAgent } from "./agents/providerFactory";
 import type { FlowChangePlan } from "./models/flowChange";
-import type { AppSurface, BusinessDomain, EdgeType, FlowEndpoint, PageNode, ProductFlow, UserRole } from "./models/productFlow";
+import type { AppSurface, BusinessDomain, EdgeType, FlowEdge, FlowEndpoint, PageNode, ProductFlow, UserRole } from "./models/productFlow";
 import { validateProductFlow } from "./models/productFlow";
 import { applyFlowChangePlan } from "./changes/flowChangeApplier";
 import { proposeValidatedFlowChange } from "./changes/flowChangePlanner";
@@ -438,6 +438,8 @@ async function createNodeAt(
     FlowPanel.selectedNodeId = node.nodeId;
     FlowPanel.selectedEdgeId = undefined;
     FlowPanel.selectedAppSurfaceId = undefined;
+    FlowPanel.selectedDomainId = undefined;
+    FlowPanel.selectedRoleId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowPath, pendingChangePlan);
   } catch (error) {
     showError("Create node failed", error);
@@ -455,6 +457,8 @@ async function updateNodeDetails(context: vscode.ExtensionContext, nodeId?: stri
     FlowPanel.selectedNodeId = nodeId;
     FlowPanel.selectedEdgeId = undefined;
     FlowPanel.selectedAppSurfaceId = undefined;
+    FlowPanel.selectedDomainId = undefined;
+    FlowPanel.selectedRoleId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowPath, pendingChangePlan);
   } catch (error) {
     showError("Update node details failed", error);
@@ -478,6 +482,8 @@ async function createEdge(
     FlowPanel.selectedNodeId = undefined;
     FlowPanel.selectedEdgeId = edge.edgeId;
     FlowPanel.selectedAppSurfaceId = undefined;
+    FlowPanel.selectedDomainId = undefined;
+    FlowPanel.selectedRoleId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowPath, pendingChangePlan);
   } catch (error) {
     showError("Create edge failed", error);
@@ -538,6 +544,8 @@ async function createConnectedNodeAt(context: vscode.ExtensionContext, request?:
     FlowPanel.selectedNodeId = node.nodeId;
     FlowPanel.selectedEdgeId = undefined;
     FlowPanel.selectedAppSurfaceId = undefined;
+    FlowPanel.selectedDomainId = undefined;
+    FlowPanel.selectedRoleId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowPath, pendingChangePlan);
   } catch (error) {
     showError("Create connected node failed", error);
@@ -559,6 +567,8 @@ async function deleteNode(context: vscode.ExtensionContext, nodeId?: string): Pr
     FlowPanel.selectedNodeId = undefined;
     FlowPanel.selectedEdgeId = undefined;
     FlowPanel.selectedAppSurfaceId = undefined;
+    FlowPanel.selectedDomainId = undefined;
+    FlowPanel.selectedRoleId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowPath, pendingChangePlan);
   } catch (error) {
     showError("Delete node failed", error);
@@ -576,6 +586,8 @@ async function updateEdgeDetails(context: vscode.ExtensionContext, edgeId?: stri
     FlowPanel.selectedNodeId = undefined;
     FlowPanel.selectedEdgeId = edgeId;
     FlowPanel.selectedAppSurfaceId = undefined;
+    FlowPanel.selectedDomainId = undefined;
+    FlowPanel.selectedRoleId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowPath, pendingChangePlan);
   } catch (error) {
     showError("Update edge details failed", error);
@@ -605,6 +617,15 @@ async function updateTaxonomy(context: vscode.ExtensionContext, request?: Taxono
     const { flow, flowPath } = await loadCurrentFlow();
     applyTaxonomyRequest(flow, request);
     await applyFlowDocumentEdit(flowPath, flow);
+    if (request.action === "delete") {
+      if (request.kind === "appSurface") {
+        FlowPanel.selectedAppSurfaceId = undefined;
+      } else if (request.kind === "domain") {
+        FlowPanel.selectedDomainId = undefined;
+      } else if (request.kind === "role") {
+        FlowPanel.selectedRoleId = undefined;
+      }
+    }
     FlowPanel.createOrShow(context.extensionUri, flow, flowPath, pendingChangePlan);
   } catch (error) {
     showError("Update MindFlow metadata failed", error);
@@ -799,20 +820,26 @@ function applyAppSurfaceRequest(flow: ProductFlow, request: TaxonomyRequest): vo
       node.appSurfaceIds = (node.appSurfaceIds ?? []).filter((id) => id !== appId);
     }
     for (const edge of flow.edges) {
+      if (edge.status === "active" && edgeReferencesAppSurface(edge, appId)) {
+        markTaxonomyEdgeRemoved(edge);
+      }
       edge.appSurfaceIds = (edge.appSurfaceIds ?? []).filter((id) => id !== appId);
     }
     return;
   }
   const item = request.item ?? {};
-  const name = readString(item.name, "新应用端");
-  const appId = request.id ?? readString(item.appId, makeTaxonomyId("app", name));
+  const requestedAppId = request.id ?? readOptionalString(item.appId);
+  const existing = requestedAppId ? flow.appSurfaces.find((item) => item.appId === requestedAppId) : undefined;
+  const name = readString(item.name, existing?.name ?? "新应用端");
+  const appId = requestedAppId ?? makeTaxonomyId("app", name);
   const next: AppSurface = {
     appId,
     name,
     type: normalizeSurfaceType(readString(item.type, "other")),
     description: readString(item.description, ""),
     domainIds: readStringArray(item.domainIds),
-    roleIds: readStringArray(item.roleIds)
+    roleIds: readStringArray(item.roleIds),
+    view: existing?.view
   };
   upsertById(flow.appSurfaces, (item) => item.appId, next);
 }
@@ -836,8 +863,10 @@ function applyDomainRequest(flow: ProductFlow, request: TaxonomyRequest): void {
     return;
   }
   const item = request.item ?? {};
-  const name = readString(item.name, "新业务域");
-  const domainId = request.id ?? readString(item.domainId, makeTaxonomyId("domain", name));
+  const requestedDomainId = request.id ?? readOptionalString(item.domainId);
+  const existing = requestedDomainId ? flow.domains.find((item) => item.domainId === requestedDomainId) : undefined;
+  const name = readString(item.name, existing?.name ?? "新业务域");
+  const domainId = requestedDomainId ?? makeTaxonomyId("domain", name);
   const next: BusinessDomain = {
     domainId,
     name,
@@ -863,8 +892,10 @@ function applyRoleRequest(flow: ProductFlow, request: TaxonomyRequest): void {
     return;
   }
   const item = request.item ?? {};
-  const name = readString(item.name, "新角色");
-  const roleId = request.id ?? readString(item.roleId, makeTaxonomyId("role", name));
+  const requestedRoleId = request.id ?? readOptionalString(item.roleId);
+  const existing = requestedRoleId ? flow.roles.find((item) => item.roleId === requestedRoleId) : undefined;
+  const name = readString(item.name, existing?.name ?? "新角色");
+  const roleId = requestedRoleId ?? makeTaxonomyId("role", name);
   const next: UserRole = {
     roleId,
     name,
@@ -872,6 +903,26 @@ function applyRoleRequest(flow: ProductFlow, request: TaxonomyRequest): void {
     domainIds: readStringArray(item.domainIds)
   };
   upsertById(flow.roles, (item) => item.roleId, next);
+}
+
+function edgeReferencesAppSurface(edge: FlowEdge, appId: string): boolean {
+  const from = edge.from;
+  const to = edge.to;
+  return endpointReferencesAppSurface(from, appId) ||
+    endpointReferencesAppSurface(to, appId) ||
+    (!from && edge.fromNodeId === appId) ||
+    (!to && edge.toNodeId === appId);
+}
+
+function endpointReferencesAppSurface(endpoint: FlowEndpoint | undefined, appId: string): boolean {
+  return Boolean(endpoint && endpoint.kind === "appSurface" && (endpoint.appId ?? endpoint.nodeId) === appId);
+}
+
+function markTaxonomyEdgeRemoved(edge: FlowEdge): void {
+  edge.status = "removed";
+  edge.removedAt = nowIso();
+  edge.removedByChangeSetId = "manual";
+  edge.updatedByChangeSetId = "manual";
 }
 
 function upsertById<T>(items: T[], getId: (item: T) => string, next: T): void {
@@ -897,6 +948,10 @@ function makeTaxonomyId(prefix: string, name: string): string {
 
 function readString(value: unknown, fallback: string): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function readStringArray(value: unknown): string[] {
