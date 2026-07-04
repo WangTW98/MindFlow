@@ -65,7 +65,8 @@
       "mindflow": [
         {
           "id": "mindflow.sidebar",
-          "name": "MindFlow"
+          "name": "MindFlow",
+          "type": "webview"
         }
       ]
     },
@@ -78,7 +79,11 @@
         ],
         "extensions": [
           ".mindflow"
-        ]
+        ],
+        "icon": {
+          "light": "src/webview/media/icon.svg",
+          "dark": "src/webview/media/icon.svg"
+        }
       }
     ],
     "customEditors": [

@@ -23,6 +23,7 @@ import {
 } from "./core/flowEditing";
 import { ArtifactRepository } from "./storage/artifactRepository";
 import { FlowRepository, writeJsonAtomic } from "./storage/flowRepository";
+import { RecentFlowStore } from "./storage/recentFlows";
 import { applySyncReport, buildSyncReport, collectArtifactSnapshots } from "./sync/syncArtifacts";
 import { nowIso, shortHash, slugify } from "./utils/id";
 import { FlowPanel } from "./webview/FlowPanel";
@@ -32,15 +33,16 @@ let currentFlowPath: string | undefined;
 let pendingChangePlan: FlowChangePlan | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
+  const sidebarView = new SidebarView(context, getWorkspaceRoot);
   context.subscriptions.push(
     FlowPanel.register(context, (flowPath) => {
-      currentFlowPath = flowPath;
+      void rememberRecentFlow(context, sidebarView, flowPath);
     }),
-    vscode.window.registerWebviewViewProvider(SidebarView.viewId, new SidebarView(context.extensionUri, getWorkspaceRoot))
+    vscode.window.registerWebviewViewProvider(SidebarView.viewId, sidebarView)
   );
   context.subscriptions.push(
-    vscode.commands.registerCommand("mindflow.analyzeDocument", () => analyzeDocument(context)),
-    vscode.commands.registerCommand("mindflow.openFlow", (flowPath?: string) => openFlow(context, flowPath)),
+    vscode.commands.registerCommand("mindflow.analyzeDocument", () => analyzeDocument(context, sidebarView)),
+    vscode.commands.registerCommand("mindflow.openFlow", (flowPath?: string) => openFlow(context, sidebarView, flowPath)),
     vscode.commands.registerCommand("mindflow.modifyFlowByInstruction", (instruction?: string, nodeId?: string) =>
       modifyFlowByInstruction(context, instruction, nodeId)
     ),
@@ -90,7 +92,7 @@ export function deactivate(): void {
   // No background resources are held.
 }
 
-async function analyzeDocument(context: vscode.ExtensionContext): Promise<void> {
+async function analyzeDocument(context: vscode.ExtensionContext, sidebarView?: SidebarView): Promise<void> {
   try {
     const input = await readDocumentInput();
     if (!input) {
@@ -103,7 +105,7 @@ async function analyzeDocument(context: vscode.ExtensionContext): Promise<void> 
     );
     const repository = createFlowRepository();
     const flowPath = await repository.save(flow);
-    currentFlowPath = flowPath;
+    await rememberRecentFlow(context, sidebarView, flowPath);
     pendingChangePlan = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowPath);
     vscode.window.showInformationMessage(`MindFlow saved file: ${repository.relativePath(flowPath)}`);
@@ -112,16 +114,15 @@ async function analyzeDocument(context: vscode.ExtensionContext): Promise<void> 
   }
 }
 
-async function openFlow(context: vscode.ExtensionContext, flowPath?: string): Promise<void> {
+async function openFlow(context: vscode.ExtensionContext, sidebarView: SidebarView | undefined, flowPath?: string): Promise<void> {
   try {
     const repository = createFlowRepository();
-    const resolvedPath = flowPath ?? currentFlowPath ?? (await chooseOrLatestFlow(repository));
+    const resolvedPath = flowPath ?? (await pickMindFlowFile(repository));
     if (!resolvedPath) {
-      vscode.window.showWarningMessage("No MindFlow file exists. Run MindFlow: Analyze Document first.");
       return;
     }
     const flow = await repository.load(resolvedPath);
-    currentFlowPath = resolvedPath;
+    await rememberRecentFlow(context, sidebarView, resolvedPath);
     FlowPanel.createOrShow(context.extensionUri, flow, resolvedPath, pendingChangePlan);
   } catch (error) {
     showError("Open flow failed", error);
@@ -734,6 +735,31 @@ async function chooseOrLatestFlow(repository: FlowRepository): Promise<string | 
     { title: "Select MindFlow file" }
   );
   return selected?.file ?? latest;
+}
+
+async function pickMindFlowFile(repository: FlowRepository): Promise<string | undefined> {
+  const picked = await vscode.window.showOpenDialog({
+    title: "Open MindFlow",
+    canSelectFiles: true,
+    canSelectFolders: false,
+    canSelectMany: false,
+    defaultUri: vscode.Uri.file(repository.directoryPath),
+    filters: {
+      "MindFlow": ["mindflow"],
+      "All Files": ["*"]
+    }
+  });
+  return picked?.[0]?.fsPath;
+}
+
+async function rememberRecentFlow(
+  context: vscode.ExtensionContext,
+  sidebarView: SidebarView | undefined,
+  flowPath: string
+): Promise<void> {
+  currentFlowPath = flowPath;
+  await new RecentFlowStore(context.workspaceState).add(flowPath);
+  void sidebarView?.refresh();
 }
 
 function createFlowRepository(): FlowRepository {

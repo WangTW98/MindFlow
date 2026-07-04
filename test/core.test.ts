@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
+import type * as vscode from "vscode";
 import { MockProvider } from "../src/agents/MockProvider";
 import { applyFlowChangePlan } from "../src/changes/flowChangeApplier";
 import { revertLastChangeSet } from "../src/changes/revertChangeSet";
@@ -17,6 +18,7 @@ import {
 } from "../src/core/flowEditing";
 import { validateProductFlow } from "../src/models/productFlow";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
+import { RecentFlowStore } from "../src/storage/recentFlows";
 import { buildSyncReport } from "../src/sync/syncArtifacts";
 import { nowIso } from "../src/utils/id";
 
@@ -446,22 +448,59 @@ test("FlowRepository saves and lists only .mindflow ProductFlow files", async ()
   }
 });
 
+test("RecentFlowStore clears and removes recent MindFlow records", async () => {
+  const state = new FakeMemento();
+  const store = new RecentFlowStore(state as unknown as vscode.Memento);
+  const first = path.join(os.tmpdir(), "first.mindflow");
+  const second = path.join(os.tmpdir(), "second.mindflow");
+
+  await store.add(first, 100);
+  await store.add(second, 200);
+  await store.add(first, 300);
+
+  assert.deepEqual(store.get()?.map((record) => record.absolutePath), [path.normalize(first), path.normalize(second)]);
+
+  await store.remove(first);
+  assert.deepEqual(store.get()?.map((record) => record.absolutePath), [path.normalize(second)]);
+
+  await store.clear();
+  assert.deepEqual(store.get(), []);
+});
+
 test("Extension manifest contributes MindFlow activity view and .mindflow custom editor only", async () => {
   const raw = await fs.readFile(path.join(process.cwd(), "package.json"), "utf8");
   const manifest = JSON.parse(raw) as {
     activationEvents?: string[];
     contributes?: {
       viewsContainers?: { activitybar?: Array<{ id?: string; icon?: string }> };
-      views?: Record<string, Array<{ id?: string }>>;
+      views?: Record<string, Array<{ id?: string; type?: string }>>;
+      languages?: Array<{ id?: string; extensions?: string[]; icon?: { light?: string; dark?: string } }>;
       customEditors?: Array<{ viewType?: string; selector?: Array<{ filenamePattern?: string }> }>;
     };
   };
 
   assert.ok(manifest.contributes?.viewsContainers?.activitybar?.some((item) => item.id === "mindflow" && item.icon === "src/webview/media/icon.svg"));
-  assert.ok(manifest.contributes?.views?.mindflow?.some((item) => item.id === "mindflow.sidebar"));
+  const sidebarView = manifest.contributes?.views?.mindflow?.find((item) => item.id === "mindflow.sidebar");
+  assert.equal(sidebarView?.type, "webview");
+  const language = manifest.contributes?.languages?.find((item) => item.id === "mindflow");
+  assert.ok(language?.extensions?.includes(".mindflow"));
+  assert.equal(language?.icon?.light, "src/webview/media/icon.svg");
+  assert.equal(language?.icon?.dark, "src/webview/media/icon.svg");
   const editor = manifest.contributes?.customEditors?.find((item) => item.viewType === "mindflow.productFlow");
   assert.ok(editor);
   assert.ok(editor.selector?.some((item) => item.filenamePattern === "*.mindflow"));
   assert.equal(editor.selector?.some((item) => String(item.filenamePattern || "").endsWith(".json")), false);
   assert.ok(manifest.activationEvents?.includes("onCommand:mindflow.updateAppSurfacePosition"));
 });
+
+class FakeMemento {
+  private readonly values = new Map<string, unknown>();
+
+  public get<T>(key: string, defaultValue?: T): T | undefined {
+    return this.values.has(key) ? this.values.get(key) as T : defaultValue;
+  }
+
+  public async update(key: string, value: unknown): Promise<void> {
+    this.values.set(key, value);
+  }
+}

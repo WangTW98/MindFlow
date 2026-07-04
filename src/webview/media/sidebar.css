@@ -40,12 +40,20 @@ section,
   gap: 8px;
 }
 
-header,
-.hero {
+header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.title {
+  padding-top: 2px;
+}
+
+.action-list {
+  display: grid;
+  gap: 6px;
 }
 
 button {
@@ -56,6 +64,17 @@ button {
   padding: 6px 8px;
   font: inherit;
   cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.action-item {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--fg);
 }
 
 .icon-button,
@@ -70,6 +89,34 @@ button {
   gap: 2px;
   width: 100%;
   text-align: left;
+}
+
+.recent-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.recent-open {
+  min-width: 0;
+}
+
+.remove-recent {
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  padding: 0;
+}
+
+.lucide {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .list-item span,

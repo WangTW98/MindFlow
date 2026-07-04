@@ -5,9 +5,16 @@ declare module "vscode" {
     dispose(): unknown;
   }
 
+  export interface Memento {
+    get<T>(key: string): T | undefined;
+    get<T>(key: string, defaultValue: T): T;
+    update(key: string, value: unknown): Thenable<void>;
+  }
+
   export interface ExtensionContext {
     subscriptions: { push(...items: Disposable[]): void };
     extensionUri: Uri;
+    workspaceState: Memento;
     secrets: {
       get(key: string): Thenable<string | undefined>;
       store(key: string, value: string): Thenable<void>;
@@ -77,6 +84,7 @@ declare module "vscode" {
     canSelectFiles?: boolean;
     canSelectFolders?: boolean;
     canSelectMany?: boolean;
+    defaultUri?: Uri;
     filters?: Record<string, string[]>;
   }
 

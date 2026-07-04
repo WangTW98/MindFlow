@@ -55,6 +55,7 @@ declare module "node:path" {
   export function dirname(path: string): string;
   export function extname(path: string): string;
   export function isAbsolute(path: string): boolean;
+  export function normalize(path: string): string;
 }
 
 declare module "node:os" {
@@ -85,6 +86,7 @@ declare module "node:https" {
 
 declare module "node:child_process" {
   export interface ChildProcess {
+    kill?: () => void;
     stdin?: {
       write(data: string): void;
       end(): void;
@@ -109,6 +111,7 @@ declare module "node:child_process" {
 declare module "node:assert" {
   export const strict: {
     equal(actual: unknown, expected: unknown, message?: string): void;
+    deepEqual(actual: unknown, expected: unknown, message?: string): void;
     ok(value: unknown, message?: string): asserts value;
   };
 }
