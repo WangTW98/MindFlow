@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindflow.local/schema/productFlow.schema.json",
+  "title": "ProductFlow",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "flowId",
+    "revision",
+    "title",
+    "sourceDocumentId",
+    "sourceSummary",
+    "createdAt",
+    "updatedAt",
+    "domains",
+    "roles",
+    "nodes",
+    "edges",
+    "artifacts",
+    "changeHistory",
+    "syncState"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string" },
+    "flowId": { "type": "string" },
+    "revision": { "type": "number" },
+    "title": { "type": "string" },
+    "sourceDocumentId": { "type": "string" },
+    "sourceSummary": { "type": "string" },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" },
+    "domains": { "type": "array" },
+    "roles": { "type": "array" },
+    "appSurfaces": { "type": "array" },
+    "nodes": { "type": "array" },
+    "edges": { "type": "array" },
+    "artifacts": {
+      "type": "object",
+      "required": ["prds", "pencils"],
+      "properties": {
+        "prds": { "type": "array" },
+        "pencils": { "type": "array" }
+      }
+    },
+    "changeHistory": { "type": "array" },
+    "syncState": {
+      "type": "object",
+      "required": ["issues"],
+      "properties": {
+        "lastSyncedAt": { "type": "string" },
+        "issues": { "type": "array" }
+      }
+    },
+    "openQuestions": { "type": "array" }
+  }
+}

@@ -1,0 +1,15 @@
+.git/**
+.vscode/**
+.npm-cache/**
+node_modules/**
+test/**
+scripts/**
+samples/**
+docs/**
+designs/**
+.mindflow/**
+src/**/*.ts
+!src/webview/media/**
+out/**/*.map
+plan.md
+*.vsix

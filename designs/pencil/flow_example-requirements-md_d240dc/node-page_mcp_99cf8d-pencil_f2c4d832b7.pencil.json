@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "pencilId": "pencil_f2c4d832b7",
+    "flowId": "flow_example-requirements-md_d240dc",
+    "scope": "node",
+    "nodeId": "page_mcp_99cf8d",
+    "linkedPrdIds": [
+      "prd_c595bfc3e8"
+    ],
+    "linkedJsonPath": ".mindflow/flows/flow-ddd5ba-flow_example-requirements-md_d240dc.mindflow",
+    "generatedBy": "mcp",
+    "createdAt": "2026-07-04T19:02:13.628Z",
+    "updatedAt": "2026-07-04T19:02:13.629Z"
+  },
+  "spec": {
+    "page": "MCP 验证页",
+    "nodeId": "page_mcp_99cf8d",
+    "layout": "single-column",
+    "components": [
+      "验证按钮"
+    ]
+  }
+}

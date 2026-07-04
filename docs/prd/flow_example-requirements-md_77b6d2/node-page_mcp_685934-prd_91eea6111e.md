@@ -1,0 +1,15 @@
+---
+prdId: "prd_91eea6111e"
+flowId: "flow_example-requirements-md_77b6d2"
+scope: "node"
+nodeId: "page_mcp_685934"
+linkedPencilIds: []
+linkedJsonPath: ".mindflow/flows/flow-ddd5ba-flow_example-requirements-md_77b6d2.mindflow"
+generatedBy: "mcp"
+createdAt: "2026-07-04T19:25:30.058Z"
+updatedAt: "2026-07-04T19:25:30.058Z"
+---
+
+# MCP 验证页 PRD
+
+用于验证 MindFlow MCP 写入节点级 PRD。

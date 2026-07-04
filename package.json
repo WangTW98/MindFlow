@@ -1,0 +1,220 @@
+{
+  "name": "mindflow-product-flow-agent",
+  "displayName": "MindFlow Product Flow Agent",
+  "description": "Analyze product documents into editable product-flow JSON, generate PRDs and Pencil design specs, and keep artifacts synchronized.",
+  "version": "0.1.0",
+  "publisher": "mindflow",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.92.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "bin": {
+    "mindflow": "./out/src/mcp/server.js",
+    "mindflow-mcp": "./out/src/mcp/server.js"
+  },
+  "activationEvents": [
+    "onView:mindflow.sidebar",
+    "onCommand:mindflow.analyzeDocument",
+    "onCommand:mindflow.openFlow",
+    "onCustomEditor:mindflow.productFlow",
+    "onLanguage:mindflow",
+    "onCommand:mindflow.modifyFlowByInstruction",
+    "onCommand:mindflow.previewChangeSet",
+    "onCommand:mindflow.applyChangeSet",
+    "onCommand:mindflow.revertLastChangeSet",
+    "onCommand:mindflow.validateFlowJson",
+    "onCommand:mindflow.generateNodePrd",
+    "onCommand:mindflow.generateFullPrd",
+    "onCommand:mindflow.refreshStalePrd",
+    "onCommand:mindflow.generateNodePencil",
+    "onCommand:mindflow.generateFullPencil",
+    "onCommand:mindflow.refreshStalePencil",
+    "onCommand:mindflow.syncArtifacts",
+    "onCommand:mindflow.openArtifact",
+    "onCommand:mindflow.updateNodePosition",
+    "onCommand:mindflow.updateAppSurfacePosition",
+    "onCommand:mindflow.createNodeAt",
+    "onCommand:mindflow.updateNodeDetails",
+    "onCommand:mindflow.createEdge",
+    "onCommand:mindflow.createConnectedNodeAt",
+    "onCommand:mindflow.removeNode",
+    "onCommand:mindflow.updateEdgeDetails",
+    "onCommand:mindflow.removeEdge",
+    "onCommand:mindflow.updateTaxonomy",
+    "onCommand:mindflow.configureAgent"
+  ],
+  "main": "./out/src/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mindflow",
+          "title": "MindFlow",
+          "icon": "src/webview/media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "mindflow": [
+        {
+          "id": "mindflow.sidebar",
+          "name": "MindFlow"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "mindflow",
+        "aliases": [
+          "MindFlow",
+          "mindflow"
+        ],
+        "extensions": [
+          ".mindflow"
+        ]
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "mindflow.productFlow",
+        "displayName": "MindFlow Product Flow",
+        "selector": [
+          {
+            "filenamePattern": "*.mindflow"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": [
+          "*.mindflow"
+        ],
+        "url": "./src/schema/productFlow.schema.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "mindflow.analyzeDocument",
+        "title": "MindFlow: Analyze Document"
+      },
+      {
+        "command": "mindflow.openFlow",
+        "title": "MindFlow: Open Product Flow"
+      },
+      {
+        "command": "mindflow.modifyFlowByInstruction",
+        "title": "MindFlow: Modify Product Flow by Instruction"
+      },
+      {
+        "command": "mindflow.previewChangeSet",
+        "title": "MindFlow: Preview ChangeSet"
+      },
+      {
+        "command": "mindflow.applyChangeSet",
+        "title": "MindFlow: Apply ChangeSet"
+      },
+      {
+        "command": "mindflow.revertLastChangeSet",
+        "title": "MindFlow: Revert Last ChangeSet"
+      },
+      {
+        "command": "mindflow.validateFlowJson",
+        "title": "MindFlow: Validate Flow JSON"
+      },
+      {
+        "command": "mindflow.generateNodePrd",
+        "title": "MindFlow: Generate Node PRD"
+      },
+      {
+        "command": "mindflow.generateFullPrd",
+        "title": "MindFlow: Generate Full PRD"
+      },
+      {
+        "command": "mindflow.refreshStalePrd",
+        "title": "MindFlow: Refresh Stale PRD"
+      },
+      {
+        "command": "mindflow.generateNodePencil",
+        "title": "MindFlow: Generate Node Pencil Design"
+      },
+      {
+        "command": "mindflow.generateFullPencil",
+        "title": "MindFlow: Generate Full Pencil Design"
+      },
+      {
+        "command": "mindflow.refreshStalePencil",
+        "title": "MindFlow: Refresh Stale Pencil Design"
+      },
+      {
+        "command": "mindflow.syncArtifacts",
+        "title": "MindFlow: Sync PRD/Pencil/JSON Artifacts"
+      },
+      {
+        "command": "mindflow.openArtifact",
+        "title": "MindFlow: Open Linked Artifact"
+      },
+      {
+        "command": "mindflow.configureAgent",
+        "title": "MindFlow: Configure AI Agent"
+      }
+    ],
+    "configuration": {
+      "title": "MindFlow",
+      "properties": {
+        "mindflow.agent.provider": {
+          "type": "string",
+          "default": "mock",
+          "enum": [
+            "mock",
+            "codex",
+            "gemini"
+          ],
+          "description": "AI Agent provider used for document analysis, flow changes, PRD generation, and Pencil design specs."
+        },
+        "mindflow.agent.model": {
+          "type": "string",
+          "default": "",
+          "description": "Provider-specific model name."
+        },
+        "mindflow.agent.endpoint": {
+          "type": "string",
+          "default": "",
+          "description": "Provider-specific HTTP endpoint. Leave empty to use MockProvider or provider defaults."
+        },
+        "mindflow.agent.codexCliPath": {
+          "type": "string",
+          "default": "codex",
+          "description": "Path to Codex CLI used when provider is codex and no HTTP endpoint is configured."
+        },
+        "mindflow.storage.flowDirectory": {
+          "type": "string",
+          "default": ".mindflow/flows",
+          "description": "Workspace-relative directory where MindFlow ProductFlow files are stored."
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "mindflow.analyzeDocument",
+          "when": "editorTextFocus",
+          "group": "mindflow@1"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "node scripts/run-tests.mjs"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.9.2",
+    "typescript": "5.5.4"
+  }
+}
