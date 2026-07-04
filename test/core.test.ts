@@ -8,6 +8,8 @@ import { MockProvider } from "../src/agents/MockProvider";
 import { applyFlowChangePlan } from "../src/changes/flowChangeApplier";
 import { revertLastChangeSet } from "../src/changes/revertChangeSet";
 import { createEmptyProductFlow } from "../src/core/emptyFlow";
+import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/core/taxonomyEditing";
+import { MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions } from "../src/core/untitledMindFlowDocument";
 import {
   createManualEdge,
   createManualNode,
@@ -47,6 +49,16 @@ test("Empty ProductFlow starts as a valid blank canvas", () => {
   assert.equal(flow.domains.length, 0);
   assert.equal(flow.roles.length, 0);
   assert.equal(flow.appSurfaces?.length, 0);
+});
+
+test("Blank MindFlow opens as an untitled document without a target file path", () => {
+  const flow = createEmptyProductFlow();
+  const options = createUntitledMindFlowDocumentOptions(flow);
+  const validation = validateProductFlow(JSON.parse(options.content) as unknown);
+
+  assert.equal(options.language, MINDFLOW_LANGUAGE_ID);
+  assert.equal("uri" in options, false);
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
 
 test("FlowChangePlan inserts a business node between two existing nodes", async () => {
@@ -263,6 +275,79 @@ test("Manual app surface card can be positioned and connected as a normal edge e
   assert.equal(edge.from?.appId, surface.appId);
   assert.ok(edge.appSurfaceIds?.includes(surface.appId));
   assert.equal(validateProductFlow(flow).valid, true);
+});
+
+test("Deleting an app surface removes connected edge endpoints and keeps the flow valid", async () => {
+  const provider = new MockProvider();
+  const flow = await provider.analyzeDocument({
+    documentName: "example.md",
+    documentText: "采购流程",
+    sourceDocumentId: "example.md"
+  });
+  const surface = flow.appSurfaces?.find((item) => item.appId === "app_supplier_portal") ?? flow.appSurfaces?.[0];
+  const [fromNode, toNode] = flow.nodes.filter((node) => node.status === "active");
+  assert.ok(surface);
+  assert.ok(fromNode);
+  assert.ok(toNode);
+
+  const connectedEdge = createManualEdge(flow, {
+    from: { kind: "appSurface", nodeId: surface.appId, appId: surface.appId },
+    to: { kind: "node", nodeId: toNode.nodeId },
+    trigger: "从被删除应用端进入页面",
+    type: "navigate"
+  });
+  const metadataOnlyEdge = createManualEdge(flow, {
+    from: { kind: "node", nodeId: fromNode.nodeId },
+    to: { kind: "node", nodeId: toNode.nodeId },
+    trigger: "普通节点连线",
+    type: "navigate"
+  });
+  metadataOnlyEdge.appSurfaceIds = [surface.appId];
+  fromNode.appSurfaceIds = [...(fromNode.appSurfaceIds ?? []), surface.appId];
+
+  const result = deleteAppSurface(flow, surface.appId);
+  const validation = validateProductFlow(flow);
+
+  assert.ok(result.removedEdgeIds.includes(connectedEdge.edgeId));
+  assert.equal(flow.appSurfaces?.some((item) => item.appId === surface.appId), false);
+  assert.equal(flow.nodes.some((node) => node.appSurfaceIds?.includes(surface.appId)), false);
+  assert.equal(flow.edges.some((edge) => edge.edgeId === connectedEdge.edgeId), false);
+  assert.ok(flow.edges.some((edge) => edge.edgeId === metadataOnlyEdge.edgeId));
+  assert.equal(flow.edges.some((edge) => edge.appSurfaceIds?.includes(surface.appId)), false);
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+});
+
+test("Pruning app surface references removes stale connected card edges before validation", async () => {
+  const provider = new MockProvider();
+  const flow = await provider.analyzeDocument({
+    documentName: "example.md",
+    documentText: "采购流程",
+    sourceDocumentId: "example.md"
+  });
+  const surface = flow.appSurfaces?.find((item) => item.appId === "app_admin") ?? flow.appSurfaces?.[0];
+  const target = flow.nodes.find((node) => node.status === "active");
+  assert.ok(surface);
+  assert.ok(target);
+
+  const connectedEdge = createManualEdge(flow, {
+    from: { kind: "appSurface", nodeId: surface.appId, appId: surface.appId },
+    to: { kind: "node", nodeId: target.nodeId },
+    trigger: "从管理后台进入页面",
+    type: "navigate"
+  });
+  flow.appSurfaces = (flow.appSurfaces ?? []).filter((item) => item.appId !== surface.appId);
+
+  const invalid = validateProductFlow(flow);
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.some((error) => error.includes(`${connectedEdge.edgeId}`) || error.includes(surface.appId)));
+
+  const result = pruneMissingAppSurfaceReferences(flow);
+  const validation = validateProductFlow(flow);
+
+  assert.ok(result.removedEdgeIds.includes(connectedEdge.edgeId));
+  assert.equal(flow.edges.some((edge) => edge.edgeId === connectedEdge.edgeId), false);
+  assert.equal(flow.edges.some((edge) => edge.from?.appId === surface.appId), false);
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
 
 test("Manual edge details update endpoints and new edge category types", async () => {

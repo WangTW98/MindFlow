@@ -22,6 +22,8 @@ import {
   type UpdateNodeDetailsInput
 } from "./core/flowEditing";
 import { createEmptyProductFlow } from "./core/emptyFlow";
+import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "./core/taxonomyEditing";
+import { createUntitledMindFlowDocumentOptions } from "./core/untitledMindFlowDocument";
 import { ArtifactRepository } from "./storage/artifactRepository";
 import { FlowRepository, writeJsonAtomic } from "./storage/flowRepository";
 import { RecentFlowStore } from "./storage/recentFlows";
@@ -107,10 +109,7 @@ export function deactivate(): void {
 async function newFlow(): Promise<void> {
   try {
     const flow = createEmptyProductFlow();
-    const document = await vscode.workspace.openTextDocument(vscode.Uri.parse("untitled:Untitled.mindflow"));
-    const edit = new vscode.WorkspaceEdit();
-    edit.insert(document.uri, new vscode.Position(0, 0), `${JSON.stringify(flow, null, 2)}\n`);
-    await vscode.workspace.applyEdit(edit);
+    const document = await vscode.workspace.openTextDocument(createUntitledMindFlowDocumentOptions(flow));
     currentFlowPath = undefined;
     pendingChangePlan = undefined;
     await vscode.commands.executeCommand("vscode.openWith", document.uri, FlowPanel.viewType);
@@ -771,6 +770,7 @@ async function loadCurrentFlow(): Promise<{ flow: ProductFlow; flowPath: string 
 
 async function applyFlowDocumentEdit(flowPath: string, flow: ProductFlow): Promise<void> {
   flow.updatedAt = nowIso();
+  pruneMissingAppSurfaceReferences(flow);
   const validation = validateProductFlow(flow);
   if (!validation.valid) {
     throw new Error(`Cannot apply invalid ProductFlow:\n${validation.errors.join("\n")}`);
@@ -917,16 +917,7 @@ function applyAppSurfaceRequest(flow: ProductFlow, request: TaxonomyRequest): vo
   flow.appSurfaces = flow.appSurfaces ?? [];
   if (request.action === "delete") {
     const appId = requireRequestId(request);
-    flow.appSurfaces = flow.appSurfaces.filter((item) => item.appId !== appId);
-    for (const node of flow.nodes) {
-      node.appSurfaceIds = (node.appSurfaceIds ?? []).filter((id) => id !== appId);
-    }
-    for (const edge of flow.edges) {
-      if (edge.status === "active" && edgeReferencesAppSurface(edge, appId)) {
-        markTaxonomyEdgeRemoved(edge);
-      }
-      edge.appSurfaceIds = (edge.appSurfaceIds ?? []).filter((id) => id !== appId);
-    }
+    deleteAppSurface(flow, appId);
     return;
   }
   const item = request.item ?? {};
@@ -1005,26 +996,6 @@ function applyRoleRequest(flow: ProductFlow, request: TaxonomyRequest): void {
     domainIds: readStringArray(item.domainIds)
   };
   upsertById(flow.roles, (item) => item.roleId, next);
-}
-
-function edgeReferencesAppSurface(edge: FlowEdge, appId: string): boolean {
-  const from = edge.from;
-  const to = edge.to;
-  return endpointReferencesAppSurface(from, appId) ||
-    endpointReferencesAppSurface(to, appId) ||
-    (!from && edge.fromNodeId === appId) ||
-    (!to && edge.toNodeId === appId);
-}
-
-function endpointReferencesAppSurface(endpoint: FlowEndpoint | undefined, appId: string): boolean {
-  return Boolean(endpoint && endpoint.kind === "appSurface" && (endpoint.appId ?? endpoint.nodeId) === appId);
-}
-
-function markTaxonomyEdgeRemoved(edge: FlowEdge): void {
-  edge.status = "removed";
-  edge.removedAt = nowIso();
-  edge.removedByChangeSetId = "manual";
-  edge.updatedByChangeSetId = "manual";
 }
 
 function upsertById<T>(items: T[], getId: (item: T) => string, next: T): void {

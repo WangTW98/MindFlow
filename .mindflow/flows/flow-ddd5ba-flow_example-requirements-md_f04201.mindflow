@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.0.0",
   "flowId": "flow_example-requirements-md_f04201",
-  "revision": 18,
+  "revision": 21,
   "title": "多应用端采购协同平台需求示例",
   "sourceDocumentId": "/Users/wang/Documents/MindFlow/samples/example-requirements.md",
   "sourceSummary": "基于示例需求生成的多应用端采购协同平台产品流程。",
   "createdAt": "2026-07-04T18:03:20.124Z",
-  "updatedAt": "2026-07-04T21:56:38.611Z",
+  "updatedAt": "2026-07-04T22:46:10.747Z",
   "domains": [
     {
       "domainId": "domain_plan",
@@ -312,8 +312,8 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 60,
-          "y": 60
+          "x": 247,
+          "y": -361
         }
       },
       "updatedByChangeSetId": "manual"
@@ -458,8 +458,8 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 420,
-          "y": 60
+          "x": 829,
+          "y": -858
         }
       }
     },
@@ -589,8 +589,8 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 780,
-          "y": 60
+          "x": 1364,
+          "y": -821
         }
       }
     },
@@ -861,8 +861,8 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 1484,
-          "y": -256
+          "x": 2392,
+          "y": -510
         }
       },
       "updatedByChangeSetId": "manual"
@@ -2177,8 +2177,8 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 1500,
-          "y": 700
+          "x": 1502,
+          "y": 938
         }
       }
     },
@@ -2267,8 +2267,8 @@
       },
       "view": {
         "position": {
-          "x": 1880,
-          "y": 760
+          "x": 784,
+          "y": 1984
         }
       },
       "confidence": 1
@@ -3120,6 +3120,123 @@
       ],
       "confidence": 1,
       "updatedByChangeSetId": "manual"
+    },
+    {
+      "edgeId": "edge_6d88d3fd55",
+      "status": "active",
+      "fromNodeId": "app_supplier_portal",
+      "toNodeId": "page_page-2d4715_2d4715",
+      "from": {
+        "kind": "appSurface",
+        "nodeId": "app_supplier_portal",
+        "appId": "app_supplier_portal"
+      },
+      "to": {
+        "kind": "node",
+        "nodeId": "page_page-2d4715_2d4715"
+      },
+      "action": "手动连接",
+      "trigger": "手动连接",
+      "type": "navigate",
+      "appSurfaceIds": [
+        "app_supplier_portal"
+      ],
+      "domainIds": [
+        "domain_supplier",
+        "domain_contract_archive",
+        "domain_plan",
+        "domain_sourcing"
+      ],
+      "roleIds": [
+        "role_supplier_sales",
+        "role_supplier_admin",
+        "role_buyer"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "供应商门户 -> page_page-2d4715_2d4715"
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "edgeId": "edge_8c523c59a2",
+      "status": "active",
+      "fromNodeId": "page_page-2d4715_2d4715",
+      "toNodeId": "page_page-b6d354_b6d354",
+      "from": {
+        "kind": "featureGroup",
+        "nodeId": "page_page-2d4715_2d4715",
+        "groupId": "group_group-e7a572_6d9679"
+      },
+      "to": {
+        "kind": "node",
+        "nodeId": "page_page-b6d354_b6d354"
+      },
+      "action": "手动连接",
+      "trigger": "手动连接",
+      "type": "navigate",
+      "appSurfaceIds": [
+        "app_supplier_portal",
+        "app_admin"
+      ],
+      "domainIds": [
+        "domain_plan",
+        "domain_sourcing"
+      ],
+      "roleIds": [
+        "role_buyer"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "page_page-2d4715_2d4715/group_group-e7a572_6d9679 -> page_page-b6d354_b6d354"
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "edgeId": "edge_2a8a7fa72f",
+      "status": "active",
+      "fromNodeId": "page_page-2d4715_2d4715",
+      "toNodeId": "page_page-4975e3_4975e3",
+      "from": {
+        "kind": "featureItem",
+        "nodeId": "page_page-2d4715_2d4715",
+        "groupId": "group_group-e7a572_6d9679",
+        "itemId": "item_item-bc9fc7_0e9b06"
+      },
+      "to": {
+        "kind": "node",
+        "nodeId": "page_page-4975e3_4975e3"
+      },
+      "action": "手动连接",
+      "trigger": "手动连接",
+      "type": "navigate",
+      "appSurfaceIds": [
+        "app_supplier_portal"
+      ],
+      "domainIds": [
+        "domain_plan",
+        "domain_sourcing",
+        "domain_supplier"
+      ],
+      "roleIds": [
+        "role_buyer",
+        "role_supplier_sales",
+        "role_supplier_admin"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "page_page-2d4715_2d4715/group_group-e7a572_6d9679/item_item-bc9fc7_0e9b06 -> page_page-4975e3_4975e3"
+        }
+      ],
+      "confidence": 1
     }
   ],
   "artifacts": {

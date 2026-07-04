@@ -270,11 +270,12 @@ small,
 .managed-list-body {
   display: grid;
   gap: 4px;
+  min-height: 0;
 }
 
 .managed-list-item {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
   min-width: 0;
@@ -309,6 +310,16 @@ small,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.managed-list-row-action {
+  width: 24px;
+  height: 24px;
+}
+
+.managed-list-row-action:hover {
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .save-hint {
@@ -536,6 +547,7 @@ small,
 .taxonomy-panel .managed-list-body {
   max-height: min(34vh, 300px);
   overflow: auto;
+  overscroll-behavior: contain;
   padding-right: 2px;
 }
 
@@ -717,9 +729,27 @@ small,
 .meta-grid,
 .edge-summary {
   display: grid;
-  grid-template-columns: 58px 1fr;
   gap: 4px 8px;
   margin: 0;
+}
+
+.meta-grid {
+  grid-template-columns: 22px 1fr;
+}
+
+.edge-summary {
+  grid-template-columns: 58px 1fr;
+}
+
+.meta-grid dt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.meta-grid dt .lucide-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .meta-grid dd,

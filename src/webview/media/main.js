@@ -36,6 +36,7 @@
   selectedRoleId ||= taxonomySelection.role;
   let taxonomyPanelsOpen = readTaxonomyPanelsOpen();
   let nodeSearch = persisted.nodeSearch || "";
+  let nodeSearchComposing = false;
   let leftPanelCollapsed = Boolean(persisted.leftPanelCollapsed);
   let zoom = clamp(Number(persisted.zoom || 1), MIN_ZOOM, MAX_ZOOM);
   let camera = persisted.camera && Number.isFinite(persisted.camera.x) && Number.isFinite(persisted.camera.y)
@@ -254,6 +255,7 @@
       "panel-left-close": '<rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path>',
       "panel-left-open": '<rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m14 9 3 3-3 3"></path>',
       "file-text": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path>',
+      "globe-2": '<path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"></path><path d="M7 3.34V5a3 3 0 0 0 3 3 2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17"></path><path d="M11 21.95V18a2 2 0 0 0-2-2 2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"></path><circle cx="12" cy="12" r="10"></circle>',
       "grip-vertical": '<circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle>',
       "layout-dashboard": '<rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect>',
       "monitor-smartphone": '<path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"></path><path d="M10 19v-4"></path><path d="M7 19h5"></path><rect width="6" height="10" x="16" y="12" rx="2"></rect>',
@@ -261,6 +263,7 @@
       "pen-line": '<path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>',
       plus: '<path d="M5 12h14"></path><path d="M12 5v14"></path>',
       "trash-2": '<path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
+      user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>',
       users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>',
       x: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>'
     };
@@ -290,6 +293,7 @@
                   <strong>${escapeHtml(item[labelKey])}</strong>
                   <small>${escapeHtml(item[descriptionKey] || getTaxonomySecondaryText(kind, item) || "无说明")}</small>
                 </span>
+                ${renderTaxonomyActionButton(kind, "delete", `删除 ${item[labelKey]}`, "trash-2", false, "danger managed-list-row-action", `data-taxonomy-id="${escapeAttr(itemId)}"`)}
               </div>
             `;
           }).join("") || "<p class=\"empty compact\">暂无数据</p>"}
@@ -298,9 +302,9 @@
     `;
   }
 
-  function renderTaxonomyActionButton(kind, action, label, iconName, disabled = false, extraClass = "") {
+  function renderTaxonomyActionButton(kind, action, label, iconName, disabled = false, extraClass = "", attrs = "") {
     return `
-      <button type="button" class="icon-button taxonomy-action ${escapeAttr(extraClass)}" data-kind="${kind}" data-action="${action}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}" ${disabled ? "disabled" : ""}>
+      <button type="button" class="icon-button taxonomy-action ${escapeAttr(extraClass)}" data-kind="${kind}" data-action="${action}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}" ${attrs} ${disabled ? "disabled" : ""}>
         ${renderLucideIcon(iconName)}
       </button>
     `;
@@ -365,8 +369,8 @@
         </header>
         <p class="purpose">${escapeHtml(node.purpose)}</p>
         <dl class="meta-grid">
-          <dt>业务域</dt><dd>${escapeHtml(domains || "未设置")}</dd>
-          <dt>角色</dt><dd>${escapeHtml(roles || "未设置")}</dd>
+          <dt title="业务域" aria-label="业务域">${renderLucideIcon("globe-2")}</dt><dd>${escapeHtml(domains || "未设置")}</dd>
+          <dt title="角色" aria-label="角色">${renderLucideIcon("user")}</dt><dd>${escapeHtml(roles || "未设置")}</dd>
         </dl>
         <div class="feature-groups">
           ${groups.map((group) => renderFeatureGroup(group, node.nodeId)).join("") || "<p class=\"empty compact\">暂无功能</p>"}
@@ -735,16 +739,22 @@
       render();
     });
     if (nodeSearchInput) {
+      nodeSearchInput.addEventListener("compositionstart", () => {
+        nodeSearchComposing = true;
+      });
+      nodeSearchInput.addEventListener("compositionend", (event) => {
+        nodeSearchComposing = false;
+        nodeSearch = event.target.value;
+        persistUiState();
+        renderAfterNodeSearchInput();
+      });
       nodeSearchInput.addEventListener("input", (event) => {
         nodeSearch = event.target.value;
-        render();
-        requestAnimationFrame(() => {
-          const nextInput = document.getElementById("nodeSearch");
-          if (nextInput) {
-            nextInput.focus({ preventScroll: true });
-            nextInput.setSelectionRange(nodeSearch.length, nodeSearch.length);
-          }
-        });
+        persistUiState();
+        if (nodeSearchComposing || event.isComposing) {
+          return;
+        }
+        renderAfterNodeSearchInput();
       });
       nodeSearchInput.addEventListener("keydown", (event) => {
         event.stopPropagation();
@@ -818,6 +828,17 @@
       return;
     }
     button.addEventListener("click", handler);
+  }
+
+  function renderAfterNodeSearchInput() {
+    render();
+    requestAnimationFrame(() => {
+      const nextInput = document.getElementById("nodeSearch");
+      if (nextInput) {
+        nextInput.focus({ preventScroll: true });
+        nextInput.setSelectionRange(nodeSearch.length, nodeSearch.length);
+      }
+    });
   }
 
   function bindCanvasElements(root = document) {
@@ -917,7 +938,7 @@
     root.querySelectorAll(".taxonomy-action").forEach((button) => {
       button.addEventListener("click", (event) => {
         event.stopPropagation();
-        manageTaxonomy(button.dataset.kind, button.dataset.action);
+        manageTaxonomy(button.dataset.kind, button.dataset.action, button.dataset.taxonomyId);
       });
     });
   }
@@ -1270,27 +1291,104 @@
     }));
   }
 
-  function manageTaxonomy(kind, action) {
+  function manageTaxonomy(kind, action, targetId = "") {
+    if (!kind || !action) {
+      return;
+    }
     const flow = state.flow;
-    const currentId = action === "create" ? "" : taxonomySelection[kind] || "";
+    const currentId = action === "create" ? "" : targetId || getSelectedTaxonomyId(kind) || taxonomySelection[kind] || "";
     const current = getTaxonomyItems(flow, kind).find((item) => getTaxonomyId(kind, item) === currentId);
-    if (action !== "create" && !current) {
-      window.alert("请先在列表中选中要编辑或删除的项目。");
+    if (action === "create") {
+      const item = createDefaultTaxonomyItem(flow, kind);
+      const id = getTaxonomyId(kind, item);
+      addTaxonomyItemLocally(flow, kind, item);
+      selectTaxonomyItem(kind, id);
+      vscode.postMessage({ type: "updateTaxonomy", request: { kind, action, id, item } });
+      return;
+    }
+    if (!current) {
       return;
     }
     if (action === "delete") {
-      if (!window.confirm("确定删除当前项？相关节点和连线引用会同步移除。")) {
-        return;
-      }
       clearTaxonomySelection(kind, currentId);
+      removeTaxonomyItemLocally(flow, kind, currentId);
       vscode.postMessage({ type: "updateTaxonomy", request: { kind, action, id: currentId } });
+      render();
       return;
     }
-    const item = promptTaxonomyItem(flow, kind, current);
-    if (!item) {
-      return;
+  }
+
+  function createDefaultTaxonomyItem(flow, kind) {
+    const index = getTaxonomyItems(flow, kind).length + 1;
+    if (kind === "appSurface") {
+      return {
+        appId: makeClientId("app"),
+        name: `新应用端 ${index}`,
+        type: "other",
+        description: "",
+        domainIds: [],
+        roleIds: []
+      };
     }
-    vscode.postMessage({ type: "updateTaxonomy", request: { kind, action, id: current ? getTaxonomyId(kind, current) : undefined, item } });
+    if (kind === "domain") {
+      return {
+        domainId: makeClientId("domain"),
+        name: `新业务域 ${index}`,
+        description: ""
+      };
+    }
+    return {
+      roleId: makeClientId("role"),
+      name: `新角色 ${index}`,
+      description: "",
+      domainIds: []
+    };
+  }
+
+  function addTaxonomyItemLocally(flow, kind, item) {
+    if (kind === "appSurface") {
+      flow.appSurfaces = flow.appSurfaces || [];
+      flow.appSurfaces.push(item);
+      seedAppSurfacePositions(flow);
+    } else if (kind === "domain") {
+      flow.domains = flow.domains || [];
+      flow.domains.push(item);
+    } else if (kind === "role") {
+      flow.roles = flow.roles || [];
+      flow.roles.push(item);
+    }
+  }
+
+  function removeTaxonomyItemLocally(flow, kind, id) {
+    if (kind === "appSurface") {
+      flow.appSurfaces = (flow.appSurfaces || []).filter((item) => item.appId !== id);
+      flow.nodes.forEach((node) => {
+        node.appSurfaceIds = (node.appSurfaceIds || []).filter((appId) => appId !== id);
+      });
+      flow.edges = flow.edges.filter((edge) => {
+        if (edgeReferencesAppSurfaceEndpoint(edge, id)) {
+          return false;
+        }
+        edge.appSurfaceIds = (edge.appSurfaceIds || []).filter((appId) => appId !== id);
+        return true;
+      });
+      appSurfacePositions.delete(id);
+    } else if (kind === "domain") {
+      flow.domains = (flow.domains || []).filter((item) => item.domainId !== id);
+    } else if (kind === "role") {
+      flow.roles = (flow.roles || []).filter((item) => item.roleId !== id);
+    }
+  }
+
+  function edgeReferencesAppSurfaceEndpoint(edge, appId) {
+    return endpointReferencesAppSurface(edge.from, appId) ||
+      endpointReferencesAppSurface(edge.to, appId) ||
+      (!edge.from && edge.fromNodeId === appId) ||
+      (!edge.to && edge.toNodeId === appId);
+  }
+
+  function endpointReferencesAppSurface(endpoint, appId) {
+    return Boolean(endpoint && endpoint.kind === "appSurface" && endpointEntityId(endpoint) === appId);
   }
 
   function clearTaxonomySelection(kind, id) {
@@ -1313,38 +1411,6 @@
       selectedRoleId = "";
     }
     persistUiState();
-  }
-
-  function promptTaxonomyItem(flow, kind, current) {
-    if (kind === "appSurface") {
-      const name = window.prompt("应用端名称", current?.name || "");
-      if (!name) return null;
-      return {
-        appId: current?.appId,
-        name,
-        type: window.prompt("应用端类型：admin/web/app/miniapp/desktop/other", current?.type || "other") || "other",
-        description: window.prompt("应用端说明", current?.description || "") || "",
-        domainIds: splitIds(window.prompt("关联业务域 ID，逗号分隔", (current?.domainIds || []).join(", ")) || ""),
-        roleIds: splitIds(window.prompt("关联角色 ID，逗号分隔", (current?.roleIds || []).join(", ")) || "")
-      };
-    }
-    if (kind === "domain") {
-      const name = window.prompt("业务域名称", current?.name || "");
-      if (!name) return null;
-      return {
-        domainId: current?.domainId,
-        name,
-        description: window.prompt("业务域说明", current?.description || "") || ""
-      };
-    }
-    const name = window.prompt("角色名称", current?.name || "");
-    if (!name) return null;
-    return {
-      roleId: current?.roleId,
-      name,
-      description: window.prompt("角色说明", current?.description || "") || "",
-      domainIds: splitIds(window.prompt("关联业务域 ID，逗号分隔", (current?.domainIds || []).join(", ")) || "")
-    };
   }
 
   function seedNodePositions(flow) {
@@ -1665,7 +1731,14 @@
     persistUiState();
   }
 
+  function shouldLetPanelHandleWheel(target) {
+    return Boolean(target?.closest?.(".floating-taxonomy-controls, .floating-taxonomy-panels"));
+  }
+
   function handleWheel(event) {
+    if (shouldLetPanelHandleWheel(event.target)) {
+      return;
+    }
     event.preventDefault();
     if (event.ctrlKey || event.metaKey) {
       const factor = event.deltaY < 0 ? 1.08 : 0.92;
@@ -3254,13 +3327,6 @@
       .map((input) => input.value);
   }
 
-  function splitIds(value) {
-    return String(value || "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
   function readIdSelection(value, legacyValue) {
     if (Array.isArray(value)) {
       return Array.from(new Set(value.filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim())));
@@ -3277,10 +3343,11 @@
   }
 
   function readTaxonomyPanelsOpen() {
+    const value = persisted.taxonomyPanelsOpen || {};
     return {
-      appSurface: false,
-      domain: false,
-      role: false
+      appSurface: value.appSurface === true,
+      domain: value.domain === true,
+      role: value.role === true
     };
   }
 
@@ -3293,6 +3360,7 @@
       appFilters,
       domainFilters,
       roleFilters,
+      taxonomyPanelsOpen,
       taxonomySelection,
       selectedAppSurfaceId,
       selectedDomainId,
