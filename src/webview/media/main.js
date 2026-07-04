@@ -6,6 +6,10 @@
 
   const CARD_WIDTH = 300;
   const CARD_MIN_HEIGHT = 230;
+  const LAYOUT_START_X = 0;
+  const LAYOUT_START_Y = 0;
+  const LAYOUT_COLUMN_GAP = 480;
+  const LAYOUT_ROW_GAP = 84;
   const MIN_ZOOM = 0.2;
   const MAX_ZOOM = 2.6;
   const EDGE_TYPE_OPTIONS = [
@@ -30,7 +34,7 @@
   selectedAppSurfaceId ||= taxonomySelection.appSurface;
   selectedDomainId ||= taxonomySelection.domain;
   selectedRoleId ||= taxonomySelection.role;
-  let taxonomyPanelsOpen = readTaxonomyPanelsOpen(persisted.taxonomyPanelsOpen);
+  let taxonomyPanelsOpen = readTaxonomyPanelsOpen();
   let nodeSearch = persisted.nodeSearch || "";
   let leftPanelCollapsed = Boolean(persisted.leftPanelCollapsed);
   let zoom = clamp(Number(persisted.zoom || 1), MIN_ZOOM, MAX_ZOOM);
@@ -78,11 +82,6 @@
                 <h2>节点</h2>
                 <small>${visibleListNodes.length}/${activeNodes.length}</small>
               </div>
-              <div class="toolbar-actions" aria-label="节点操作">
-                ${renderIconButton("generateFullPrd", "生成完整 PRD", "file-text")}
-                ${renderIconButton("generateFullPencil", "生成完整 Pencil", "pen-line")}
-                ${renderIconButton("collapseLeftPanel", "收起左侧栏", "panel-left-close")}
-              </div>
             </header>
             <div class="node-search">
               <input id="nodeSearch" value="${escapeAttr(nodeSearch)}" placeholder="快速检索节点卡片">
@@ -94,7 +93,6 @@
         </aside>
 
         <section class="canvas" id="canvas" tabindex="0">
-          ${leftPanelCollapsed ? renderFloatingLeftActions() : ""}
           ${renderFloatingTaxonomyControls()}
           ${renderTaxonomyPanels(flow)}
           <svg class="edge-layer" id="edgeLayer"></svg>
@@ -202,17 +200,22 @@
   }
 
   function renderFloatingTaxonomyControls() {
+    const panelButtonId = leftPanelCollapsed ? "expandLeftPanel" : "collapseLeftPanel";
+    const panelButtonLabel = leftPanelCollapsed ? "展开左侧栏" : "收起左侧栏";
+    const panelButtonIcon = leftPanelCollapsed ? "panel-left-open" : "panel-left-close";
     return `
       <div class="floating-taxonomy-controls" aria-label="应用端、业务域、角色面板">
+        ${renderIconButton(panelButtonId, panelButtonLabel, panelButtonIcon, "floating-icon")}
         ${renderTaxonomyToggleButton("appSurface", "应用端", "monitor-smartphone")}
         ${renderTaxonomyToggleButton("domain", "业务域", "network")}
         ${renderTaxonomyToggleButton("role", "角色", "users")}
+        ${renderIconButton("autoLayoutCanvas", "自动排版", "layout-dashboard", "floating-icon")}
       </div>
     `;
   }
 
   function renderTaxonomyToggleButton(kind, label, iconName) {
-    const open = taxonomyPanelsOpen[kind] !== false;
+    const open = taxonomyPanelsOpen[kind] === true;
     return `
       <button type="button" class="icon-button taxonomy-toggle ${open ? "active" : ""}" data-taxonomy-toggle="${escapeAttr(kind)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}" aria-pressed="${open ? "true" : "false"}">
         ${renderLucideIcon(iconName)}
@@ -223,19 +226,9 @@
   function renderTaxonomyPanels(flow) {
     return `
       <div class="floating-taxonomy-panels" aria-label="应用端、业务域、角色列表">
-        ${taxonomyPanelsOpen.appSurface === false ? "" : renderManagedList("appSurface", "应用端", flow.appSurfaces || [], "appId", "name", "description", appFilters)}
-        ${taxonomyPanelsOpen.domain === false ? "" : renderManagedList("domain", "业务域", getAvailableDomains(flow), "domainId", "name", "description", domainFilters)}
-        ${taxonomyPanelsOpen.role === false ? "" : renderManagedList("role", "角色", getAvailableRoles(flow), "roleId", "name", "description", roleFilters)}
-      </div>
-    `;
-  }
-
-  function renderFloatingLeftActions() {
-    return `
-      <div class="floating-left-actions" aria-label="节点操作">
-        ${renderIconButton("expandLeftPanel", "展开左侧栏", "panel-left-open", "floating-icon")}
-        ${renderIconButton("floatingGenerateFullPrd", "生成完整 PRD", "file-text", "floating-icon")}
-        ${renderIconButton("floatingGenerateFullPencil", "生成完整 Pencil", "pen-line", "floating-icon")}
+        ${taxonomyPanelsOpen.appSurface === true ? renderManagedList("appSurface", "应用端", flow.appSurfaces || [], "appId", "name", "description", appFilters) : ""}
+        ${taxonomyPanelsOpen.domain === true ? renderManagedList("domain", "业务域", getAvailableDomains(flow), "domainId", "name", "description", domainFilters) : ""}
+        ${taxonomyPanelsOpen.role === true ? renderManagedList("role", "角色", getAvailableRoles(flow), "roleId", "name", "description", roleFilters) : ""}
       </div>
     `;
   }
@@ -262,6 +255,7 @@
       "panel-left-open": '<rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m14 9 3 3-3 3"></path>',
       "file-text": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path>',
       "grip-vertical": '<circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle>',
+      "layout-dashboard": '<rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect>',
       "monitor-smartphone": '<path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"></path><path d="M10 19v-4"></path><path d="M7 19h5"></path><rect width="6" height="10" x="16" y="12" rx="2"></rect>',
       network: '<rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path>',
       "pen-line": '<path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>',
@@ -436,8 +430,6 @@
             <code>${escapeHtml(node.nodeId)}</code>
           </div>
           <div class="inspector-actions">
-            ${renderIconButton("nodePrd", "创建当前页面 PRD", "file-text")}
-            ${renderIconButton("nodePencil", "创建当前页面 Pencil", "pen-line")}
             ${renderIconButton("closeInspector", "关闭详情", "x")}
           </div>
         </header>
@@ -765,12 +757,7 @@
     bindTaxonomyPanelToggles(document);
     bindTaxonomyControls(document);
 
-    bindButton("generateFullPrd", { type: "generateFullPrd" });
-    bindButton("floatingGenerateFullPrd", { type: "generateFullPrd" });
-    bindButton("generateFullPencil", { type: "generateFullPencil" });
-    bindButton("floatingGenerateFullPencil", { type: "generateFullPencil" });
-    bindButton("nodePrd", selectedNodeId ? { type: "generateNodePrd", nodeId: selectedNodeId } : null);
-    bindButton("nodePencil", selectedNodeId ? { type: "generateNodePencil", nodeId: selectedNodeId } : null);
+    bindAction("autoLayoutCanvas", autoLayoutCanvas);
 
     bindCanvasElements();
 
@@ -823,14 +810,6 @@
     if (edgeForm) {
       bindEdgeInspector(edgeForm);
     }
-  }
-
-  function bindButton(id, message) {
-    const button = document.getElementById(id);
-    if (!button || !message) {
-      return;
-    }
-    button.addEventListener("click", () => vscode.postMessage(message));
   }
 
   function bindAction(id, handler) {
@@ -901,7 +880,7 @@
         }
         taxonomyPanelsOpen = {
           ...taxonomyPanelsOpen,
-          [kind]: taxonomyPanelsOpen[kind] === false
+          [kind]: taxonomyPanelsOpen[kind] !== true
         };
         persistUiState();
         render();
@@ -1420,6 +1399,254 @@
     });
   }
 
+  function autoLayoutCanvas() {
+    seedNodePositions(state.flow);
+    seedAppSurfacePositions(state.flow);
+    positionCards();
+
+    const layout = calculateAutoLayout();
+    if (!layout) {
+      return;
+    }
+
+    layout.nodes.forEach((item) => {
+      nodePositions.set(item.nodeId, { x: item.x, y: item.y });
+      const node = state.flow.nodes.find((candidate) => candidate.nodeId === item.nodeId);
+      if (node) {
+        node.view = {
+          ...node.view,
+          position: { x: item.x, y: item.y }
+        };
+      }
+    });
+    layout.appSurfaces.forEach((item) => {
+      appSurfacePositions.set(item.appId, { x: item.x, y: item.y });
+      const surface = (state.flow.appSurfaces || []).find((candidate) => candidate.appId === item.appId);
+      if (surface) {
+        surface.view = {
+          ...surface.view,
+          position: { x: item.x, y: item.y }
+        };
+      }
+    });
+
+    positionCards();
+    fitCameraToBounds(layout.bounds);
+    applyCamera();
+    scheduleDrawEdges();
+    vscode.postMessage({
+      type: "saveLayoutPositions",
+      nodes: layout.nodes.map((item) => ({ nodeId: item.nodeId, x: item.x, y: item.y })),
+      appSurfaces: layout.appSurfaces.map((item) => ({ appId: item.appId, x: item.x, y: item.y }))
+    });
+  }
+
+  function calculateAutoLayout() {
+    const activeNodes = state.flow.nodes.filter((node) => node.status !== "removed");
+    const appSurfaces = state.flow.appSurfaces || [];
+    if (activeNodes.length === 0 && appSurfaces.length === 0) {
+      return null;
+    }
+
+    const graph = buildLayoutGraph(activeNodes, appSurfaces);
+    const layers = assignLayoutLayers(graph, appSurfaces.length > 0);
+    const dimensions = measureLayoutCards();
+    const placed = new Map();
+    const layouts = [];
+    const layerNumbers = Array.from(new Set(Array.from(layers.values()))).sort((left, right) => left - right);
+
+    layerNumbers.forEach((layer) => {
+      const items = graph.entities
+        .filter((item) => layers.get(item.id) === layer)
+        .sort((left, right) => compareLayoutItems(left, right, graph, placed));
+      let y = LAYOUT_START_Y;
+      items.forEach((item) => {
+        const size = dimensions.get(item.id) || {
+          width: CARD_WIDTH,
+          height: item.type === "appSurface" ? 132 : CARD_MIN_HEIGHT
+        };
+        const layout = {
+          ...item,
+          x: LAYOUT_START_X + layer * LAYOUT_COLUMN_GAP,
+          y,
+          width: size.width,
+          height: size.height
+        };
+        layouts.push(layout);
+        placed.set(item.id, layout);
+        y += size.height + LAYOUT_ROW_GAP;
+      });
+    });
+
+    const bounds = getLayoutBounds(layouts);
+    return {
+      bounds,
+      nodes: layouts
+        .filter((item) => item.type === "node")
+        .map((item) => ({ nodeId: item.entityId, x: item.x, y: item.y })),
+      appSurfaces: layouts
+        .filter((item) => item.type === "appSurface")
+        .map((item) => ({ appId: item.entityId, x: item.x, y: item.y }))
+    };
+  }
+
+  function buildLayoutGraph(activeNodes, appSurfaces) {
+    const entities = [
+      ...appSurfaces.map((surface, index) => ({
+        id: layoutEntityId("appSurface", surface.appId),
+        entityId: surface.appId,
+        type: "appSurface",
+        order: index
+      })),
+      ...activeNodes.map((node, index) => ({
+        id: layoutEntityId("node", node.nodeId),
+        entityId: node.nodeId,
+        type: "node",
+        order: appSurfaces.length + index
+      }))
+    ];
+    const entityIds = new Set(entities.map((item) => item.id));
+    const edges = state.flow.edges
+      .filter((edge) => edge.status === "active")
+      .map((edge) => {
+        const from = endpointLayoutEntityId(edge.from || { kind: "node", nodeId: edge.fromNodeId });
+        const to = endpointLayoutEntityId(edge.to || { kind: "node", nodeId: edge.toNodeId });
+        return from && to && from !== to && entityIds.has(from) && entityIds.has(to) ? { from, to } : null;
+      })
+      .filter(Boolean);
+    const outgoing = new Map();
+    const incoming = new Map();
+    entities.forEach((item) => {
+      outgoing.set(item.id, []);
+      incoming.set(item.id, []);
+    });
+    edges.forEach((edge) => {
+      outgoing.get(edge.from)?.push(edge.to);
+      incoming.get(edge.to)?.push(edge.from);
+    });
+    return { entities, edges, outgoing, incoming };
+  }
+
+  function assignLayoutLayers(graph, hasAppSurfaces) {
+    const layers = new Map();
+    const indegree = new Map();
+    const processed = new Set();
+    graph.entities.forEach((item) => {
+      layers.set(item.id, item.type === "appSurface" ? 0 : (hasAppSurfaces ? 1 : 0));
+      indegree.set(item.id, graph.incoming.get(item.id)?.length || 0);
+    });
+
+    const queue = graph.entities
+      .filter((item) => (indegree.get(item.id) || 0) === 0)
+      .sort((left, right) => left.order - right.order);
+    for (let index = 0; index < queue.length; index += 1) {
+      const item = queue[index];
+      processed.add(item.id);
+      (graph.outgoing.get(item.id) || []).forEach((targetId) => {
+        layers.set(targetId, Math.max(layers.get(targetId) || 0, (layers.get(item.id) || 0) + 1));
+        indegree.set(targetId, (indegree.get(targetId) || 0) - 1);
+        if (indegree.get(targetId) === 0) {
+          const target = graph.entities.find((candidate) => candidate.id === targetId);
+          if (target) {
+            queue.push(target);
+          }
+        }
+      });
+    }
+
+    graph.entities.forEach((item) => {
+      if (processed.has(item.id) || item.type === "appSurface") {
+        return;
+      }
+      const predecessorLayers = (graph.incoming.get(item.id) || [])
+        .map((id) => layers.get(id))
+        .filter((layer) => Number.isFinite(layer));
+      if (predecessorLayers.length > 0) {
+        layers.set(item.id, Math.max(layers.get(item.id) || 0, Math.max(...predecessorLayers) + 1));
+      }
+    });
+    return layers;
+  }
+
+  function compareLayoutItems(left, right, graph, placed) {
+    const leftAnchor = averagePlacedY(graph.incoming.get(left.id) || [], placed);
+    const rightAnchor = averagePlacedY(graph.incoming.get(right.id) || [], placed);
+    if (leftAnchor !== rightAnchor) {
+      return leftAnchor - rightAnchor;
+    }
+    return left.order - right.order;
+  }
+
+  function averagePlacedY(ids, placed) {
+    const values = ids
+      .map((id) => placed.get(id))
+      .filter(Boolean)
+      .map((item) => item.y + item.height / 2);
+    if (values.length === 0) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  function measureLayoutCards() {
+    const dimensions = new Map();
+    document.querySelectorAll(".app-surface-card").forEach((card) => {
+      dimensions.set(layoutEntityId("appSurface", card.dataset.appSurfaceId), {
+        width: card.offsetWidth || CARD_WIDTH,
+        height: card.offsetHeight || 132
+      });
+    });
+    document.querySelectorAll(".node-card").forEach((card) => {
+      dimensions.set(layoutEntityId("node", card.dataset.nodeId), {
+        width: card.offsetWidth || CARD_WIDTH,
+        height: card.offsetHeight || CARD_MIN_HEIGHT
+      });
+    });
+    return dimensions;
+  }
+
+  function getLayoutBounds(layouts) {
+    return layouts.reduce((bounds, item) => ({
+      minX: Math.min(bounds.minX, item.x),
+      minY: Math.min(bounds.minY, item.y),
+      maxX: Math.max(bounds.maxX, item.x + item.width),
+      maxY: Math.max(bounds.maxY, item.y + item.height)
+    }), {
+      minX: Number.POSITIVE_INFINITY,
+      minY: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      maxY: Number.NEGATIVE_INFINITY
+    });
+  }
+
+  function fitCameraToBounds(bounds) {
+    const canvas = document.getElementById("canvas");
+    if (!canvas || !Number.isFinite(bounds.minX) || !Number.isFinite(bounds.minY)) {
+      return;
+    }
+    const width = Math.max(1, bounds.maxX - bounds.minX);
+    const height = Math.max(1, bounds.maxY - bounds.minY);
+    const availableWidth = Math.max(320, canvas.clientWidth - 180);
+    const availableHeight = Math.max(260, canvas.clientHeight - 160);
+    zoom = clamp(Math.min(1, availableWidth / width, availableHeight / height), MIN_ZOOM, MAX_ZOOM);
+    camera.x = 86 - bounds.minX * zoom;
+    camera.y = 72 - bounds.minY * zoom;
+  }
+
+  function layoutEntityId(kind, id) {
+    return `${kind}:${id || ""}`;
+  }
+
+  function endpointLayoutEntityId(endpoint) {
+    if (!endpoint) {
+      return "";
+    }
+    if (endpoint.kind === "appSurface") {
+      return layoutEntityId("appSurface", endpointEntityId(endpoint));
+    }
+    return layoutEntityId("node", endpoint.nodeId);
+  }
+
   function applyCamera() {
     const world = document.getElementById("world");
     const canvas = document.getElementById("canvas");
@@ -1672,7 +1899,7 @@
       canvas?.contains(element) &&
       !element.closest(".node-card") &&
       !element.closest(".app-surface-card") &&
-      !element.closest(".floating-left-actions, .floating-taxonomy-controls, .floating-taxonomy-panels") &&
+      !element.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") &&
       !element.closest("[data-edge-id]") &&
       !element.closest("button, input, textarea, select")
     );
@@ -1684,7 +1911,7 @@
       (event.button !== 0 && event.button !== 1) ||
       event.target.closest(".node-card") ||
       event.target.closest(".app-surface-card") ||
-      event.target.closest(".floating-left-actions, .floating-taxonomy-controls, .floating-taxonomy-panels") ||
+      event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") ||
       event.target.closest("button, input, textarea, select") ||
       event.target.closest("[data-edge-id]")
     ) {
@@ -1882,7 +2109,7 @@
     if (
       event.target.closest(".node-card") ||
       event.target.closest(".app-surface-card") ||
-      event.target.closest(".floating-left-actions, .floating-taxonomy-controls, .floating-taxonomy-panels") ||
+      event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") ||
       event.target.closest("[data-edge-id]") ||
       event.target.closest("button, input, textarea, select") ||
       connectionDrag
@@ -2218,9 +2445,9 @@
       return;
     }
     panels.innerHTML = `
-      ${taxonomyPanelsOpen.appSurface === false ? "" : renderManagedList("appSurface", "应用端", state.flow.appSurfaces || [], "appId", "name", "description", appFilters)}
-      ${taxonomyPanelsOpen.domain === false ? "" : renderManagedList("domain", "业务域", getAvailableDomains(state.flow), "domainId", "name", "description", domainFilters)}
-      ${taxonomyPanelsOpen.role === false ? "" : renderManagedList("role", "角色", getAvailableRoles(state.flow), "roleId", "name", "description", roleFilters)}
+      ${taxonomyPanelsOpen.appSurface === true ? renderManagedList("appSurface", "应用端", state.flow.appSurfaces || [], "appId", "name", "description", appFilters) : ""}
+      ${taxonomyPanelsOpen.domain === true ? renderManagedList("domain", "业务域", getAvailableDomains(state.flow), "domainId", "name", "description", domainFilters) : ""}
+      ${taxonomyPanelsOpen.role === true ? renderManagedList("role", "角色", getAvailableRoles(state.flow), "roleId", "name", "description", roleFilters) : ""}
     `;
     bindTaxonomyControls(panels);
   }
@@ -2575,11 +2802,16 @@
     }
     if (element) {
       const rect = element.getBoundingClientRect();
+      const card = element.closest(".node-card, .app-surface-card");
+      const cardRect = card?.getBoundingClientRect();
       const canvasRect = document.getElementById("canvas").getBoundingClientRect();
+      const x = cardRect
+        ? (direction === "to" ? cardRect.left - 1 : cardRect.right + 1)
+        : rect.left + rect.width / 2;
       return {
-        x: rect.left + rect.width / 2 - canvasRect.left,
+        x: x - canvasRect.left,
         y: rect.top + rect.height / 2 - canvasRect.top,
-        related: !element.closest(".node-card, .app-surface-card")?.classList.contains("dimmed")
+        related: !card?.classList.contains("dimmed")
       };
     }
     if (endpoint.kind === "appSurface") {
@@ -3044,11 +3276,11 @@
     };
   }
 
-  function readTaxonomyPanelsOpen(value) {
+  function readTaxonomyPanelsOpen() {
     return {
-      appSurface: value?.appSurface !== false,
-      domain: value?.domain !== false,
-      role: value?.role !== false
+      appSurface: false,
+      domain: false,
+      role: false
     };
   }
 
@@ -3062,7 +3294,6 @@
       domainFilters,
       roleFilters,
       taxonomySelection,
-      taxonomyPanelsOpen,
       selectedAppSurfaceId,
       selectedDomainId,
       selectedRoleId,

@@ -261,6 +261,12 @@ class FlowEditorSession {
       case "saveAppSurfacePosition":
         await vscode.commands.executeCommand("mindflow.updateAppSurfacePosition", message.appId, message.x, message.y);
         break;
+      case "saveLayoutPositions":
+        await vscode.commands.executeCommand("mindflow.updateLayoutPositions", {
+          nodes: message.nodes,
+          appSurfaces: message.appSurfaces
+        });
+        break;
       case "createNodeAt":
         await vscode.commands.executeCommand(
           "mindflow.createNodeAt",
@@ -385,6 +391,11 @@ type WebviewMessage =
   | { type: "openArtifact"; path: string }
   | { type: "saveNodePosition"; nodeId: string; x: number; y: number }
   | { type: "saveAppSurfacePosition"; appId: string; x: number; y: number }
+  | {
+      type: "saveLayoutPositions";
+      nodes?: Array<{ nodeId: string; x: number; y: number }>;
+      appSurfaces?: Array<{ appId: string; x: number; y: number }>;
+    }
   | { type: "createNodeAt"; x: number; y: number; appSurfaceIds?: string[]; domainIds?: string[]; roleIds?: string[] }
   | { type: "updateNodeDetails"; nodeId: string; patch: Record<string, unknown> }
   | { type: "createEdge"; from: Record<string, unknown>; to: Record<string, unknown>; trigger?: string; edgeType?: string }
