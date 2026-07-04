@@ -52,7 +52,23 @@ test("Empty ProductFlow starts as a valid blank canvas", () => {
   assert.equal(flow.domains.length, 0);
   assert.equal(flow.roles.length, 0);
   assert.equal(flow.appSurfaces?.length, 0);
+  assert.equal(flow.statusGroups?.length, 0);
   assert.equal(flow.productDesignIssues?.length, 0);
+});
+
+test("Manual node details can set and clear a status group", () => {
+  const flow = createEmptyProductFlow();
+  flow.statusGroups = [{ statusGroupId: "status_review", title: "评审中", color: "#33aa55" }];
+  const node = createManualNode(flow, { title: "需求评审页" });
+
+  updateManualNodeDetails(flow, node.nodeId, { statusGroupId: "status_review" });
+  assert.equal(node.statusGroupId, "status_review");
+
+  updateManualNodeDetails(flow, node.nodeId, { statusGroupId: "" });
+  assert.equal(node.statusGroupId, undefined);
+
+  const validation = validateProductFlow(flow);
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
 
 test("Blank MindFlow opens as an untitled document without a target file path", () => {
@@ -374,6 +390,13 @@ test("Manual edge details update endpoints and new edge category types", async (
   assert.ok(quoteGroup);
   assert.ok(quoteItem);
 
+  const defaultEdge = createManualEdge(flow, {
+    from: { kind: "node", nodeId: inquiry.nodeId },
+    toNodeId: quote.nodeId,
+    trigger: "默认连线类型"
+  });
+  assert.equal(defaultEdge.type, "interaction");
+
   const edge = createManualEdge(flow, {
     from: { kind: "node", nodeId: inquiry.nodeId },
     toNodeId: compare.nodeId,
@@ -404,6 +427,9 @@ test("Manual edge details update endpoints and new edge category types", async (
   assert.equal(updated?.type, "dataFlow");
   assert.equal(updated?.condition, "报价数据同步后可流转");
   assert.equal(updated?.appSurfaceIds?.join(","), "app_admin,app_supplier_portal");
+
+  updateManualEdgeDetails(flow, edge.edgeId, { type: "statusChange" });
+  assert.equal(updated?.type, "statusChange");
 });
 
 test("Manual node feature group edits preserve parent-child hierarchy and derived actions", async () => {

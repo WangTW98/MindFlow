@@ -32,6 +32,21 @@
     "domains": { "type": "array" },
     "roles": { "type": "array" },
     "appSurfaces": { "type": "array" },
+    "statusGroups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["statusGroupId", "title", "color"],
+        "properties": {
+          "statusGroupId": { "type": "string" },
+          "title": { "type": "string" },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        }
+      }
+    },
     "nodes": { "type": "array" },
     "edges": { "type": "array" },
     "artifacts": {

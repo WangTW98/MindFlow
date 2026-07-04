@@ -15,6 +15,7 @@ export function createEmptyProductFlow(title = "Untitled MindFlow"): ProductFlow
     domains: [],
     roles: [],
     appSurfaces: [],
+    statusGroups: [],
     nodes: [],
     edges: [],
     artifacts: {

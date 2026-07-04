@@ -13,9 +13,34 @@
   const MIN_ZOOM = 0.2;
   const MAX_ZOOM = 2.6;
   const EDGE_TYPE_OPTIONS = [
-    { value: "interaction", label: "交互触发" },
-    { value: "autoNavigate", label: "自动跳转" },
-    { value: "dataFlow", label: "数据流转" }
+    {
+      value: "interaction",
+      group: "interaction",
+      label: "交互触发",
+      color: "var(--vscode-charts-blue, #3794ff)",
+      description: "用户通过执行操作(如鼠标点击、屏幕触控等行为)主动触发的跳转行为；"
+    },
+    {
+      value: "autoNavigate",
+      group: "auto",
+      label: "自动跳转",
+      color: "var(--vscode-charts-green, #89d185)",
+      description: "应用/系统自动执行的跳转行为(如后台计算完成、支付完成等)；"
+    },
+    {
+      value: "dataFlow",
+      group: "data",
+      label: "数据流转",
+      color: "var(--vscode-charts-purple, #b180d7)",
+      description: "当用户主动触发或系统自动触发某些条件时，控制数据同步(如后台发布文章，APP端进行查看)；"
+    },
+    {
+      value: "statusChange",
+      group: "status",
+      label: "状态变更",
+      color: "var(--vscode-charts-pink, #f472b6)",
+      description: "用户主动或系统自动触发，但跳转或执行目标仅在相同状态组内执行(用于状态变更);"
+    }
   ];
   const PENDING_EDGE_DETAILS_TTL_MS = 15000;
   const APP_SURFACE_SOURCE_X = -360;
@@ -223,6 +248,7 @@
         ${renderTaxonomyToggleButton("appSurface", "应用端", "monitor-smartphone")}
         ${renderTaxonomyToggleButton("domain", "业务域", "network")}
         ${renderTaxonomyToggleButton("role", "角色", "users")}
+        ${renderTaxonomyToggleButton("statusGroup", "状态组", "palette")}
         ${renderIconButton("autoLayoutCanvas", "自动排版", "layout-dashboard", "floating-icon")}
       </div>
     `;
@@ -243,6 +269,7 @@
         ${taxonomyPanelsOpen.appSurface === true ? renderManagedList("appSurface", "应用端", flow.appSurfaces || [], "appId", "name", "description", appFilters) : ""}
         ${taxonomyPanelsOpen.domain === true ? renderManagedList("domain", "业务域", getAvailableDomains(flow), "domainId", "name", "description", domainFilters) : ""}
         ${taxonomyPanelsOpen.role === true ? renderManagedList("role", "角色", getAvailableRoles(flow), "roleId", "name", "description", roleFilters) : ""}
+        ${taxonomyPanelsOpen.statusGroup === true ? renderStatusGroupList(getStatusGroups(flow)) : ""}
       </div>
     `;
   }
@@ -351,6 +378,7 @@
       "monitor-smartphone": '<path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"></path><path d="M10 19v-4"></path><path d="M7 19h5"></path><rect width="6" height="10" x="16" y="12" rx="2"></rect>',
       network: '<rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path>',
       "octagon-alert": '<path d="M12 16h.01"></path><path d="M12 8v4"></path><path d="M15.31 2a2 2 0 0 1 1.42.59l4.68 4.68A2 2 0 0 1 22 8.69v6.62a2 2 0 0 1-.59 1.42l-4.68 4.68a2 2 0 0 1-1.42.59H8.69a2 2 0 0 1-1.42-.59l-4.68-4.68A2 2 0 0 1 2 15.31V8.69a2 2 0 0 1 .59-1.42l4.68-4.68A2 2 0 0 1 8.69 2Z"></path>',
+      palette: '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.4-.4-.8-.4-1.3 0-1.1.9-2 2-2H16c3.3 0 6-2.7 6-6 0-4.4-4.5-8-10-8Z"></path>',
       "pen-line": '<path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>',
       plus: '<path d="M5 12h14"></path><path d="M12 5v14"></path>',
       "trash-2": '<path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
@@ -394,6 +422,28 @@
     `;
   }
 
+  function renderStatusGroupList(groups) {
+    return `
+      <section class="managed-list taxonomy-panel status-group-panel" data-kind="statusGroup" data-taxonomy-panel="statusGroup">
+        <header class="managed-list-head">
+          <h4>状态组</h4>
+          <div class="tiny-actions">
+            ${renderTaxonomyActionButton("statusGroup", "create", "新增状态组", "plus")}
+          </div>
+        </header>
+        <div class="managed-list-body status-group-list" role="list" aria-label="状态组列表">
+          ${groups.map((group) => `
+            <div class="status-group-list-item" role="listitem">
+              <span class="status-group-color-square" style="--status-group-color: ${escapeAttr(normalizeStatusGroupColor(group.color))};" aria-hidden="true"></span>
+              <strong title="${escapeAttr(group.title)}">${escapeHtml(group.title)}</strong>
+              ${renderTaxonomyActionButton("statusGroup", "delete", `删除 ${group.title}`, "trash-2", false, "danger managed-list-row-action", `data-taxonomy-id="${escapeAttr(group.statusGroupId)}"`)}
+            </div>
+          `).join("") || "<p class=\"empty compact\">暂无状态组</p>"}
+        </div>
+      </section>
+    `;
+  }
+
   function renderTaxonomyActionButton(kind, action, label, iconName, disabled = false, extraClass = "", attrs = "") {
     return `
       <button type="button" class="icon-button taxonomy-action ${escapeAttr(extraClass)}" data-kind="${kind}" data-action="${action}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}" ${attrs} ${disabled ? "disabled" : ""}>
@@ -408,6 +458,9 @@
     }
     if (kind === "domain") {
       return selectedDomainId;
+    }
+    if (kind === "statusGroup") {
+      return "";
     }
     return selectedRoleId;
   }
@@ -436,6 +489,7 @@
     const surfaces = namesByIds(flow.appSurfaces || [], "appId", node.appSurfaceIds || []);
     const domains = namesByIds(flow.domains, "domainId", node.domainIds);
     const roles = namesByIds(flow.roles, "roleId", node.roleIds);
+    const statusGroup = getStatusGroup(flow, node.statusGroupId);
     const nodeOrigin = { kind: "node", nodeId: node.nodeId };
     const nodeOriginKey = endpointKey(nodeOrigin);
     const entryAppNames = getEntryAppSurfaceNames(flow, node);
@@ -459,6 +513,7 @@
             title="卡片连线出口"
             aria-label="卡片连线出口"></button>
         </header>
+        ${renderNodeStatusGroupBadge(statusGroup)}
         <p class="purpose">${escapeHtml(node.purpose)}</p>
         <dl class="meta-grid">
           <dt title="业务域" aria-label="业务域">${renderLucideIcon("globe-2")}</dt><dd>${escapeHtml(domains || "未设置")}</dd>
@@ -468,6 +523,19 @@
           ${groups.map((group) => renderFeatureGroup(group, node.nodeId)).join("") || "<p class=\"empty compact\">暂无功能</p>"}
         </div>
       </article>
+    `;
+  }
+
+  function renderNodeStatusGroupBadge(statusGroup) {
+    if (!statusGroup) {
+      return "";
+    }
+    const title = statusGroup.title || "未命名状态组";
+    return `
+      <div class="node-status-group" title="状态组: ${escapeAttr(title)}">
+        <span class="status-group-color-square small" style="--status-group-color: ${escapeAttr(normalizeStatusGroupColor(statusGroup.color))};" aria-hidden="true"></span>
+        <span>${escapeHtml(title)}</span>
+      </div>
     `;
   }
 
@@ -538,6 +606,7 @@
         <label>页面目的
           <textarea id="nodePurpose" rows="4">${escapeHtml(node.purpose)}</textarea>
         </label>
+        ${renderStatusGroupSelect(flow, node)}
         ${renderMultiSelect("nodeAppSurfaceIds", "应用端", flow.appSurfaces || [], "appId", "name", node.appSurfaceIds || [])}
         ${renderMultiSelect("nodeDomainIds", "业务域", flow.domains, "domainId", "name", node.domainIds || [])}
         ${renderMultiSelect("nodeRoleIds", "角色", flow.roles, "roleId", "name", node.roleIds || [])}
@@ -552,6 +621,19 @@
         </section>
         <p class="form-error" id="nodeFormError"></p>
       </form>
+    `;
+  }
+
+  function renderStatusGroupSelect(flow, node) {
+    const groups = getStatusGroups(flow);
+    const selectedId = groups.some((group) => group.statusGroupId === node.statusGroupId) ? node.statusGroupId : "";
+    return `
+      <label>状态组
+        <select id="nodeStatusGroupId">
+          <option value="" ${selectedId ? "" : "selected"}>无</option>
+          ${groups.map((group) => `<option value="${escapeAttr(group.statusGroupId)}" ${selectedId === group.statusGroupId ? "selected" : ""}>${escapeHtml(group.title)}</option>`).join("")}
+        </select>
+      </label>
     `;
   }
 
@@ -645,13 +727,7 @@
         </label>
         ${renderEndpointPicker("edgeFromEndpoint", "起点", flow, edge.from || { kind: "node", nodeId: edge.fromNodeId }, true)}
         ${renderEndpointPicker("edgeToEndpoint", "终点", flow, edge.to || { kind: "node", nodeId: edge.toNodeId }, false)}
-        <label>路径类型
-          <select id="edgeType">
-            ${EDGE_TYPE_OPTIONS.map((type) =>
-              `<option value="${type.value}" ${selectedType === type.value ? "selected" : ""}>${type.label}</option>`
-            ).join("")}
-          </select>
-        </label>
+        ${renderEdgeTypePicker(selectedType)}
         <label>条件描述
           <textarea id="edgeCondition" rows="3">${escapeHtml(edge.condition || "")}</textarea>
         </label>
@@ -660,6 +736,46 @@
         ${renderTagMultiSelect("edgeRoleIds", "角色", flow.roles, "roleId", "name", edge.roleIds || [])}
         <p class="form-error" id="edgeFormError"></p>
       </form>
+    `;
+  }
+
+  function renderEdgeTypePicker(selectedType) {
+    const selected = getEdgeTypeOption(selectedType);
+    return `
+      <div class="edge-type-field">
+        <span class="field-label">路径类型</span>
+        <div class="edge-type-picker" data-edge-type-picker>
+          <button type="button"
+            id="edgeType"
+            class="edge-type-trigger"
+            data-edge-type-value="${escapeAttr(selected.value)}"
+            aria-haspopup="listbox"
+            aria-expanded="false">
+            ${renderEdgeTypeOptionContent(selected)}
+          </button>
+          <div class="edge-type-menu" role="listbox" aria-label="路径类型">
+            ${EDGE_TYPE_OPTIONS.map((type) => `
+              <button type="button"
+                class="edge-type-option ${type.value === selected.value ? "selected" : ""}"
+                data-edge-type-option="${escapeAttr(type.value)}"
+                role="option"
+                aria-selected="${type.value === selected.value ? "true" : "false"}">
+                ${renderEdgeTypeOptionContent(type)}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderEdgeTypeOptionContent(type) {
+    return `
+      <span class="edge-type-swatch" style="--edge-type-color: ${escapeAttr(type.color)};" aria-hidden="true"></span>
+      <span class="edge-type-copy">
+        <strong>${escapeHtml(type.label)}</strong>
+        <small>${escapeHtml(type.description)}</small>
+      </span>
     `;
   }
 
@@ -1164,11 +1280,17 @@
     if (kind === "domain") {
       return domainFilters;
     }
+    if (kind === "statusGroup") {
+      return [];
+    }
     return roleFilters;
   }
 
   function selectTaxonomyItem(kind, id) {
     if (!kind || !id) {
+      return;
+    }
+    if (kind === "statusGroup") {
       return;
     }
     if (kind === "appSurface") {
@@ -1238,6 +1360,22 @@
     });
     edgeForm.querySelectorAll(".endpoint-option").forEach((option) => {
       option.addEventListener("click", () => selectEndpointOption(option));
+    });
+    edgeForm.querySelectorAll(".edge-type-trigger").forEach((trigger) => {
+      trigger.addEventListener("click", () => toggleEdgeTypePicker(trigger));
+      trigger.addEventListener("keydown", (event) => event.stopPropagation());
+    });
+    edgeForm.querySelectorAll(".edge-type-picker").forEach((picker) => {
+      picker.addEventListener("focusout", () => {
+        setTimeout(() => {
+          if (!picker.contains(document.activeElement)) {
+            closeEdgeTypePicker(picker);
+          }
+        }, 0);
+      });
+    });
+    edgeForm.querySelectorAll(".edge-type-option").forEach((option) => {
+      option.addEventListener("click", () => selectEdgeTypeOption(option));
     });
   }
 
@@ -1447,7 +1585,11 @@
       const item = createDefaultTaxonomyItem(flow, kind);
       const id = getTaxonomyId(kind, item);
       addTaxonomyItemLocally(flow, kind, item);
-      selectTaxonomyItem(kind, id);
+      if (kind === "statusGroup") {
+        render();
+      } else {
+        selectTaxonomyItem(kind, id);
+      }
       vscode.postMessage({ type: "updateTaxonomy", request: { kind, action, id, item } });
       return;
     }
@@ -1455,7 +1597,9 @@
       return;
     }
     if (action === "delete") {
-      clearTaxonomySelection(kind, currentId);
+      if (kind !== "statusGroup") {
+        clearTaxonomySelection(kind, currentId);
+      }
       removeTaxonomyItemLocally(flow, kind, currentId);
       vscode.postMessage({ type: "updateTaxonomy", request: { kind, action, id: currentId } });
       render();
@@ -1482,6 +1626,13 @@
         description: ""
       };
     }
+    if (kind === "statusGroup") {
+      return {
+        statusGroupId: makeClientId("status"),
+        title: `新状态组 ${index}`,
+        color: randomStatusGroupColor(getStatusGroups(flow))
+      };
+    }
     return {
       roleId: makeClientId("role"),
       name: `新角色 ${index}`,
@@ -1501,6 +1652,9 @@
     } else if (kind === "role") {
       flow.roles = flow.roles || [];
       flow.roles.push(item);
+    } else if (kind === "statusGroup") {
+      flow.statusGroups = flow.statusGroups || [];
+      flow.statusGroups.push(item);
     }
   }
 
@@ -1522,6 +1676,13 @@
       flow.domains = (flow.domains || []).filter((item) => item.domainId !== id);
     } else if (kind === "role") {
       flow.roles = (flow.roles || []).filter((item) => item.roleId !== id);
+    } else if (kind === "statusGroup") {
+      flow.statusGroups = (flow.statusGroups || []).filter((item) => item.statusGroupId !== id);
+      flow.nodes.forEach((node) => {
+        if (node.statusGroupId === id) {
+          delete node.statusGroupId;
+        }
+      });
     }
   }
 
@@ -2073,7 +2234,7 @@
     if (!from || !to) {
       return;
     }
-    vscode.postMessage({ type: "createEdge", from, to, trigger: "手动连接", edgeType: "navigate" });
+    vscode.postMessage({ type: "createEdge", from, to, trigger: "手动连接", edgeType: "interaction" });
   }
 
   function postCreateConnectedNode(link, event) {
@@ -2085,7 +2246,7 @@
         x: Math.round(point.x),
         y: Math.round(point.y),
         trigger: "手动连接",
-        type: "navigate",
+        type: "interaction",
         appSurfaceIds: appFilters,
         domainIds: domainFilters,
         roleIds: roleFilters
@@ -2453,6 +2614,7 @@
       title: document.getElementById("nodeTitle").value,
       pageType: document.getElementById("nodePageType").value,
       purpose: document.getElementById("nodePurpose").value,
+      statusGroupId: document.getElementById("nodeStatusGroupId")?.value || "",
       appSurfaceIds: collectMultiSelect("nodeAppSurfaceIds"),
       domainIds: collectMultiSelect("nodeDomainIds"),
       roleIds: collectMultiSelect("nodeRoleIds"),
@@ -2666,6 +2828,7 @@
       ${taxonomyPanelsOpen.appSurface === true ? renderManagedList("appSurface", "应用端", state.flow.appSurfaces || [], "appId", "name", "description", appFilters) : ""}
       ${taxonomyPanelsOpen.domain === true ? renderManagedList("domain", "业务域", getAvailableDomains(state.flow), "domainId", "name", "description", domainFilters) : ""}
       ${taxonomyPanelsOpen.role === true ? renderManagedList("role", "角色", getAvailableRoles(state.flow), "roleId", "name", "description", roleFilters) : ""}
+      ${taxonomyPanelsOpen.statusGroup === true ? renderStatusGroupList(getStatusGroups(state.flow)) : ""}
     `;
     bindTaxonomyControls(panels);
   }
@@ -2696,7 +2859,7 @@
       trigger: document.getElementById("edgeTriggerRule").value,
       from: parseEndpointValue(document.getElementById("edgeFromEndpoint").dataset.endpointValue),
       to: parseEndpointValue(document.getElementById("edgeToEndpoint").dataset.endpointValue),
-      type: document.getElementById("edgeType").value,
+      type: document.getElementById("edgeType").dataset.edgeTypeValue || "interaction",
       condition: document.getElementById("edgeCondition").value,
       appSurfaceIds: collectTagMultiSelect("edgeAppSurfaceIds"),
       domainIds: collectTagMultiSelect("edgeDomainIds"),
@@ -2724,6 +2887,11 @@
     node.title = patch.title;
     node.pageType = patch.pageType;
     node.purpose = patch.purpose;
+    if (patch.statusGroupId) {
+      node.statusGroupId = patch.statusGroupId;
+    } else {
+      delete node.statusGroupId;
+    }
     node.appSurfaceIds = patch.appSurfaceIds;
     node.domainIds = patch.domainIds;
     node.roleIds = patch.roleIds;
@@ -3252,14 +3420,52 @@
     submitEdgeDetails({ immediate: true });
   }
 
+  function toggleEdgeTypePicker(trigger) {
+    const picker = trigger.closest(".edge-type-picker");
+    if (!picker) {
+      return;
+    }
+    const open = !picker.classList.contains("open");
+    picker.classList.toggle("open", open);
+    trigger.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function closeEdgeTypePicker(picker) {
+    picker.classList.remove("open");
+    picker.querySelector(".edge-type-trigger")?.setAttribute("aria-expanded", "false");
+  }
+
+  function selectEdgeTypeOption(option) {
+    const picker = option.closest(".edge-type-picker");
+    const trigger = picker?.querySelector(".edge-type-trigger");
+    if (!picker || !trigger) {
+      return;
+    }
+    const type = getEdgeTypeOption(option.dataset.edgeTypeOption);
+    trigger.dataset.edgeTypeValue = type.value;
+    trigger.innerHTML = renderEdgeTypeOptionContent(type);
+    picker.querySelectorAll(".edge-type-option.selected").forEach((item) => {
+      item.classList.remove("selected");
+      item.setAttribute("aria-selected", "false");
+    });
+    option.classList.add("selected");
+    option.setAttribute("aria-selected", "true");
+    closeEdgeTypePicker(picker);
+    submitEdgeDetails({ immediate: true });
+  }
+
   function normalizeEdgeTypeForSelect(type) {
     const group = edgeTypeGroup(type);
+    if (group === "status") return "statusChange";
     if (group === "auto") return "autoNavigate";
     if (group === "data") return "dataFlow";
     return "interaction";
   }
 
   function edgeTypeGroup(type) {
+    if (type === "statusChange") {
+      return "status";
+    }
     if (type === "autoNavigate" || type === "navigate" || type === "branch") {
       return "auto";
     }
@@ -3267,6 +3473,11 @@
       return "data";
     }
     return "interaction";
+  }
+
+  function getEdgeTypeOption(value) {
+    const normalizedValue = normalizeEdgeTypeForSelect(value);
+    return EDGE_TYPE_OPTIONS.find((type) => type.value === normalizedValue) || EDGE_TYPE_OPTIONS[0];
   }
 
   function getFeatureGroups(node) {
@@ -3446,13 +3657,40 @@
   function getTaxonomyItems(flow, kind) {
     if (kind === "appSurface") return flow.appSurfaces || [];
     if (kind === "domain") return flow.domains || [];
+    if (kind === "statusGroup") return getStatusGroups(flow);
     return flow.roles || [];
   }
 
   function getTaxonomyId(kind, item) {
     if (kind === "appSurface") return item.appId;
     if (kind === "domain") return item.domainId;
+    if (kind === "statusGroup") return item.statusGroupId;
     return item.roleId;
+  }
+
+  function getStatusGroups(flow) {
+    return Array.isArray(flow.statusGroups) ? flow.statusGroups : [];
+  }
+
+  function getStatusGroup(flow, statusGroupId) {
+    return statusGroupId ? getStatusGroups(flow).find((group) => group.statusGroupId === statusGroupId) || null : null;
+  }
+
+  function normalizeStatusGroupColor(color) {
+    return /^#[0-9a-fA-F]{6}$/.test(String(color || "").trim()) ? String(color).trim() : "#6b7280";
+  }
+
+  function randomStatusGroupColor(existingGroups = []) {
+    const usedColors = new Set(existingGroups.map((group) => normalizeStatusGroupColor(group.color).toLowerCase()));
+    const seed = Math.floor(Math.random() * 0x1000000);
+    for (let attempt = 0; attempt < 0x1000000; attempt += 1) {
+      const value = (seed + attempt * 9973) % 0x1000000;
+      const color = `#${value.toString(16).padStart(6, "0")}`;
+      if (!usedColors.has(color)) {
+        return color;
+      }
+    }
+    return "#000000";
   }
 
   function namesByIds(items, idKey, ids) {
@@ -3585,7 +3823,8 @@
     return {
       appSurface: value.appSurface === true,
       domain: value.domain === true,
-      role: value.role === true
+      role: value.role === true,
+      statusGroup: value.statusGroup === true
     };
   }
 

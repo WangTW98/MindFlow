@@ -3,7 +3,17 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { createAgentProvider, configureAgent } from "./agents/providerFactory";
 import type { FlowChangePlan } from "./models/flowChange";
-import type { AppSurface, BusinessDomain, EdgeType, FlowEdge, FlowEndpoint, PageNode, ProductFlow, UserRole } from "./models/productFlow";
+import type {
+  AppSurface,
+  BusinessDomain,
+  EdgeType,
+  FlowEdge,
+  FlowEndpoint,
+  PageNode,
+  ProductFlow,
+  ProductStatusGroup,
+  UserRole
+} from "./models/productFlow";
 import { validateProductFlow } from "./models/productFlow";
 import { applyFlowChangePlan } from "./changes/flowChangeApplier";
 import { proposeValidatedFlowChange } from "./changes/flowChangePlanner";
@@ -885,7 +895,7 @@ function markNodePencilActive(flow: ProductFlow, nodeId: string, pencilId: strin
   }
 }
 
-type TaxonomyKind = "appSurface" | "domain" | "role";
+type TaxonomyKind = "appSurface" | "domain" | "role" | "statusGroup";
 type TaxonomyAction = "create" | "update" | "delete";
 
 interface TaxonomyRequest {
@@ -905,6 +915,9 @@ function applyTaxonomyRequest(flow: ProductFlow, request: TaxonomyRequest): void
       break;
     case "role":
       applyRoleRequest(flow, request);
+      break;
+    case "statusGroup":
+      applyStatusGroupRequest(flow, request);
       break;
     default:
       throw new Error(`Unsupported taxonomy kind: ${String(request.kind)}`);
@@ -998,6 +1011,32 @@ function applyRoleRequest(flow: ProductFlow, request: TaxonomyRequest): void {
   upsertById(flow.roles, (item) => item.roleId, next);
 }
 
+function applyStatusGroupRequest(flow: ProductFlow, request: TaxonomyRequest): void {
+  flow.statusGroups = flow.statusGroups ?? [];
+  if (request.action === "delete") {
+    const statusGroupId = requireRequestId(request);
+    flow.statusGroups = flow.statusGroups.filter((item) => item.statusGroupId !== statusGroupId);
+    for (const node of flow.nodes) {
+      if (node.statusGroupId === statusGroupId) {
+        delete node.statusGroupId;
+      }
+    }
+    return;
+  }
+  const item = request.item ?? {};
+  const requestedStatusGroupId = request.id ?? readOptionalString(item.statusGroupId);
+  const existing = requestedStatusGroupId ? flow.statusGroups.find((item) => item.statusGroupId === requestedStatusGroupId) : undefined;
+  const title = readString(item.title ?? item.name, existing?.title ?? "新状态组");
+  const statusGroupId = requestedStatusGroupId ?? makeTaxonomyId("status", title);
+  const requestedColor = readStatusGroupColor(item.color, existing?.color ?? randomStatusGroupColor(flow.statusGroups, statusGroupId));
+  const next: ProductStatusGroup = {
+    statusGroupId,
+    title,
+    color: uniqueStatusGroupColor(requestedColor, flow.statusGroups, statusGroupId)
+  };
+  upsertById(flow.statusGroups, (item) => item.statusGroupId, next);
+}
+
 function upsertById<T>(items: T[], getId: (item: T) => string, next: T): void {
   const nextId = getId(next);
   const index = items.findIndex((item) => getId(item) === nextId);
@@ -1032,6 +1071,40 @@ function readStringArray(value: unknown): string[] {
     return [];
   }
   return value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+}
+
+function readStatusGroupColor(value: unknown, fallback: string): string {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value.trim()) ? value.trim() : fallback;
+}
+
+function uniqueStatusGroupColor(color: string, groups: ProductStatusGroup[], currentId: string): string {
+  return statusGroupColorExists(color, groups, currentId) ? randomStatusGroupColor(groups, currentId) : color;
+}
+
+function statusGroupColorExists(color: string, groups: ProductStatusGroup[], currentId: string): boolean {
+  const normalized = color.toLowerCase();
+  return groups.some((group) =>
+    group.statusGroupId !== currentId &&
+    readStatusGroupColor(group.color, "").toLowerCase() === normalized
+  );
+}
+
+function randomStatusGroupColor(groups: ProductStatusGroup[] = [], currentId = ""): string {
+  const usedColors = new Set(
+    groups
+      .filter((group) => group.statusGroupId !== currentId)
+      .map((group) => readStatusGroupColor(group.color, "").toLowerCase())
+      .filter(Boolean)
+  );
+  const seed = Math.floor(Math.random() * 0x1000000);
+  for (let attempt = 0; attempt < 0x1000000; attempt += 1) {
+    const value = (seed + attempt * 9973) % 0x1000000;
+    const color = `#${value.toString(16).padStart(6, "0")}`;
+    if (!usedColors.has(color)) {
+      return color;
+    }
+  }
+  return "#000000";
 }
 
 function normalizeSurfaceType(value: string): AppSurface["type"] {

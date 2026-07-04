@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.0.0",
   "flowId": "flow_example-requirements-md_f04201",
-  "revision": 21,
+  "revision": 27,
   "title": "多应用端采购协同平台需求示例",
   "sourceDocumentId": "/Users/wang/Documents/MindFlow/samples/example-requirements.md",
   "sourceSummary": "基于示例需求生成的多应用端采购协同平台产品流程。",
   "createdAt": "2026-07-04T18:03:20.124Z",
-  "updatedAt": "2026-07-04T22:46:10.747Z",
+  "updatedAt": "2026-07-04T23:50:24.519Z",
   "domains": [
     {
       "domainId": "domain_plan",
@@ -871,7 +871,7 @@
       "nodeId": "page_page-5c8a02_5c8a02",
       "stableKey": "2b336832949b",
       "status": "active",
-      "version": 1,
+      "version": 2,
       "title": "报价对比页",
       "pageType": "workspace",
       "appSurfaceIds": [
@@ -924,28 +924,28 @@
       ],
       "elements": [
         {
-          "elementId": "el_element-cbb2ff_97c83a",
+          "elementId": "el_element-cbb2ff_60bcdc",
           "name": "供应商名称",
           "type": "input",
           "description": "按供应商名称筛选。",
           "required": true
         },
         {
-          "elementId": "el_element-1bc481_d9719b",
+          "elementId": "el_element-1bc481_236000",
           "name": "报价结果列表",
           "type": "table",
           "description": "展示供应商、报价、税率、交期、评分和风险标签。",
           "required": true
         },
         {
-          "elementId": "el_element-e96dc5_53a1fd",
+          "elementId": "el_element-e96dc5_584ec4",
           "name": "查询按钮",
           "type": "button",
           "description": "查询报价列表。",
           "required": false
         },
         {
-          "elementId": "el_element-11c09d_763c6f",
+          "elementId": "el_element-11c09d_94be50",
           "name": "生成比价报告按钮",
           "type": "button",
           "description": "生成比价报告。",
@@ -954,13 +954,13 @@
       ],
       "actions": [
         {
-          "actionId": "act_action-e96dc5_53a1fd",
+          "actionId": "act_action-e96dc5_584ec4",
           "label": "查询按钮",
           "type": "user",
           "result": "查询报价列表。"
         },
         {
-          "actionId": "act_action-11c09d_763c6f",
+          "actionId": "act_action-11c09d_94be50",
           "label": "生成比价报告按钮",
           "type": "user",
           "result": "生成比价报告。"
@@ -1002,7 +1002,9 @@
           "x": 60,
           "y": 380
         }
-      }
+      },
+      "statusGroupId": "status_mr70lqe1_jty0n",
+      "updatedByChangeSetId": "manual"
     },
     {
       "nodeId": "page_page-d501c4_d501c4",
@@ -3267,5 +3269,32 @@
   "syncState": {
     "issues": []
   },
-  "openQuestions": []
+  "openQuestions": [],
+  "statusGroups": [
+    {
+      "statusGroupId": "status_mr70lqe1_jty0n",
+      "title": "新状态组 1",
+      "color": "#c89a69"
+    },
+    {
+      "statusGroupId": "status_mr70lqrg_hkxro",
+      "title": "新状态组 2",
+      "color": "#4c5adb"
+    },
+    {
+      "statusGroupId": "status_mr70lr7n_e2vsh",
+      "title": "新状态组 3",
+      "color": "#06a99a"
+    },
+    {
+      "statusGroupId": "status_mr70lrcq_gw4sp",
+      "title": "新状态组 4",
+      "color": "#ba8dc3"
+    },
+    {
+      "statusGroupId": "status_mr70lrhu_mqxas",
+      "title": "新状态组 5",
+      "color": "#fa6a32"
+    }
+  ]
 }

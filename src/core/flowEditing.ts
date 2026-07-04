@@ -39,6 +39,7 @@ export interface UpdateNodeDetailsInput {
   pageType?: string;
   purpose?: string;
   appSurfaceIds?: string[];
+  statusGroupId?: string;
   domainIds?: string[];
   roleIds?: string[];
   permissions?: string[];
@@ -126,6 +127,14 @@ export function updateManualNodeDetails(flow: ProductFlow, nodeId: string, patch
   if (patch.appSurfaceIds !== undefined) {
     node.appSurfaceIds = normalizeStringArray(patch.appSurfaceIds);
   }
+  if (patch.statusGroupId !== undefined) {
+    const statusGroupId = typeof patch.statusGroupId === "string" ? patch.statusGroupId.trim() : "";
+    if (statusGroupId && (flow.statusGroups || []).some((group) => group.statusGroupId === statusGroupId)) {
+      node.statusGroupId = statusGroupId;
+    } else {
+      delete node.statusGroupId;
+    }
+  }
   if (patch.domainIds !== undefined) {
     node.domainIds = normalizeStringArray(patch.domainIds);
   }
@@ -195,7 +204,7 @@ export function createManualEdge(flow: ProductFlow, input: CreateEdgeInput): Flo
     to,
     action: trigger,
     trigger,
-    type: input.type ?? "navigate",
+    type: input.type ?? "interaction",
     condition: input.condition,
     appSurfaceIds: mergeUnique(endpointAppSurfaceIds(flow, from), endpointAppSurfaceIds(flow, to)),
     domainIds: mergeUnique(endpointDomainIds(flow, from), endpointDomainIds(flow, to)),

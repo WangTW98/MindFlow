@@ -3,6 +3,7 @@ export type EdgeType =
   | "interaction"
   | "autoNavigate"
   | "dataFlow"
+  | "statusChange"
   | "navigate"
   | "submit"
   | "approve"
@@ -46,6 +47,12 @@ export interface AppSurface {
       y: number;
     };
   };
+}
+
+export interface ProductStatusGroup {
+  statusGroupId: string;
+  title: string;
+  color: string;
 }
 
 export interface PageElement {
@@ -104,6 +111,7 @@ export interface PageNode {
   title: string;
   pageType: string;
   appSurfaceIds?: string[];
+  statusGroupId?: string;
   domainIds: string[];
   roleIds: string[];
   purpose: string;
@@ -240,6 +248,7 @@ export interface ProductFlow {
   domains: BusinessDomain[];
   roles: UserRole[];
   appSurfaces?: AppSurface[];
+  statusGroups?: ProductStatusGroup[];
   nodes: PageNode[];
   edges: FlowEdge[];
   artifacts: {
@@ -281,6 +290,9 @@ export function validateProductFlow(flow: unknown): ValidationResult {
   requireArray(flow, "roles", errors);
   if ("appSurfaces" in flow) {
     requireArray(flow, "appSurfaces", errors);
+  }
+  if ("statusGroups" in flow) {
+    requireArray(flow, "statusGroups", errors);
   }
   requireArray(flow, "nodes", errors);
   requireArray(flow, "edges", errors);
@@ -353,6 +365,35 @@ export function validateProductFlow(flow: unknown): ValidationResult {
         }
         appSurfaceIds.add(surface.appId);
       }
+    }
+  }
+
+  const statusGroupIds = new Set<string>();
+  if (Array.isArray(flow.statusGroups)) {
+    for (const [index, group] of flow.statusGroups.entries()) {
+      if (!isRecord(group)) {
+        errors.push(`statusGroups[${index}] must be an object.`);
+        continue;
+      }
+      requireString(group, "statusGroupId", errors, `statusGroups[${index}]`);
+      requireString(group, "title", errors, `statusGroups[${index}]`);
+      requireString(group, "color", errors, `statusGroups[${index}]`);
+      if (typeof group.statusGroupId === "string") {
+        if (statusGroupIds.has(group.statusGroupId)) {
+          errors.push(`Duplicate statusGroupId: ${group.statusGroupId}`);
+        }
+        statusGroupIds.add(group.statusGroupId);
+      }
+    }
+  }
+
+  for (const [index, node] of flow.nodes.entries()) {
+    if (!isRecord(node) || node.statusGroupId === undefined) {
+      continue;
+    }
+    requireString(node, "statusGroupId", errors, `nodes[${index}]`);
+    if (typeof node.statusGroupId === "string" && node.statusGroupId && !statusGroupIds.has(node.statusGroupId)) {
+      warnings.push(`nodes[${index}].statusGroupId references missing status group ${node.statusGroupId}.`);
     }
   }
 
