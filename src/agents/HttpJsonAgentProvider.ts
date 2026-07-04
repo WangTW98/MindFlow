@@ -12,7 +12,7 @@ import { buildGeneratePencilPrompt } from "../prompts/generatePencil";
 import { buildGeneratePrdPrompt } from "../prompts/generatePrd";
 import { buildModifyFlowPrompt } from "../prompts/modifyFlow";
 
-const PRODUCT_FLOW_SCHEMA_SUMMARY = "ProductFlow fields: schemaVersion, flowId, revision, title, sourceDocumentId, sourceSummary, createdAt, updatedAt, domains, roles, nodes, edges, artifacts, changeHistory, syncState.";
+const PRODUCT_FLOW_SCHEMA_SUMMARY = "ProductFlow fields: schemaVersion, flowId, revision, title, sourceDocumentId, sourceSummary, createdAt, updatedAt, domains, roles, appSurfaces, nodes, edges, artifacts, changeHistory, syncState, productDesignIssues, openQuestions. productDesignIssues is an array of { issueId, severity: critical|warning|optional, title, description, prompt, relatedNodeIds?, relatedEdgeIds?, sourceRefs? } for product logic/design closure and requirement improvement issues.";
 const FLOW_CHANGE_SCHEMA_SUMMARY = "FlowChangePlan fields: changeSetId, flowId, baseRevision, instruction, intent, requiresClarification, operations, affectedNodeIds, affectedEdgeIds, artifactImpact, openQuestions, confidence.";
 
 export abstract class HttpJsonAgentProvider implements AgentProvider {

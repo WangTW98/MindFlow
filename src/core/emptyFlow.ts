@@ -25,6 +25,7 @@ export function createEmptyProductFlow(title = "Untitled MindFlow"): ProductFlow
     syncState: {
       issues: []
     },
+    productDesignIssues: [],
     openQuestions: []
   };
 }

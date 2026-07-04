@@ -37,6 +37,9 @@ test("MockProvider analyzes a document into a valid ProductFlow", async () => {
   assert.equal(validation.valid, true, validation.errors.join("\n"));
   assert.ok(flow.nodes.length >= 5);
   assert.ok(flow.edges.length >= 5);
+  assert.ok(flow.productDesignIssues?.some((issue) => issue.severity === "critical"));
+  assert.ok(flow.productDesignIssues?.some((issue) => issue.severity === "warning"));
+  assert.ok(flow.productDesignIssues?.some((issue) => issue.severity === "optional"));
 });
 
 test("Empty ProductFlow starts as a valid blank canvas", () => {
@@ -49,6 +52,7 @@ test("Empty ProductFlow starts as a valid blank canvas", () => {
   assert.equal(flow.domains.length, 0);
   assert.equal(flow.roles.length, 0);
   assert.equal(flow.appSurfaces?.length, 0);
+  assert.equal(flow.productDesignIssues?.length, 0);
 });
 
 test("Blank MindFlow opens as an untitled document without a target file path", () => {

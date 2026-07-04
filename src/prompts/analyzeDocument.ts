@@ -12,6 +12,8 @@ export const analyzeDocumentPrompt = `你是产品架构分析 Agent。请把输
 - 为每个节点标注 appSurfaceIds；默认所有应用端节点可统一展示，跨应用端边也允许存在。
 - 节点中的功能必须按 featureGroups / items 分组输出；卡片、功能分组、功能项都可能成为后续连线起点。
 - 保留来源引用 sourceRefs，用于追溯文档依据。
+- 结合实际产品业务推断逻辑闭环、异常路径、需求优化、角色权限、跨端协作和数据流转等产品设计问题，写入 productDesignIssues。
+- productDesignIssues 按严重程度分为 critical、warning、optional；每条必须包含 title、description、prompt，其中 prompt 是可直接粘贴给 agent 的处理提示词。
 - 如果文档存在不确定内容，写入 openQuestions，不要编造。
 
 硬性要求：

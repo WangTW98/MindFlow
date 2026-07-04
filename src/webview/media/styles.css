@@ -868,6 +868,7 @@ small,
   border-color: var(--border);
   background: transparent;
   color: var(--muted);
+  cursor: pointer;
   line-height: 1;
 }
 
@@ -889,6 +890,259 @@ small,
 .feature-icon-button {
   width: 26px;
   height: 26px;
+}
+
+.product-issue-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 22;
+  display: grid;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: var(--card-shadow);
+}
+
+.product-issues-open .product-issue-fab {
+  bottom: calc(min(36vh, 320px) + 28px);
+}
+
+.product-issue-button {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  color: var(--fg);
+}
+
+.product-issue-button-critical {
+  color: var(--danger);
+}
+
+.product-issue-button-warning {
+  color: var(--vscode-charts-orange, #d18616);
+}
+
+.product-issue-button-optional {
+  color: var(--vscode-charts-blue, #3794ff);
+}
+
+.product-issue-button.active {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor, transparent 88%);
+}
+
+.product-issue-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  border: 1px solid var(--bg);
+  border-radius: 999px;
+  padding: 0 4px;
+  background: var(--danger);
+  color: var(--vscode-button-foreground);
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+}
+
+.product-issue-panel {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 21;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: min(36vh, 320px);
+  min-height: 172px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg);
+  box-shadow: var(--card-shadow-strong);
+}
+
+.product-issue-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 9px 10px;
+}
+
+.product-issue-title,
+.product-issue-panel-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.product-issue-title strong,
+.product-issue-title span {
+  white-space: nowrap;
+}
+
+.product-issue-title span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.product-issue-tabs {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.product-issue-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  border-color: var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.product-issue-tab.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent), transparent 84%);
+  color: var(--fg);
+}
+
+.product-issue-tab span {
+  min-width: 16px;
+  border-radius: 999px;
+  padding: 0 5px;
+  background: color-mix(in srgb, var(--border), transparent 28%);
+  color: var(--fg);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.product-issue-close {
+  flex: 0 0 auto;
+}
+
+.product-issue-list {
+  min-height: 0;
+  overflow: auto;
+}
+
+.product-issue-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid color-mix(in srgb, var(--border), transparent 42%);
+  padding: 10px 12px;
+}
+
+.product-issue-row:last-child {
+  border-bottom: 0;
+}
+
+.product-issue-row-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.product-issue-row h4,
+.product-issue-row p {
+  margin: 0;
+}
+
+.product-issue-row h4 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.product-issue-row p {
+  color: var(--muted);
+  line-height: 1.42;
+}
+
+.product-issue-copy {
+  width: 30px;
+  height: 30px;
+}
+
+.product-issue-empty {
+  padding: 16px;
+}
+
+.clipboard-fallback {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.mindflow-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 40;
+  transform: translate(-50%, 8px);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 11px;
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: var(--card-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.mindflow-toast.visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+@media (max-width: 720px) {
+  .product-issues-open .product-issue-fab {
+    bottom: calc(min(44vh, 360px) + 24px);
+  }
+
+  .product-issue-panel {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    max-height: min(44vh, 360px);
+  }
+
+  .product-issue-panel-head {
+    display: grid;
+    align-items: start;
+  }
+
+  .product-issue-panel-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .product-issue-tabs {
+    overflow-x: auto;
+  }
+
+  .product-issue-row h4 {
+    white-space: normal;
+  }
 }
 
 .inspector h2 {

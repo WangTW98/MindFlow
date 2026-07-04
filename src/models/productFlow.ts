@@ -201,6 +201,19 @@ export interface SyncIssue {
   autoFixAvailable?: boolean;
 }
 
+export type ProductDesignIssueSeverity = "critical" | "warning" | "optional";
+
+export interface ProductDesignIssue {
+  issueId: string;
+  severity: ProductDesignIssueSeverity;
+  title: string;
+  description: string;
+  prompt: string;
+  relatedNodeIds?: string[];
+  relatedEdgeIds?: string[];
+  sourceRefs?: SourceRef[];
+}
+
 export interface ChangeSetSummary {
   changeSetId: string;
   baseRevision: number;
@@ -238,6 +251,7 @@ export interface ProductFlow {
     lastSyncedAt?: string;
     issues: SyncIssue[];
   };
+  productDesignIssues?: ProductDesignIssue[];
   openQuestions?: string[];
 }
 
@@ -273,6 +287,9 @@ export function validateProductFlow(flow: unknown): ValidationResult {
   requireObject(flow, "artifacts", errors);
   requireArray(flow, "changeHistory", errors);
   requireObject(flow, "syncState", errors);
+  if ("productDesignIssues" in flow) {
+    requireArray(flow, "productDesignIssues", errors);
+  }
 
   if (!Array.isArray(flow.nodes) || !Array.isArray(flow.edges)) {
     return { valid: errors.length === 0, errors, warnings };
@@ -374,6 +391,8 @@ export function validateProductFlow(flow: unknown): ValidationResult {
     checkEndpoint(edge.to, `edges[${index}].to`, nodeIds, appSurfaceIds, errors);
   }
 
+  validateProductDesignIssues(flow.productDesignIssues, nodeIds, edgeIds, errors, warnings);
+
   const artifactIds = new Set<string>();
   const artifacts = flow.artifacts;
   if (isRecord(artifacts)) {
@@ -391,6 +410,76 @@ export function validateProductFlow(flow: unknown): ValidationResult {
 
 export function isProductFlow(flow: unknown): flow is ProductFlow {
   return validateProductFlow(flow).valid;
+}
+
+function validateProductDesignIssues(
+  value: unknown,
+  nodeIds: Set<string>,
+  edgeIds: Set<string>,
+  errors: string[],
+  warnings: string[]
+): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!Array.isArray(value)) {
+    return;
+  }
+  const issueIds = new Set<string>();
+  const severities = new Set<ProductDesignIssueSeverity>(["critical", "warning", "optional"]);
+  for (const [index, issue] of value.entries()) {
+    const path = `productDesignIssues[${index}]`;
+    if (!isRecord(issue)) {
+      errors.push(`${path} must be an object.`);
+      continue;
+    }
+    requireString(issue, "issueId", errors, path);
+    requireString(issue, "severity", errors, path);
+    requireString(issue, "title", errors, path);
+    requireString(issue, "description", errors, path);
+    requireString(issue, "prompt", errors, path);
+
+    if (typeof issue.issueId === "string") {
+      if (issueIds.has(issue.issueId)) {
+        errors.push(`Duplicate productDesignIssue issueId: ${issue.issueId}`);
+      }
+      issueIds.add(issue.issueId);
+    }
+    if (typeof issue.severity === "string" && !severities.has(issue.severity as ProductDesignIssueSeverity)) {
+      errors.push(`${path}.severity must be critical, warning, or optional.`);
+    }
+    checkOptionalStringReferences(issue.relatedNodeIds, `${path}.relatedNodeIds`, nodeIds, "node", errors, warnings);
+    checkOptionalStringReferences(issue.relatedEdgeIds, `${path}.relatedEdgeIds`, edgeIds, "edge", errors, warnings);
+    if ("sourceRefs" in issue) {
+      requireArray(issue, "sourceRefs", errors, path);
+    }
+  }
+}
+
+function checkOptionalStringReferences(
+  value: unknown,
+  path: string,
+  knownIds: Set<string>,
+  label: "node" | "edge",
+  errors: string[],
+  warnings: string[]
+): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!Array.isArray(value)) {
+    errors.push(`${path} must be an array.`);
+    return;
+  }
+  for (const [index, item] of value.entries()) {
+    if (typeof item !== "string") {
+      errors.push(`${path}[${index}] must be a string.`);
+      continue;
+    }
+    if (!knownIds.has(item)) {
+      warnings.push(`${path}[${index}] references missing ${label} ${item}.`);
+    }
+  }
 }
 
 function checkArtifactIds(
