@@ -890,19 +890,19 @@ small,
 
 .feature-groups {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   min-height: 0;
   overflow: visible;
 }
 
 .feature-group {
   display: grid;
-  gap: 7px;
-  border: 1px solid color-mix(in srgb, var(--outlet), var(--border) 68%);
-  border-left: 4px solid var(--outlet);
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--border), transparent 10%);
   border-radius: 6px;
-  padding: 8px 8px 8px 10px;
+  padding: 9px;
   background: var(--group-bg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .feature-group-head {
@@ -931,7 +931,7 @@ small,
 
 .feature-group ul {
   display: grid;
-  gap: 4px;
+  gap: 7px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -942,11 +942,11 @@ small,
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 8px;
-  margin-left: 10px;
-  border-left: 2px solid var(--inlet);
-  border-radius: 4px;
-  padding: 4px 0 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--border), transparent 12%);
+  border-radius: 5px;
+  padding: 6px 8px;
   background: color-mix(in srgb, var(--input), transparent 38%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
 }
 
 .compact {
@@ -1293,7 +1293,8 @@ small,
   gap: 12px;
 }
 
-.edge-type-field {
+.edge-type-field,
+.status-group-field {
   display: grid;
   gap: 5px;
 }
@@ -1302,14 +1303,17 @@ small,
   color: var(--fg);
 }
 
-.edge-type-picker {
+.edge-type-picker,
+.status-group-picker {
   position: relative;
   display: grid;
   gap: 4px;
 }
 
 .edge-type-trigger,
-.edge-type-option {
+.edge-type-option,
+.status-group-trigger,
+.status-group-option {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
@@ -1327,12 +1331,16 @@ small,
 
 .edge-type-trigger:hover,
 .edge-type-option:hover,
-.edge-type-option.selected {
+.edge-type-option.selected,
+.status-group-trigger:hover,
+.status-group-option:hover,
+.status-group-option.selected {
   border-color: color-mix(in srgb, var(--accent), transparent 35%);
   background: color-mix(in srgb, var(--accent), transparent 86%);
 }
 
-.edge-type-menu {
+.edge-type-menu,
+.status-group-menu {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
@@ -1349,11 +1357,13 @@ small,
   padding: 5px;
 }
 
-.edge-type-picker.open .edge-type-menu {
+.edge-type-picker.open .edge-type-menu,
+.status-group-picker.open .status-group-menu {
   display: grid;
 }
 
-.edge-type-option {
+.edge-type-option,
+.status-group-option {
   background: transparent;
   color: var(--fg);
 }
@@ -1382,6 +1392,34 @@ small,
 .edge-type-copy small {
   line-height: 1.35;
   white-space: normal;
+}
+
+.status-group-trigger,
+.status-group-option {
+  align-items: center;
+  min-height: 38px;
+}
+
+.status-group-picker-swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+}
+
+.status-group-picker-swatch.empty {
+  border: 1px dashed color-mix(in srgb, var(--muted), transparent 30%);
+  background: transparent;
+}
+
+.status-group-picker-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.status-group-picker-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .endpoint-picker {
@@ -1580,22 +1618,34 @@ small,
 
 .feature-edit-items {
   display: grid;
-  gap: 6px;
+  gap: 9px;
   min-height: 18px;
-  padding: 6px;
+  padding: 8px;
   border: 1px dashed color-mix(in srgb, var(--border), transparent 20%);
   border-radius: 4px;
 }
 
 .feature-edit-item {
   display: grid;
-  grid-template-columns: auto 1fr 80px 1fr auto auto;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--border), transparent 10%);
+  border-radius: 5px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--card), var(--input) 34%);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.feature-edit-item-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 82px auto;
   align-items: center;
   gap: 6px;
-  border-left: 2px solid var(--outlet);
-  border-radius: 4px;
-  padding-left: 6px;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.feature-edit-item .item-description {
+  min-height: 54px;
+  resize: vertical;
 }
 
 .drag-handle {

@@ -636,14 +636,57 @@
 
   function renderStatusGroupSelect(flow, node) {
     const groups = getStatusGroups(flow);
-    const selectedId = groups.some((group) => group.statusGroupId === node.statusGroupId) ? node.statusGroupId : "";
+    const selectedGroup = groups.find((group) => group.statusGroupId === node.statusGroupId) || null;
+    const selectedId = selectedGroup?.statusGroupId || "";
     return `
-      <label>状态组
-        <select id="nodeStatusGroupId">
-          <option value="" ${selectedId ? "" : "selected"}>无</option>
-          ${groups.map((group) => `<option value="${escapeAttr(group.statusGroupId)}" ${selectedId === group.statusGroupId ? "selected" : ""}>${escapeHtml(group.title)}</option>`).join("")}
-        </select>
-      </label>
+      <div class="status-group-field">
+        <span class="field-label">状态组</span>
+        <input id="nodeStatusGroupId" type="hidden" value="${escapeAttr(selectedId)}">
+        <div class="status-group-picker" data-status-group-picker>
+          <button type="button"
+            class="status-group-trigger"
+            data-status-group-value="${escapeAttr(selectedId)}"
+            aria-haspopup="listbox"
+            aria-expanded="false">
+            ${renderStatusGroupOptionContent(selectedGroup)}
+          </button>
+          <div class="status-group-menu" role="listbox" aria-label="状态组">
+            <button type="button"
+              class="status-group-option ${selectedId ? "" : "selected"}"
+              data-status-group-option=""
+              role="option"
+              aria-selected="${selectedId ? "false" : "true"}">
+              ${renderStatusGroupOptionContent(null)}
+            </button>
+            ${groups.map((group) => `
+              <button type="button"
+                class="status-group-option ${selectedId === group.statusGroupId ? "selected" : ""}"
+                data-status-group-option="${escapeAttr(group.statusGroupId)}"
+                role="option"
+                aria-selected="${selectedId === group.statusGroupId ? "true" : "false"}">
+                ${renderStatusGroupOptionContent(group)}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderStatusGroupOptionContent(statusGroup) {
+    if (!statusGroup) {
+      return `
+        <span class="status-group-picker-swatch empty" aria-hidden="true"></span>
+        <span class="status-group-picker-copy">
+          <strong>无状态组</strong>
+        </span>
+      `;
+    }
+    return `
+      <span class="status-group-color-square status-group-picker-swatch" data-status-group-color="${escapeAttr(normalizeStatusGroupColor(statusGroup.color))}" aria-hidden="true"></span>
+      <span class="status-group-picker-copy">
+        <strong>${escapeHtml(statusGroup.title)}</strong>
+      </span>
     `;
   }
 
@@ -931,13 +974,14 @@
 
   function renderFeatureEditorItem(item, groupIndex, itemIndex) {
     return `
-      <div class="feature-edit-item" data-group-index="${groupIndex}" data-item-index="${itemIndex}" data-item-id="${escapeAttr(item.itemId || makeClientId("item"))}">
-        ${renderIconActionButton("drag-handle", "拖拽排序功能项", "grip-vertical", `data-drag-kind="item" data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
-        <input class="item-name" value="${escapeAttr(item.name || "")}" placeholder="功能项名称">
-        <input class="item-type" value="${escapeAttr(item.type || "text")}" placeholder="类型">
-        <input class="item-description" value="${escapeAttr(item.description || "")}" placeholder="说明">
-        <label class="checkbox-label"><input class="item-required" type="checkbox" ${item.required ? "checked" : ""}> 必填</label>
-        ${renderIconActionButton("delete-feature-item danger-text", "删除功能项", "trash-2", `data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
+      <div class="feature-edit-item" data-group-index="${groupIndex}" data-item-index="${itemIndex}" data-item-id="${escapeAttr(item.itemId || makeClientId("item"))}" data-item-required="${item.required ? "true" : "false"}">
+        <div class="feature-edit-item-main">
+          ${renderIconActionButton("drag-handle", "拖拽排序功能项", "grip-vertical", `data-drag-kind="item" data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
+          <input class="item-name" value="${escapeAttr(item.name || "")}" placeholder="功能项名称">
+          <input class="item-type" value="${escapeAttr(item.type || "text")}" placeholder="类型">
+          ${renderIconActionButton("delete-feature-item danger-text", "删除功能项", "trash-2", `data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
+        </div>
+        <textarea class="item-description" rows="2" placeholder="功能项介绍">${escapeHtml(item.description || "")}</textarea>
       </div>
     `;
   }
@@ -1242,6 +1286,22 @@
     });
     nodeForm.addEventListener("change", () => {
       commitNodeDetailsChange({ immediate: true });
+    });
+    nodeForm.querySelectorAll(".status-group-trigger").forEach((trigger) => {
+      trigger.addEventListener("click", () => toggleStatusGroupPicker(trigger));
+      trigger.addEventListener("keydown", (event) => event.stopPropagation());
+    });
+    nodeForm.querySelectorAll(".status-group-picker").forEach((picker) => {
+      picker.addEventListener("focusout", () => {
+        setTimeout(() => {
+          if (!picker.contains(document.activeElement)) {
+            closeStatusGroupPicker(picker);
+          }
+        }, 0);
+      });
+    });
+    nodeForm.querySelectorAll(".status-group-option").forEach((option) => {
+      option.addEventListener("click", () => selectStatusGroupOption(option));
     });
     bindFeatureEditor();
   }
@@ -1594,7 +1654,7 @@
         name: itemEl.querySelector(".item-name").value.trim() || "未命名功能项",
         type: itemEl.querySelector(".item-type").value.trim() || "text",
         description: itemEl.querySelector(".item-description").value.trim(),
-        required: Boolean(itemEl.querySelector(".item-required").checked)
+        required: itemEl.dataset.itemRequired === "true"
       }))
     }));
   }
@@ -3295,6 +3355,43 @@
     option.setAttribute("aria-selected", "true");
     closeEdgeTypePicker(picker);
     submitEdgeDetails({ immediate: true });
+  }
+
+  function toggleStatusGroupPicker(trigger) {
+    const picker = trigger.closest(".status-group-picker");
+    if (!picker) {
+      return;
+    }
+    const open = !picker.classList.contains("open");
+    picker.classList.toggle("open", open);
+    trigger.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function closeStatusGroupPicker(picker) {
+    picker.classList.remove("open");
+    picker.querySelector(".status-group-trigger")?.setAttribute("aria-expanded", "false");
+  }
+
+  function selectStatusGroupOption(option) {
+    const picker = option.closest(".status-group-picker");
+    const trigger = picker?.querySelector(".status-group-trigger");
+    const input = document.getElementById("nodeStatusGroupId");
+    if (!picker || !trigger || !input) {
+      return;
+    }
+    const value = option.dataset.statusGroupOption || "";
+    input.value = value;
+    trigger.dataset.statusGroupValue = value;
+    trigger.innerHTML = option.innerHTML;
+    applyStatusGroupColorSwatches(trigger);
+    picker.querySelectorAll(".status-group-option.selected").forEach((item) => {
+      item.classList.remove("selected");
+      item.setAttribute("aria-selected", "false");
+    });
+    option.classList.add("selected");
+    option.setAttribute("aria-selected", "true");
+    closeStatusGroupPicker(picker);
+    commitNodeDetailsChange({ immediate: true });
   }
 
   function normalizeEdgeTypeForSelect(type) {

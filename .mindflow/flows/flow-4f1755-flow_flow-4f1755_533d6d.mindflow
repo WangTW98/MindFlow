@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.0",
   "flowId": "flow_flow-4f1755_533d6d",
-  "revision": 31,
+  "revision": 36,
   "title": "多应用端采购协同平台",
   "sourceDocumentId": "samples/example-requirements.md",
   "sourceSummary": "从 samples/example-requirements.md 提取四个应用端、采购协同核心流程、业务域、角色、功能分组与跨应用端连线。",
   "createdAt": "2026-07-05T08:12:37.260Z",
-  "updatedAt": "2026-07-05T08:47:07.104Z",
+  "updatedAt": "2026-07-05T08:58:48.684Z",
   "domains": [
     {
       "domainId": "domain_purchase_plan",
@@ -198,7 +198,7 @@
       "nodeId": "page_page-64451e_cdb276",
       "stableKey": "3b6bf271c6cd",
       "status": "active",
-      "version": 1,
+      "version": 5,
       "title": "新建页面",
       "pageType": "page",
       "appSurfaceIds": [
@@ -218,13 +218,15 @@
               "itemId": "item_item-da1a76_1b4922",
               "name": "主要内容",
               "type": "content",
-              "description": "承载此页面的核心业务内容。"
+              "description": "承载此页面的核心业务内容。",
+              "required": false
             },
             {
               "itemId": "item_item-16de57_707625",
               "name": "确认按钮",
               "type": "button",
-              "description": "触发页面主要业务操作。"
+              "description": "触发页面主要业务操作。",
+              "required": false
             }
           ]
         }
@@ -234,13 +236,15 @@
           "elementId": "el_element-da1a76_19b346",
           "name": "主要内容",
           "type": "content",
-          "description": "承载此页面的核心业务内容。"
+          "description": "承载此页面的核心业务内容。",
+          "required": false
         },
         {
           "elementId": "el_element-16de57_56e9c0",
           "name": "确认按钮",
           "type": "button",
-          "description": "触发页面主要业务操作。"
+          "description": "触发页面主要业务操作。",
+          "required": false
         }
       ],
       "actions": [
@@ -285,7 +289,8 @@
           "y": 9
         }
       },
-      "confidence": 1
+      "confidence": 1,
+      "updatedByChangeSetId": "manual"
     },
     {
       "nodeId": "page_page-64451e_d5c1fd",
@@ -588,7 +593,8 @@
       "trigger": "手动连接",
       "type": "interaction",
       "appSurfaceIds": [
-        "app_admin_backend"
+        "app_admin_backend",
+        "app_supplier_portal"
       ],
       "domainIds": [
         "domain_purchase_plan",
@@ -609,7 +615,8 @@
           "excerpt": "管理后台 -> page_page-64451e_cdb276"
         }
       ],
-      "confidence": 1
+      "confidence": 1,
+      "updatedByChangeSetId": "manual"
     },
     {
       "edgeId": "edge_75c6bb3826",
