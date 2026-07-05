@@ -1,0 +1,154 @@
+import { strict as assert } from "node:assert";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
+import test from "node:test";
+import type * as vscode from "vscode";
+import { ensureAppSurfaceEntryEdges } from "../src/core/appSurfaceEntryEdges";
+import { ensureReasonableNodeLayout } from "../src/core/canvasLayout";
+import { createEmptyProductFlow } from "../src/core/emptyFlow";
+import { createManualEdge, createManualNode, removeManualEdge, removeManualNode, updateManualAppSurfacePosition, updateManualEdgeDetails, updateManualNodeDetails, updateManualNodePosition } from "../src/core/flowEditing";
+import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/core/projectOverview";
+import { applyTaxonomyRequest } from "../src/core/taxonomy";
+import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/core/taxonomyEditing";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/core/untitledMindFlowDocument";
+import { EDGE_TYPES, validateProductFlow } from "../src/models/productFlow";
+import { parseProductFlowText, serializeProductFlow } from "../src/models/productFlowCodec";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
+import { RecentFlowStore } from "../src/storage/recentFlows";
+import { recordEdgeDetailsRevision } from "../src/webview/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/webview/flowWebviewHtml";
+import { parseWebviewMessage } from "../src/webview/flowWebviewMessages";
+import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
+
+test("real-provider fixture creates a valid ProductFlow with app-surface entry edges", () => {
+  const flow = createProcurementFlow();
+  const validation = validateProductFlow(flow);
+
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+  assert.equal(flow.appSurfaces?.length, 4);
+  assert.ok(flow.nodes.length >= 15);
+  assert.ok(flow.edges.length >= 20);
+  assertAppSurfaceEntryEdge(flow, "app_admin", "采购工作台");
+  assertAppSurfaceEntryEdge(flow, "app_supplier_portal", "供应商门户首页");
+  assertAppSurfaceEntryEdge(flow, "app_mobile_approval", "移动审批待办");
+  assertAppSurfaceEntryEdge(flow, "app_public_site", "采购公告列表");
+});
+
+test("Empty ProductFlow starts as a valid blank canvas", () => {
+  const flow = createEmptyProductFlow();
+  const validation = validateProductFlow(flow);
+
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+  assert.equal(flow.schemaVersion, "2.0");
+  assert.equal(flow.nodes.length, 0);
+  assert.equal(flow.edges.length, 0);
+  assert.equal(flow.projectOverview.summary, "Manually created blank MindFlow.");
+  assert.equal(flow.projectOverview.goal, "");
+  assert.equal(flow.domains.length, 0);
+  assert.equal(flow.roles.length, 0);
+  assert.equal(flow.appSurfaces?.length, 0);
+  assert.equal(flow.statusGroups?.length, 0);
+  assertNoLegacyFields(flow);
+});
+
+test("JSON schema edge type enum stays aligned with runtime validation", async () => {
+  const raw = await fs.readFile(path.join(process.cwd(), "src", "schema", "productFlow.schema.json"), "utf8");
+  const schema = JSON.parse(raw) as {
+    $defs?: {
+      edgeType?: {
+        enum?: string[];
+      };
+    };
+  };
+
+  assert.deepEqual(schema.$defs?.edgeType?.enum, [...EDGE_TYPES]);
+});
+
+test("ProductFlow validation rejects invalid enums and stale references", () => {
+  const flow = createEmptyProductFlow();
+  const node = createManualNode(flow, { title: "异常节点" });
+  const record = node as unknown as Record<string, unknown>;
+  record.status = "unknown";
+  node.domainIds = ["missing_domain"];
+
+  const validation = validateProductFlow(flow);
+
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((error) => error.includes("nodes[0].status must be")));
+  assert.ok(validation.errors.some((error) => error.includes("references missing domain missing_domain")));
+});
+
+test("Legacy ProductFlow missing projectOverview can be backfilled", () => {
+  const flow = createEmptyProductFlow();
+  delete (flow as unknown as { projectOverview?: unknown }).projectOverview;
+
+  const result = ensureProjectOverview(flow);
+  const validation = validateProductFlow(flow);
+
+  assert.equal(result.changed, true);
+  assert.equal(flow.projectOverview.summary, "Manually created blank MindFlow.");
+  assert.equal(flow.projectOverview.goal, "");
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+});
+
+test("Project overview details update local project metadata", () => {
+  const flow = createEmptyProductFlow();
+
+  updateProjectOverview(flow, {
+    title: "供应链协同平台",
+    summary: "覆盖采购、供应商和审批协同。",
+    goal: "提升跨端采购协作效率。"
+  });
+
+  assert.equal(flow.title, "供应链协同平台");
+  assert.equal(flow.projectOverview.summary, "覆盖采购、供应商和审批协同。");
+  assert.equal(flow.projectOverview.goal, "提升跨端采购协作效率。");
+  assert.equal(validateProductFlow(flow).valid, true);
+});
+
+test("Blank MindFlow opens as an untitled document without a target file path", () => {
+  const flow = createEmptyProductFlow();
+  const options = createUntitledMindFlowDocumentOptions(flow);
+  const suggestedFileName = createUntitledMindFlowFileName(flow);
+  const validation = validateProductFlow(JSON.parse(options.content) as unknown);
+
+  assert.equal(options.language, MINDFLOW_LANGUAGE_ID);
+  assert.equal("uri" in options, false);
+  assert.equal(suggestedFileName.startsWith("Untitled-MindFlow-"), true);
+  assert.equal(suggestedFileName.endsWith(MINDFLOW_FILE_EXTENSION), true);
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+});
+
+test("ProductFlow codec migrates legacy generation fields to local v2", () => {
+  const legacy = createProcurementFlow();
+  const legacyRecord = legacy as unknown as Record<string, unknown>;
+  const legacyNode = legacy.nodes[0] as unknown as Record<string, unknown>;
+  const legacyEdge = legacy.edges[0] as unknown as Record<string, unknown>;
+
+  legacyRecord.schemaVersion = "1.0";
+  legacyRecord.sourceDocumentId = "samples/example-requirements.md";
+  legacyRecord.sourceSummary = "旧版文档摘要";
+  legacyRecord.projectOverview = { summary: "", goal: "" };
+  legacyRecord.artifacts = { prds: [], pencils: [] };
+  legacyRecord.changeHistory = [];
+  legacyRecord.syncState = { issues: [] };
+  legacyRecord.productDesignIssues = [{ issueId: "pdi_legacy", severity: "warning", title: "旧问题", description: "旧问题", prompt: "旧提示" }];
+  legacyRecord.openQuestions = ["旧问题"];
+  legacyNode.sourceRefs = [{ sourceId: "legacy", label: "legacy" }];
+  legacyNode.artifacts = { prdIds: ["prd_legacy"], pencilIds: ["pencil_legacy"] };
+  legacyNode.updatedByChangeSetId = "manual";
+  legacyNode.confidence = 1;
+  legacyEdge.sourceRefs = [{ sourceId: "legacy", label: "legacy" }];
+  legacyEdge.removedByChangeSetId = "manual";
+  legacyEdge.confidence = 1;
+
+  const result = parseProductFlowText(`${JSON.stringify(legacyRecord, null, 2)}\n`, "legacy flow");
+
+  assert.equal(result.migrated, true);
+  assert.equal(result.flow.schemaVersion, "2.0");
+  assert.equal(result.flow.projectOverview.summary, "旧版文档摘要");
+  assert.equal(result.validation.valid, true);
+  assertNoLegacyFields(result.flow);
+  assertNoLegacyKeysInJson(serializeProductFlow(result.flow));
+});

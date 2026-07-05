@@ -7,16 +7,16 @@ export const FLOW_WEBVIEW_STYLE_FILES = [
 ] as const;
 
 export const FLOW_WEBVIEW_SCRIPT_FILES = [
-  "canvas-namespace.js",
-  "canvas-boot-helpers.js",
-  "canvas-state.js",
-  "canvas-render.js",
-  "canvas-bindings.js",
-  "canvas-interactions.js",
-  "canvas-details.js",
-  "canvas-view.js",
-  "canvas-data.js",
-  "main.js"
+  "state/canvas-namespace.js",
+  "state/canvas-boot-helpers.js",
+  "state/canvas-state.js",
+  "render/canvas-render.js",
+  "events/canvas-bindings.js",
+  "events/canvas-interactions.js",
+  "details/canvas-details.js",
+  "view/canvas-view.js",
+  "data/canvas-data.js",
+  "state/main.js"
 ] as const;
 
 export interface FlowWebviewHtmlOptions {

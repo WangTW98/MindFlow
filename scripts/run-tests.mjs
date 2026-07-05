@@ -10,8 +10,12 @@ await run(tsc, ["-p", "./", "--noEmit"]);
 for (const script of await listJavaScriptFiles(path.join(root, "src", "webview", "media"))) {
   await run(process.execPath, ["--check", path.relative(root, script)]);
 }
+await fs.rm(path.join(root, "out", "test"), { recursive: true, force: true });
 await run(tsc, ["-p", "./tsconfig.test.json"]);
-await run(process.execPath, ["--test", "out/test/core.test.js"]);
+await run(process.execPath, ["--test", ...(await listJavaScriptFiles(path.join(root, "out", "test")))
+  .filter((script) => script.endsWith(".test.js"))
+  .map((script) => path.relative(root, script))
+]);
 
 async function listJavaScriptFiles(directory) {
   const entries = await fs.readdir(directory, { withFileTypes: true });

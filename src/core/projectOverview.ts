@@ -62,6 +62,9 @@ export function updateProjectOverview(flow: ProductFlow, patch: UpdateProjectOve
 }
 
 export function updateProjectOverviewPosition(flow: ProductFlow, x: number, y: number): ProjectOverview {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    throw new Error("Project overview position coordinates must be finite numbers.");
+  }
   const { overview } = ensureProjectOverview(flow);
   overview.view = {
     ...overview.view,

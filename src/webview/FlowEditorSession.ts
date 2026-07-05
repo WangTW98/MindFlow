@@ -278,7 +278,7 @@ export class FlowEditorSession {
   }
 
   private mediaUri(fileName: string): string {
-    return this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "src", "webview", "media", fileName)).toString();
+    return this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "src", "webview", "media", ...fileName.split("/"))).toString();
   }
 }
 
