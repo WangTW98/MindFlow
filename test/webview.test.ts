@@ -155,7 +155,7 @@ test("Edge detail revisions ignore stale webview saves", () => {
 
 test("Flow webview command dispatcher maps selection and edit messages", async () => {
   const dispatcher = createDispatcherHarness();
-  await dispatchFlowWebviewMessage({ type: "selectNode", nodeId: "node_a" }, dispatcher.dispatcher);
+  await dispatchFlowWebviewMessage({ type: "selectNode", nodeId: "node_a", selectedNodeIds: ["node_a", "node_b"] }, dispatcher.dispatcher);
   await dispatchFlowWebviewMessage({ type: "saveNodePosition", nodeId: "node_a", x: 12.2, y: 34.8 }, dispatcher.dispatcher);
   await dispatchFlowWebviewMessage({
     type: "createEdge",
@@ -168,7 +168,8 @@ test("Flow webview command dispatcher maps selection and edit messages", async (
   assert.deepEqual(dispatcher.selection, {
     ...emptyFlowSelection(),
     selectedProjectOverview: false,
-    selectedNodeId: "node_a"
+    selectedNodeId: "node_a",
+    selectedNodeIds: ["node_a", "node_b"]
   });
   assert.deepEqual(dispatcher.commands, [
     ["保存节点位置", "mindflow.updateNodePosition", "node_a", 12.2, 34.8, dispatcher.documentUri],
@@ -259,7 +260,7 @@ function createDispatcherHarness(initialSelection: FlowSelectionPatch = emptyFlo
       selectionController: {
         getSelection: () => ({ ...selection }),
         setSelection: (_flowUri: vscode.Uri | string, patch: FlowSelectionPatch) => {
-          selection = { ...emptyFlowSelection(), ...selection, ...patch };
+          selection = { ...emptyFlowSelection(), ...patch };
         }
       },
       executeCommand: async (label: string, command: string, ...args: unknown[]) => {

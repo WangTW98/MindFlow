@@ -12,6 +12,7 @@ MindFlow is a local VS Code editor for `.mindflow` ProductFlow JSON files. It pr
 | `mindflow.openFlow` | `MindFlow: Open Product Flow` | Pick an existing `.mindflow` file and open it in the canvas editor. |
 | `mindflow.saveFlowAs` | `MindFlow: Save Flow As...` | Save the current flow to a `.mindflow` file. |
 | `mindflow.validateFlowJson` | `MindFlow: Validate Flow JSON` | Validate the active `.mindflow` file and show errors or warnings. |
+| `mindflow.copyMcpConfig` | `MindFlow: Copy MCP Client Config` | Copy stdio MCP client config for third-party agents to connect to the active VS Code editor. |
 
 ### Editor Commands
 
@@ -37,6 +38,12 @@ These commands are registered for the custom editor webview and are used by the 
 MindFlow writes ProductFlow schema version `2.0`. The current format keeps local editor state only: project overview, app surfaces, domains, roles, status groups, nodes, edges, and canvas positions.
 
 Older `.mindflow` files that contain removed generation, artifact, history, or source-tracking fields are migrated when opened. Saving writes the local `2.0` shape.
+
+## MCP
+
+When the extension is active, MindFlow starts a local MCP endpoint on `127.0.0.1` and exposes a stdio bridge for third-party AI agents. Run `MindFlow: Copy MCP Client Config` in VS Code, then paste the copied config into your agent.
+
+MCP edits operate on the active MindFlow editor document through VS Code workspace edits. They do not write `.mindflow` files directly; use `Cmd+S` in VS Code to save the editor after reviewing changes.
 
 ## Development
 

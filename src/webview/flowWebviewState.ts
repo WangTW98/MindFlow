@@ -11,6 +11,7 @@ export function createFlowWebviewState(flow: ProductFlow, document: vscode.TextD
     flowFileName: path.basename(document.uri.fsPath),
     selectedProjectOverview: selection.selectedProjectOverview,
     selectedNodeId: selection.selectedNodeId ?? null,
+    selectedNodeIds: selection.selectedNodeIds,
     selectedEdgeId: selection.selectedEdgeId ?? null,
     selectedAppSurfaceId: selection.selectedAppSurfaceId ?? null,
     selectedDomainId: selection.selectedDomainId ?? null,

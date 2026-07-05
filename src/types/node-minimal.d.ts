@@ -64,15 +64,32 @@ declare module "node:os" {
 
 declare module "node:http" {
   export interface IncomingMessage {
+    method?: string;
+    url?: string;
     statusCode?: number;
+    headers?: Record<string, string | string[] | undefined>;
     on(event: "data", listener: (chunk: Buffer) => void): void;
     on(event: "end", listener: () => void): void;
+  }
+  export interface ServerResponse {
+    statusCode: number;
+    setHeader(name: string, value: string): void;
+    end(data?: string): void;
+  }
+  export interface Server {
+    listen(port: number, host: string, callback?: () => void): void;
+    close(callback?: (error?: Error) => void): void;
+    address(): { port: number } | string | null;
+    on(event: "error", listener: (error: Error) => void): void;
   }
   export interface ClientRequest {
     on(event: "error", listener: (error: Error) => void): void;
     write(body: string): void;
     end(): void;
   }
+  export function createServer(
+    listener: (request: IncomingMessage, response: ServerResponse) => void
+  ): Server;
   export function request(
     url: URL,
     options: { method?: string; headers?: Record<string, string> },

@@ -161,7 +161,7 @@
     const APP_SURFACE_SOURCE_X = -360;
     const APP_SURFACE_SOURCE_Y = 0;
     const APP_SURFACE_SOURCE_GAP = 240;
-    let selectedNodeIds = readIdSelection(persisted.selectedNodeIds, state.selectedNodeId || persisted.selectedNodeId);
+    let selectedNodeIds = readIdSelection(persisted.selectedNodeIds || state.selectedNodeIds, state.selectedNodeId || persisted.selectedNodeId);
     let selectedNodeId = selectedNodeIds.includes(persisted.selectedNodeId) ? persisted.selectedNodeId : selectedNodeIds.includes(state.selectedNodeId) ? state.selectedNodeId : selectedNodeIds[0] || state.selectedNodeId || persisted.selectedNodeId || "";
     if (selectedNodeIds.length === 0 && selectedNodeId) {
       selectedNodeIds = [selectedNodeId];
@@ -4001,7 +4001,7 @@
       selectedStatusGroupId = "";
       taxonomySelection = clearAllTaxonomySelections();
       if (selectedNodeId) {
-        postWebviewMessage({ type: "selectNode", nodeId: selectedNodeId });
+        postWebviewMessage({ type: "selectNode", nodeId: selectedNodeId, selectedNodeIds });
       } else {
         postWebviewMessage({ type: "clearSelection" });
       }

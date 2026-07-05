@@ -13,7 +13,7 @@ export interface FlowWebviewCommandDispatcher {
 export async function dispatchFlowWebviewMessage(message: WebviewMessage, dispatcher: FlowWebviewCommandDispatcher): Promise<void> {
   switch (message.type) {
     case "selectNode":
-      setSelection(dispatcher, { selectedProjectOverview: false, selectedNodeId: message.nodeId });
+      setSelection(dispatcher, { selectedProjectOverview: false, selectedNodeId: message.nodeId, selectedNodeIds: message.selectedNodeIds });
       break;
     case "selectEdge":
       setSelection(dispatcher, { selectedProjectOverview: false, selectedEdgeId: message.edgeId });

@@ -12,7 +12,7 @@ export function parseWebviewMessage(message: unknown): WebviewMessage | undefine
 
   switch (message.type) {
     case "selectNode":
-      return readIdMessage(message, "nodeId", "selectNode");
+      return readSelectNodeMessage(message);
     case "selectEdge":
       return readIdMessage(message, "edgeId", "selectEdge");
     case "selectAppSurface":
@@ -99,6 +99,18 @@ export function parseWebviewMessage(message: unknown): WebviewMessage | undefine
     default:
       return undefined;
   }
+}
+
+function readSelectNodeMessage(message: Record<string, unknown>): WebviewMessage | undefined {
+  const nodeId = readString(message, "nodeId");
+  if (!nodeId) {
+    return undefined;
+  }
+  return {
+    type: "selectNode",
+    nodeId,
+    selectedNodeIds: readOptionalStringArray(message, "selectedNodeIds")
+  };
 }
 
 function readIdMessage<TType extends WebviewMessage["type"], TKey extends string>(

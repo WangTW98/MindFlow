@@ -1,6 +1,7 @@
 export interface FlowSelectionState {
   selectedProjectOverview: boolean;
   selectedNodeId?: string;
+  selectedNodeIds: string[];
   selectedEdgeId?: string;
   selectedAppSurfaceId?: string;
   selectedDomainId?: string;
@@ -14,6 +15,7 @@ export function emptyFlowSelection(): FlowSelectionState {
   return {
     selectedProjectOverview: false,
     selectedNodeId: undefined,
+    selectedNodeIds: [],
     selectedEdgeId: undefined,
     selectedAppSurfaceId: undefined,
     selectedDomainId: undefined,

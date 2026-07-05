@@ -14,6 +14,7 @@ declare module "vscode" {
   export interface ExtensionContext {
     subscriptions: { push(...items: Disposable[]): void };
     extensionUri: Uri;
+    globalStorageUri: Uri;
     workspaceState: Memento;
     globalState: Memento;
     secrets: {
@@ -73,6 +74,7 @@ declare module "vscode" {
 
   export interface TextDocument {
     isUntitled: boolean;
+    isDirty?: boolean;
     uri: Uri;
     getText(selection?: Selection): string;
     positionAt(offset: number): Position;
@@ -126,9 +128,11 @@ declare module "vscode" {
 
   export interface WebviewPanel {
     webview: Webview;
+    active?: boolean;
     reveal(column?: ViewColumn): void;
     dispose(): unknown;
     onDidDispose(listener: () => any): Disposable;
+    onDidChangeViewState?(listener: (event: { webviewPanel: WebviewPanel }) => any): Disposable;
   }
 
   export interface WebviewView {
@@ -204,5 +208,11 @@ declare module "vscode" {
   export namespace commands {
     function registerCommand(command: string, callback: (...args: any[]) => any): Disposable;
     function executeCommand<T = unknown>(command: string, ...rest: any[]): Thenable<T>;
+  }
+
+  export namespace env {
+    const clipboard: {
+      writeText(value: string): Thenable<void>;
+    };
   }
 }

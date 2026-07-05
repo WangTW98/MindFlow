@@ -21,7 +21,7 @@ import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewH
 import { parseWebviewMessage } from "../src/webview/flowWebviewMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
-test("Extension manifest contributes standalone .mindflow editor and sidebar only", async () => {
+test("Extension manifest contributes standalone .mindflow editor, sidebar, and MCP config command", async () => {
   const raw = await fs.readFile(path.join(process.cwd(), "package.json"), "utf8");
   const manifest = JSON.parse(raw) as {
     activationEvents?: string[];
@@ -54,16 +54,17 @@ test("Extension manifest contributes standalone .mindflow editor and sidebar onl
     "mindflow.newFlow",
     "mindflow.openFlow",
     "mindflow.saveFlowAs",
-    "mindflow.validateFlowJson"
+    "mindflow.validateFlowJson",
+    "mindflow.copyMcpConfig"
   ]);
   assert.equal(
     manifest.contributes?.keybindings?.some((item) => item.command === "mindflow.saveFlowAs" && item.mac === "cmd+s") ?? false,
     false
   );
   assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), ["mindflow.storage.flowDirectory"]);
-  assert.equal(manifest.bin, undefined);
+  assert.deepEqual(manifest.bin, { "mindflow-mcp": "./out/src/mcp/stdioBridge.js" });
   const removedScriptPrefix = ["m", "c", "p"].join("") + ":";
-  const blockedActivationWords = [["m", "c", "p"], ["a", "g", "e", "n", "t"], ["a", "i"]].map((parts) => parts.join(""));
   assert.equal(Object.keys(manifest.scripts ?? {}).some((script) => script.startsWith(removedScriptPrefix)), false);
-  assert.equal(manifest.activationEvents?.some((event) => blockedActivationWords.some((word) => event.toLowerCase().includes(word))), false);
+  assert.equal(manifest.activationEvents?.includes("onStartupFinished"), true);
+  assert.equal(manifest.activationEvents?.includes("onCommand:mindflow.copyMcpConfig"), true);
 });

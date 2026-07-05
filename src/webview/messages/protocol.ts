@@ -2,7 +2,7 @@ import type { TaxonomyRequest } from "../../core/taxonomy";
 import type { EdgeType, FlowEndpoint, ProductFlow } from "../../models/productFlow";
 
 export type WebviewMessage =
-  | { type: "selectNode"; nodeId: string }
+  | { type: "selectNode"; nodeId: string; selectedNodeIds?: string[] }
   | { type: "selectEdge"; edgeId: string }
   | { type: "selectAppSurface"; appId: string }
   | { type: "selectDomain"; domainId: string }
@@ -29,6 +29,7 @@ export interface FlowWebviewInitialState {
   flowFileName: string;
   selectedProjectOverview: boolean;
   selectedNodeId: string | null;
+  selectedNodeIds: string[];
   selectedEdgeId: string | null;
   selectedAppSurfaceId: string | null;
   selectedDomainId: string | null;

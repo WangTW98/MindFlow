@@ -39,7 +39,7 @@ function selectNode(nodeId, center, options = {}) {
   selectedStatusGroupId = "";
   taxonomySelection = clearAllTaxonomySelections();
   if (selectedNodeId) {
-    postWebviewMessage({ type: "selectNode", nodeId: selectedNodeId });
+    postWebviewMessage({ type: "selectNode", nodeId: selectedNodeId, selectedNodeIds });
   } else {
     postWebviewMessage({ type: "clearSelection" });
   }

@@ -16,14 +16,19 @@
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onView:mindflow.sidebar",
     "onCommand:mindflow.newFlow",
     "onCommand:mindflow.openFlow",
     "onCommand:mindflow.saveFlowAs",
+    "onCommand:mindflow.copyMcpConfig",
     "onCustomEditor:mindflow.productFlow",
     "onLanguage:mindflow",
     "onCommand:mindflow.validateFlowJson"
   ],
+  "bin": {
+    "mindflow-mcp": "./out/src/mcp/stdioBridge.js"
+  },
   "main": "./out/src/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -96,6 +101,10 @@
       {
         "command": "mindflow.validateFlowJson",
         "title": "MindFlow: Validate Flow JSON"
+      },
+      {
+        "command": "mindflow.copyMcpConfig",
+        "title": "MindFlow: Copy MCP Client Config"
       }
     ],
     "configuration": {
