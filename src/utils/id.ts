@@ -54,18 +54,6 @@ export function makeActionId(label: string, seed: string): string {
   return `act_${slugify(label, "action")}_${shortHash(seed, 6)}`;
 }
 
-export function makePrdId(scopeSeed: string): string {
-  return `prd_${shortHash(`${scopeSeed}:${randomUUID()}`, 10)}`;
-}
-
-export function makePencilId(scopeSeed: string): string {
-  return `pencil_${shortHash(`${scopeSeed}:${randomUUID()}`, 10)}`;
-}
-
-export function makeChangeSetId(instruction: string): string {
-  return `chg_${shortHash(`${instruction}:${randomUUID()}`, 10)}`;
-}
-
 export function stableKey(...parts: string[]): string {
   return shortHash(parts.join("::"), 12);
 }

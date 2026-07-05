@@ -1,4 +1,5 @@
 import type { ProductFlow } from "../models/productFlow";
+import { serializeProductFlow } from "../models/productFlowCodec";
 
 export const MINDFLOW_LANGUAGE_ID = "mindflow";
 export const MINDFLOW_FILE_EXTENSION = ".mindflow";
@@ -10,7 +11,7 @@ export interface UntitledMindFlowDocumentOptions {
 
 export function createUntitledMindFlowDocumentOptions(flow: ProductFlow): UntitledMindFlowDocumentOptions {
   return {
-    content: `${JSON.stringify(flow, null, 2)}\n`,
+    content: serializeProductFlow(flow),
     language: MINDFLOW_LANGUAGE_ID
   };
 }

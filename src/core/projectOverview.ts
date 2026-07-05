@@ -16,9 +16,9 @@ export interface UpdateProjectOverviewInput {
   goal?: string;
 }
 
-export function createDefaultProjectOverview(sourceSummary = DEFAULT_PROJECT_SUMMARY): ProjectOverview {
+export function createDefaultProjectOverview(summary = DEFAULT_PROJECT_SUMMARY): ProjectOverview {
   return {
-    summary: sanitizeOptionalText(sourceSummary) || DEFAULT_PROJECT_SUMMARY,
+    summary: sanitizeOptionalText(summary) || DEFAULT_PROJECT_SUMMARY,
     goal: ""
   };
 }
@@ -29,10 +29,10 @@ export function ensureProjectOverview(flow: ProductFlow): EnsureProjectOverviewR
   }
   const current = flow.projectOverview;
   const currentSummary = sanitizeOptionalText(current?.summary);
-  const sourceSummary = sanitizeOptionalText(flow.sourceSummary);
+  const legacySourceSummary = sanitizeOptionalText((flow as unknown as Record<string, unknown>).sourceSummary);
   const summary = currentSummary && currentSummary !== DEFAULT_PROJECT_SUMMARY
     ? currentSummary
-    : sourceSummary || currentSummary || DEFAULT_PROJECT_SUMMARY;
+    : legacySourceSummary || currentSummary || DEFAULT_PROJECT_SUMMARY;
   const goal = typeof current?.goal === "string" ? current.goal.trim() : "";
   const position = normalizePosition(current?.view?.position);
   const next: ProjectOverview = {
@@ -40,9 +40,8 @@ export function ensureProjectOverview(flow: ProductFlow): EnsureProjectOverviewR
     goal,
     ...(position ? { view: { position } } : {})
   };
-  const changed = !sameProjectOverview(current, next) || flow.sourceSummary !== summary;
+  const changed = !sameProjectOverview(current, next);
   flow.projectOverview = next;
-  flow.sourceSummary = summary;
   return { overview: next, changed };
 }
 
@@ -53,7 +52,6 @@ export function updateProjectOverview(flow: ProductFlow, patch: UpdateProjectOve
   }
   if (patch.summary !== undefined) {
     overview.summary = sanitizeOptionalText(patch.summary) || overview.summary;
-    flow.sourceSummary = overview.summary;
   }
   if (patch.goal !== undefined) {
     overview.goal = sanitizeOptionalText(patch.goal);

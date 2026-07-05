@@ -120,8 +120,7 @@ button:disabled {
 }
 
 .list-item span,
-.list-item small,
-.agent-row small {
+.list-item small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -130,19 +129,6 @@ button:disabled {
 small,
 .empty {
   color: var(--muted);
-}
-
-.agent-row {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.agent-row > div {
-  display: grid;
-  min-width: 0;
 }
 
 .status {

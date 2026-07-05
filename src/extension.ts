@@ -6,6 +6,7 @@ import type {
   ProductFlow
 } from "./models/productFlow";
 import { validateProductFlow } from "./models/productFlow";
+import { parseProductFlowText, serializeProductFlow } from "./models/productFlowCodec";
 import {
   createManualEdge,
   createManualNode,
@@ -20,7 +21,6 @@ import {
 } from "./core/flowEditing";
 import { createEmptyProductFlow } from "./core/emptyFlow";
 import {
-  ensureProjectOverview,
   updateProjectOverview,
   updateProjectOverviewPosition,
   type UpdateProjectOverviewInput
@@ -468,29 +468,18 @@ async function loadCurrentFlow(sourceUri?: FlowUriArgument): Promise<{ flow: Pro
     throw new Error("No MindFlow file exists. Create or open a MindFlow file first.");
   }
   const document = await vscode.workspace.openTextDocument(flowUri);
-  const parsed = JSON.parse(document.getText()) as unknown;
-  ensureProjectOverview(parsed as ProductFlow);
-  const validation = validateProductFlow(parsed);
-  if (!validation.valid) {
-    throw new Error(`Invalid ProductFlow document ${flowDisplayName(flowUri)}:\n${validation.errors.join("\n")}`);
-  }
-  const flow = parsed as ProductFlow;
+  const { flow } = parseProductFlowText(document.getText(), `ProductFlow document ${flowDisplayName(flowUri)}`);
   rememberCurrentFlowUri(document.uri);
   return { flow, flowUri: document.uri };
 }
 
 async function applyFlowDocumentEdit(flowUri: vscode.Uri, flow: ProductFlow): Promise<void> {
   flow.updatedAt = nowIso();
-  ensureProjectOverview(flow);
   pruneMissingAppSurfaceReferences(flow);
-  const validation = validateProductFlow(flow);
-  if (!validation.valid) {
-    throw new Error(`Cannot apply invalid ProductFlow:\n${validation.errors.join("\n")}`);
-  }
   const document = await vscode.workspace.openTextDocument(flowUri);
   const edit = new vscode.WorkspaceEdit();
   const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
-  edit.replace(document.uri, fullRange, `${JSON.stringify(flow, null, 2)}\n`);
+  edit.replace(document.uri, fullRange, serializeProductFlow(flow));
   const applied = await vscode.workspace.applyEdit(edit);
   if (!applied) {
     throw new Error("VSCode refused the ProductFlow document edit.");

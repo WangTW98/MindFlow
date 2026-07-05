@@ -4,10 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
 import type * as vscode from "vscode";
-import type { FlowChangePlan, FlowOperation } from "../src/models/flowChange";
-import type { AppSurface, FeatureGroup, FlowEdge, PageAction, PageElement, PageNode, ProductFlow } from "../src/models/productFlow";
-import { applyFlowChangePlan } from "../src/changes/flowChangeApplier";
-import { revertLastChangeSet } from "../src/changes/revertChangeSet";
+import type { AppSurface, FeatureGroup, PageNode, ProductFlow } from "../src/models/productFlow";
 import { ensureAppSurfaceEntryEdges } from "../src/core/appSurfaceEntryEdges";
 import { ensureReasonableNodeLayout } from "../src/core/canvasLayout";
 import { createEmptyProductFlow } from "../src/core/emptyFlow";
@@ -34,10 +31,9 @@ import {
   createUntitledMindFlowFileName
 } from "../src/core/untitledMindFlowDocument";
 import { validateProductFlow } from "../src/models/productFlow";
+import { parseProductFlowText, serializeProductFlow } from "../src/models/productFlowCodec";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
 import { RecentFlowStore } from "../src/storage/recentFlows";
-import { buildSyncReport } from "../src/sync/syncArtifacts";
-import { nowIso } from "../src/utils/id";
 
 test("real-provider fixture creates a valid ProductFlow with app-surface entry edges", () => {
   const flow = createProcurementFlow();
@@ -47,9 +43,6 @@ test("real-provider fixture creates a valid ProductFlow with app-surface entry e
   assert.equal(flow.appSurfaces?.length, 4);
   assert.ok(flow.nodes.length >= 15);
   assert.ok(flow.edges.length >= 20);
-  assert.ok(flow.productDesignIssues?.some((issue) => issue.severity === "critical"));
-  assert.ok(flow.productDesignIssues?.some((issue) => issue.severity === "warning"));
-  assert.ok(flow.productDesignIssues?.some((issue) => issue.severity === "optional"));
   assertAppSurfaceEntryEdge(flow, "app_admin", "采购工作台");
   assertAppSurfaceEntryEdge(flow, "app_supplier_portal", "供应商门户首页");
   assertAppSurfaceEntryEdge(flow, "app_mobile_approval", "移动审批待办");
@@ -61,15 +54,16 @@ test("Empty ProductFlow starts as a valid blank canvas", () => {
   const validation = validateProductFlow(flow);
 
   assert.equal(validation.valid, true, validation.errors.join("\n"));
+  assert.equal(flow.schemaVersion, "2.0");
   assert.equal(flow.nodes.length, 0);
   assert.equal(flow.edges.length, 0);
-  assert.equal(flow.projectOverview.summary, flow.sourceSummary);
+  assert.equal(flow.projectOverview.summary, "Manually created blank MindFlow.");
   assert.equal(flow.projectOverview.goal, "");
   assert.equal(flow.domains.length, 0);
   assert.equal(flow.roles.length, 0);
   assert.equal(flow.appSurfaces?.length, 0);
   assert.equal(flow.statusGroups?.length, 0);
-  assert.equal(flow.productDesignIssues?.length, 0);
+  assertNoLegacyFields(flow);
 });
 
 test("Legacy ProductFlow missing projectOverview can be backfilled", () => {
@@ -80,12 +74,12 @@ test("Legacy ProductFlow missing projectOverview can be backfilled", () => {
   const validation = validateProductFlow(flow);
 
   assert.equal(result.changed, true);
-  assert.equal(flow.projectOverview.summary, flow.sourceSummary);
+  assert.equal(flow.projectOverview.summary, "Manually created blank MindFlow.");
   assert.equal(flow.projectOverview.goal, "");
   assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
 
-test("Project overview details sync flow title and source summary", () => {
+test("Project overview details update local project metadata", () => {
   const flow = createEmptyProductFlow();
 
   updateProjectOverview(flow, {
@@ -95,7 +89,6 @@ test("Project overview details sync flow title and source summary", () => {
   });
 
   assert.equal(flow.title, "供应链协同平台");
-  assert.equal(flow.sourceSummary, "覆盖采购、供应商和审批协同。");
   assert.equal(flow.projectOverview.summary, "覆盖采购、供应商和审批协同。");
   assert.equal(flow.projectOverview.goal, "提升跨端采购协作效率。");
   assert.equal(validateProductFlow(flow).valid, true);
@@ -243,6 +236,39 @@ test("Blank MindFlow opens as an untitled document without a target file path", 
   assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
 
+test("ProductFlow codec migrates legacy generation fields to local v2", () => {
+  const legacy = createProcurementFlow();
+  const legacyRecord = legacy as unknown as Record<string, unknown>;
+  const legacyNode = legacy.nodes[0] as unknown as Record<string, unknown>;
+  const legacyEdge = legacy.edges[0] as unknown as Record<string, unknown>;
+
+  legacyRecord.schemaVersion = "1.0";
+  legacyRecord.sourceDocumentId = "samples/example-requirements.md";
+  legacyRecord.sourceSummary = "旧版文档摘要";
+  legacyRecord.projectOverview = { summary: "", goal: "" };
+  legacyRecord.artifacts = { prds: [], pencils: [] };
+  legacyRecord.changeHistory = [];
+  legacyRecord.syncState = { issues: [] };
+  legacyRecord.productDesignIssues = [{ issueId: "pdi_legacy", severity: "warning", title: "旧问题", description: "旧问题", prompt: "旧提示" }];
+  legacyRecord.openQuestions = ["旧问题"];
+  legacyNode.sourceRefs = [{ sourceId: "legacy", label: "legacy" }];
+  legacyNode.artifacts = { prdIds: ["prd_legacy"], pencilIds: ["pencil_legacy"] };
+  legacyNode.updatedByChangeSetId = "manual";
+  legacyNode.confidence = 1;
+  legacyEdge.sourceRefs = [{ sourceId: "legacy", label: "legacy" }];
+  legacyEdge.removedByChangeSetId = "manual";
+  legacyEdge.confidence = 1;
+
+  const result = parseProductFlowText(`${JSON.stringify(legacyRecord, null, 2)}\n`, "legacy flow");
+
+  assert.equal(result.migrated, true);
+  assert.equal(result.flow.schemaVersion, "2.0");
+  assert.equal(result.flow.projectOverview.summary, "旧版文档摘要");
+  assert.equal(result.validation.valid, true);
+  assertNoLegacyFields(result.flow);
+  assertNoLegacyKeysInJson(serializeProductFlow(result.flow));
+});
+
 test("ensureAppSurfaceEntryEdges repairs missing app-surface entry links", () => {
   const flow = createProcurementFlow({ includeAppSurfaceEntryEdges: false });
   assert.equal(flow.edges.some((edge) => edge.from?.kind === "appSurface"), false);
@@ -254,134 +280,6 @@ test("ensureAppSurfaceEntryEdges repairs missing app-surface entry links", () =>
   assertAppSurfaceEntryEdge(flow, "app_mobile_approval", "移动审批待办");
   assertAppSurfaceEntryEdge(flow, "app_public_site", "采购公告列表");
   assert.equal(validateProductFlow(flow).valid, true);
-});
-
-test("FlowChangePlan inserts a business node between two existing nodes", () => {
-  const flow = createProcurementFlow();
-  const from = requireNodeByTitle(flow, "询价方案编辑页");
-  const to = requireNodeByTitle(flow, "供应商门户首页");
-  const newNode = createDetachedNode(flow, {
-    title: "风险复核页",
-    pageType: "workflow",
-    purpose: "处理发布询价前的供应商风险复核。",
-    appSurfaceIds: ["app_admin"],
-    domainIds: ["domain_sourcing"],
-    roleIds: ["role_buyer"]
-  });
-  const scratch = cloneFlow(flow);
-  scratch.nodes.push(newNode);
-  const edgeA = createManualEdge(scratch, {
-    from: { kind: "node", nodeId: from.nodeId },
-    toNodeId: newNode.nodeId,
-    trigger: "进入风险复核",
-    type: "navigate"
-  });
-  const edgeB = createManualEdge(scratch, {
-    from: { kind: "node", nodeId: newNode.nodeId },
-    toNodeId: to.nodeId,
-    trigger: "完成风险复核",
-    type: "submit"
-  });
-  const originalEdge = flow.edges.find((edge) => edge.fromNodeId === from.nodeId && edge.toNodeId === to.nodeId);
-  assert.ok(originalEdge);
-  const operations: FlowOperation[] = [
-    operation("addNode", { nodeId: newNode.nodeId }, null, newNode, "插入风险复核节点", false),
-    operation("removeEdge", { edgeId: originalEdge.edgeId }, originalEdge, null, "替换原直接路径", true),
-    operation("addEdge", { edgeId: edgeA.edgeId }, null, edgeA, "连接风险复核入口", false),
-    operation("addEdge", { edgeId: edgeB.edgeId }, null, edgeB, "连接风险复核出口", false)
-  ];
-  const plan = createPlan(flow, "在询价方案编辑页和供应商门户首页之间加入风险复核业务", "insertBusiness", operations, [from.nodeId, to.nodeId, newNode.nodeId], [originalEdge.edgeId, edgeA.edgeId, edgeB.edgeId]);
-  const next = applyFlowChangePlan(flow, plan, { confirmedDestructive: true });
-
-  assert.equal(next.revision, flow.revision + 1);
-  assert.ok(next.nodes.some((node) => node.title === "风险复核页"));
-  assert.equal(next.edges.find((edge) => edge.edgeId === originalEdge.edgeId)?.status, "removed");
-});
-
-test("FlowChangePlan adds a feature only to the selected node", () => {
-  const flow = createProcurementFlow();
-  const node = requireNodeByTitle(flow, "合同归档页");
-  const beforeOtherVersions = new Map(flow.nodes.map((item) => [item.nodeId, item.version]));
-  const element: PageElement = {
-    elementId: "el_export_order",
-    name: "导出订单按钮",
-    type: "button",
-    description: "导出归档订单。",
-    required: false
-  };
-  const action: PageAction = {
-    actionId: "act_export_order",
-    label: "导出订单按钮",
-    type: "user",
-    result: "导出归档订单。"
-  };
-  const plan = createPlan(flow, "给合同归档页增加导出订单按钮功能", "addFeature", [
-    operation("addElement", { nodeId: node.nodeId, elementId: element.elementId }, null, element, "新增导出订单按钮", false),
-    operation("addAction", { nodeId: node.nodeId, actionId: action.actionId }, null, action, "按钮同步新增页面动作", false)
-  ], [node.nodeId]);
-  const next = applyFlowChangePlan(flow, plan);
-  const changed = next.nodes.find((item) => item.nodeId === node.nodeId);
-
-  assert.ok(changed?.elements.some((item) => item.name === "导出订单按钮"));
-  for (const item of next.nodes) {
-    if (item.nodeId !== node.nodeId) {
-      assert.equal(item.version, beforeOtherVersions.get(item.nodeId));
-    }
-  }
-});
-
-test("Removing a feature marks linked artifacts stale and can be reverted", () => {
-  const flow = createProcurementFlow();
-  const node = requireNodeByTitle(flow, "合同归档页");
-  node.artifacts.prdIds.push("prd_existing");
-  flow.artifacts.prds.push({
-    prdId: "prd_existing",
-    scope: "node",
-    nodeId: node.nodeId,
-    path: "docs/prd/existing.md",
-    status: "active",
-    createdAt: nowIso(),
-    updatedAt: nowIso()
-  });
-  const targetElement = node.elements.find((element) => element.name === "导出 PDF 按钮");
-  assert.ok(targetElement);
-  const targetAction = node.actions.find((action) => action.label === targetElement.name);
-  const operations: FlowOperation[] = [
-    operation("removeElement", { nodeId: node.nodeId, elementId: targetElement.elementId }, targetElement, null, "移除导出 PDF 按钮", true)
-  ];
-  if (targetAction) {
-    operations.push(operation("removeAction", { nodeId: node.nodeId, actionId: targetAction.actionId }, targetAction, null, "同步移除导出动作", true));
-  }
-  const plan = createPlan(flow, "移除合同归档页里的导出 PDF 按钮功能", "removeFeature", operations, [node.nodeId]);
-  const next = applyFlowChangePlan(flow, plan, { confirmedDestructive: true });
-
-  assert.equal(next.artifacts.prds.find((ref) => ref.prdId === "prd_existing")?.status, "stale");
-
-  const reverted = revertLastChangeSet(next);
-  const revertedNode = reverted.nodes.find((item) => item.nodeId === node.nodeId);
-  assert.ok(revertedNode?.elements.some((element) => element.name === "导出 PDF 按钮"));
-});
-
-test("Sync report catches missing artifact files", () => {
-  const flow = createProcurementFlow();
-  flow.artifacts.prds.push({
-    prdId: "prd_missing",
-    scope: "node",
-    nodeId: flow.nodes[0]?.nodeId,
-    path: "docs/prd/missing.md",
-    status: "active",
-    createdAt: nowIso(),
-    updatedAt: nowIso()
-  });
-  const report = buildSyncReport(flow, [
-    {
-      kind: "prd",
-      artifactId: "prd_missing",
-      path: "docs/prd/missing.md",
-      missing: true
-    }
-  ]);
-  assert.ok(report.issues.some((issue) => issue.message.includes("missing")));
 });
 
 test("Manual feature item outlet can connect to multiple target nodes", () => {
@@ -701,6 +599,7 @@ test("FlowRepository saves and lists only .mindflow ProductFlow files", async ()
     const repository = new FlowRepository(workspaceRoot);
     const savedPath = await repository.save(flow);
     assert.equal(path.extname(savedPath), FLOW_FILE_EXTENSION);
+    assertNoLegacyKeysInJson(await fs.readFile(savedPath, "utf8"));
 
     const legacyPath = path.join(repository.directoryPath, "legacy-flow.json");
     await fs.writeFile(legacyPath, `${JSON.stringify(flow, null, 2)}\n`, "utf8");
@@ -736,6 +635,8 @@ test("Extension manifest contributes standalone .mindflow editor and sidebar onl
   const raw = await fs.readFile(path.join(process.cwd(), "package.json"), "utf8");
   const manifest = JSON.parse(raw) as {
     activationEvents?: string[];
+    bin?: Record<string, string>;
+    scripts?: Record<string, string>;
     contributes?: {
       viewsContainers?: { activitybar?: Array<{ id?: string; icon?: string }> };
       views?: Record<string, Array<{ id?: string; type?: string }>>;
@@ -765,13 +666,16 @@ test("Extension manifest contributes standalone .mindflow editor and sidebar onl
     "mindflow.validateFlowJson"
   ]);
   assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), ["mindflow.storage.flowDirectory"]);
-  assert.equal(manifest.activationEvents?.some((event) => event.includes("mindflow.agent")), false);
+  assert.equal(manifest.bin, undefined);
+  const removedScriptPrefix = ["m", "c", "p"].join("") + ":";
+  const blockedActivationWords = [["m", "c", "p"], ["a", "g", "e", "n", "t"], ["a", "i"]].map((parts) => parts.join(""));
+  assert.equal(Object.keys(manifest.scripts ?? {}).some((script) => script.startsWith(removedScriptPrefix)), false);
+  assert.equal(manifest.activationEvents?.some((event) => blockedActivationWords.some((word) => event.toLowerCase().includes(word))), false);
 });
 
 function createProcurementFlow(options: { includeAppSurfaceEntryEdges?: boolean } = {}): ProductFlow {
   const flow = createEmptyProductFlow("多应用端采购协同平台需求示例");
-  flow.sourceDocumentId = "samples/example-requirements.md";
-  flow.sourceSummary = "多应用端采购协同平台产品流程。";
+  flow.projectOverview.summary = "多应用端采购协同平台产品流程。";
   flow.domains = [
     { domainId: "domain_plan", name: "采购计划", description: "需求池、计划新建、计划详情与附件材料。" },
     { domainId: "domain_sourcing", name: "询价比价", description: "询价方案、供应商邀请、报价对比和比价报告。" },
@@ -932,33 +836,6 @@ function createProcurementFlow(options: { includeAppSurfaceEntryEdges?: boolean 
     ensureAppSurfaceEntryEdges(flow);
   }
 
-  flow.productDesignIssues = [
-    {
-      issueId: "pdi_critical_quote_retract",
-      severity: "critical",
-      title: "报价撤回缺少闭环路径",
-      description: "供应商门户描述了报价撤回场景，但当前流程缺少撤回后的状态回滚。",
-      prompt: "补充报价撤回闭环。",
-      relatedNodeIds: [supplierHomeNode.nodeId, quoteNode.nodeId, compareNode.nodeId]
-    },
-    {
-      issueId: "pdi_warning_reject_todo",
-      severity: "warning",
-      title: "退回审批后的采购待办承接不清晰",
-      description: "移动审批退回后缺少采购专员待办承接。",
-      prompt: "补充采购专员退回待办。",
-      relatedNodeIds: [mobileDetailNode.nodeId, inquiryNode.nodeId, compareNode.nodeId]
-    },
-    {
-      issueId: "pdi_optional_supplier_progress",
-      severity: "optional",
-      title: "供应商注册后缺少进度反馈体验",
-      description: "访客供应商提交注册后缺少进度查询。",
-      prompt: "补充供应商注册进度反馈。",
-      relatedNodeIds: [registerNode.nodeId, supplierReviewNode.nodeId, supplierHomeNode.nodeId]
-    }
-  ];
-
   return flow;
 }
 
@@ -1023,57 +900,42 @@ function assertAppSurfaceEntryEdge(flow: ProductFlow, appId: string, targetTitle
   assert.ok(edge, `Missing app surface entry edge ${appId} -> ${targetTitle}`);
 }
 
-function createDetachedNode(flow: ProductFlow, input: Parameters<typeof createManualNode>[1]): PageNode {
-  const scratch = cloneFlow(flow);
-  return createManualNode(scratch, input);
+function assertNoLegacyFields(flow: ProductFlow): void {
+  const record = flow as unknown as Record<string, unknown>;
+  for (const key of ["sourceDocumentId", "sourceSummary", "artifacts", "changeHistory", "syncState", "productDesignIssues", "openQuestions"]) {
+    assert.equal(key in record, false, `Unexpected legacy flow field ${key}`);
+  }
+  for (const node of flow.nodes) {
+    const nodeRecord = node as unknown as Record<string, unknown>;
+    for (const key of ["sourceRefs", "artifacts", "createdByChangeSetId", "updatedByChangeSetId", "removedByChangeSetId", "confidence"]) {
+      assert.equal(key in nodeRecord, false, `Unexpected legacy node field ${key}`);
+    }
+  }
+  for (const edge of flow.edges) {
+    const edgeRecord = edge as unknown as Record<string, unknown>;
+    for (const key of ["sourceRefs", "createdByChangeSetId", "updatedByChangeSetId", "removedByChangeSetId", "confidence"]) {
+      assert.equal(key in edgeRecord, false, `Unexpected legacy edge field ${key}`);
+    }
+  }
 }
 
-function createPlan(
-  flow: ProductFlow,
-  instruction: string,
-  intent: string,
-  operations: FlowOperation[],
-  affectedNodeIds: string[],
-  affectedEdgeIds: string[] = []
-): FlowChangePlan {
-  return {
-    changeSetId: `chg_test_${safeId(intent)}_${operations.length}`,
-    flowId: flow.flowId,
-    baseRevision: flow.revision,
-    instruction,
-    intent,
-    requiresClarification: false,
-    operations,
-    affectedNodeIds,
-    affectedEdgeIds,
-    artifactImpact: [],
-    openQuestions: [],
-    confidence: 1
-  };
-}
-
-function operation(
-  type: FlowOperation["type"],
-  target: FlowOperation["target"],
-  before: FlowOperation["before"],
-  after: FlowOperation["after"],
-  reason: string,
-  requiresConfirmation: boolean
-): FlowOperation {
-  return {
-    opId: `op_${safeId(type)}_${safeId(reason)}`,
-    type,
-    target,
-    before,
-    after,
-    reason,
-    risk: requiresConfirmation ? "medium" : "low",
-    requiresConfirmation
-  };
-}
-
-function cloneFlow(flow: ProductFlow): ProductFlow {
-  return JSON.parse(JSON.stringify(flow)) as ProductFlow;
+function assertNoLegacyKeysInJson(json: string): void {
+  for (const key of [
+    "sourceDocumentId",
+    "sourceSummary",
+    "sourceRefs",
+    "artifacts",
+    "changeHistory",
+    "syncState",
+    "productDesignIssues",
+    "openQuestions",
+    "createdByChangeSetId",
+    "updatedByChangeSetId",
+    "removedByChangeSetId",
+    "confidence"
+  ]) {
+    assert.equal(json.includes(`"${key}"`), false, `Serialized flow still contains ${key}`);
+  }
 }
 
 class FakeMemento {

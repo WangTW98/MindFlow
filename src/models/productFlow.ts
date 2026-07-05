@@ -15,13 +15,6 @@ export type EdgeType =
   | "system"
   | "branch";
 
-export interface SourceRef {
-  sourceId: string;
-  label: string;
-  excerpt?: string;
-  location?: string;
-}
-
 export interface BusinessDomain {
   domainId: string;
   name: string;
@@ -136,14 +129,6 @@ export interface PageNode {
   inputs: string[];
   outputs: string[];
   permissions: string[];
-  sourceRefs: SourceRef[];
-  artifacts: {
-    prdIds: string[];
-    pencilIds: string[];
-  };
-  createdByChangeSetId?: string;
-  updatedByChangeSetId?: string;
-  removedByChangeSetId?: string;
   replacementNodeIds?: string[];
   removedAt?: string;
   view?: {
@@ -152,7 +137,6 @@ export interface PageNode {
       y: number;
     };
   };
-  confidence: number;
 }
 
 export type FlowEndpointKind = "appSurface" | "projectOverview" | "node" | "featureGroup" | "featureItem";
@@ -179,74 +163,7 @@ export interface FlowEdge {
   appSurfaceIds?: string[];
   domainIds: string[];
   roleIds: string[];
-  sourceRefs: SourceRef[];
-  createdByChangeSetId?: string;
-  updatedByChangeSetId?: string;
-  removedByChangeSetId?: string;
   removedAt?: string;
-  confidence: number;
-}
-
-export interface PrdRef {
-  prdId: string;
-  scope: "node" | "full";
-  nodeId?: string;
-  path: string;
-  status: "active" | "stale" | "archived";
-  staleReason?: string;
-  staleByChangeSetId?: string;
-  refreshedByChangeSetId?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface PencilRef {
-  pencilId: string;
-  scope: "node" | "full";
-  nodeId?: string;
-  path: string;
-  status: "active" | "stale" | "archived";
-  staleReason?: string;
-  staleByChangeSetId?: string;
-  refreshedByChangeSetId?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SyncIssue {
-  issueId: string;
-  severity: "info" | "warning" | "error";
-  message: string;
-  artifactId?: string;
-  nodeId?: string;
-  autoFixAvailable?: boolean;
-}
-
-export type ProductDesignIssueSeverity = "critical" | "warning" | "optional";
-
-export interface ProductDesignIssue {
-  issueId: string;
-  severity: ProductDesignIssueSeverity;
-  title: string;
-  description: string;
-  prompt: string;
-  relatedNodeIds?: string[];
-  relatedEdgeIds?: string[];
-  sourceRefs?: SourceRef[];
-}
-
-export interface ChangeSetSummary {
-  changeSetId: string;
-  baseRevision: number;
-  appliedRevision: number;
-  instruction: string;
-  intent: string;
-  operationCount: number;
-  affectedNodeIds: string[];
-  affectedEdgeIds: string[];
-  appliedAt: string;
-  revertedAt?: string;
-  operations?: unknown[];
 }
 
 export interface ProductFlow {
@@ -254,8 +171,6 @@ export interface ProductFlow {
   flowId: string;
   revision: number;
   title: string;
-  sourceDocumentId: string;
-  sourceSummary: string;
   createdAt: string;
   updatedAt: string;
   projectOverview: ProjectOverview;
@@ -265,17 +180,6 @@ export interface ProductFlow {
   statusGroups?: ProductStatusGroup[];
   nodes: PageNode[];
   edges: FlowEdge[];
-  artifacts: {
-    prds: PrdRef[];
-    pencils: PencilRef[];
-  };
-  changeHistory: ChangeSetSummary[];
-  syncState: {
-    lastSyncedAt?: string;
-    issues: SyncIssue[];
-  };
-  productDesignIssues?: ProductDesignIssue[];
-  openQuestions?: string[];
 }
 
 export interface ValidationResult {
@@ -296,8 +200,6 @@ export function validateProductFlow(flow: unknown): ValidationResult {
   requireString(flow, "flowId", errors);
   requireNumber(flow, "revision", errors);
   requireString(flow, "title", errors);
-  requireString(flow, "sourceDocumentId", errors);
-  requireString(flow, "sourceSummary", errors);
   requireString(flow, "createdAt", errors);
   requireString(flow, "updatedAt", errors);
   requireObject(flow, "projectOverview", errors);
@@ -311,12 +213,6 @@ export function validateProductFlow(flow: unknown): ValidationResult {
   }
   requireArray(flow, "nodes", errors);
   requireArray(flow, "edges", errors);
-  requireObject(flow, "artifacts", errors);
-  requireArray(flow, "changeHistory", errors);
-  requireObject(flow, "syncState", errors);
-  if ("productDesignIssues" in flow) {
-    requireArray(flow, "productDesignIssues", errors);
-  }
 
   if (!Array.isArray(flow.nodes) || !Array.isArray(flow.edges)) {
     return { valid: errors.length === 0, errors, warnings };
@@ -356,9 +252,6 @@ export function validateProductFlow(flow: unknown): ValidationResult {
     requireArray(node, "inputs", errors, `nodes[${index}]`);
     requireArray(node, "outputs", errors, `nodes[${index}]`);
     requireArray(node, "permissions", errors, `nodes[${index}]`);
-    requireArray(node, "sourceRefs", errors, `nodes[${index}]`);
-    requireObject(node, "artifacts", errors, `nodes[${index}]`);
-    requireNumber(node, "confidence", errors, `nodes[${index}]`);
     if (typeof node.nodeId === "string") {
       if (nodeIds.has(node.nodeId)) {
         errors.push(`Duplicate nodeId: ${node.nodeId}`);
@@ -438,8 +331,6 @@ export function validateProductFlow(flow: unknown): ValidationResult {
     }
     requireArray(edge, "domainIds", errors, `edges[${index}]`);
     requireArray(edge, "roleIds", errors, `edges[${index}]`);
-    requireArray(edge, "sourceRefs", errors, `edges[${index}]`);
-    requireNumber(edge, "confidence", errors, `edges[${index}]`);
     if (typeof edge.edgeId === "string") {
       if (edgeIds.has(edge.edgeId)) {
         errors.push(`Duplicate edgeId: ${edge.edgeId}`);
@@ -456,15 +347,6 @@ export function validateProductFlow(flow: unknown): ValidationResult {
     checkEndpoint(edge.to, `edges[${index}].to`, nodeIds, appSurfaceIds, errors);
   }
 
-  validateProductDesignIssues(flow.productDesignIssues, nodeIds, edgeIds, errors, warnings);
-
-  const artifactIds = new Set<string>();
-  const artifacts = flow.artifacts;
-  if (isRecord(artifacts)) {
-    checkArtifactIds(artifacts.prds, "prdId", artifactIds, errors);
-    checkArtifactIds(artifacts.pencils, "pencilId", artifactIds, errors);
-  }
-
   const activeNodes = flow.nodes.filter((node) => isRecord(node) && node.status === "active");
   if (activeNodes.length === 0) {
     warnings.push("ProductFlow has no active nodes.");
@@ -475,102 +357,6 @@ export function validateProductFlow(flow: unknown): ValidationResult {
 
 export function isProductFlow(flow: unknown): flow is ProductFlow {
   return validateProductFlow(flow).valid;
-}
-
-function validateProductDesignIssues(
-  value: unknown,
-  nodeIds: Set<string>,
-  edgeIds: Set<string>,
-  errors: string[],
-  warnings: string[]
-): void {
-  if (value === undefined) {
-    return;
-  }
-  if (!Array.isArray(value)) {
-    return;
-  }
-  const issueIds = new Set<string>();
-  const severities = new Set<ProductDesignIssueSeverity>(["critical", "warning", "optional"]);
-  for (const [index, issue] of value.entries()) {
-    const path = `productDesignIssues[${index}]`;
-    if (!isRecord(issue)) {
-      errors.push(`${path} must be an object.`);
-      continue;
-    }
-    requireString(issue, "issueId", errors, path);
-    requireString(issue, "severity", errors, path);
-    requireString(issue, "title", errors, path);
-    requireString(issue, "description", errors, path);
-    requireString(issue, "prompt", errors, path);
-
-    if (typeof issue.issueId === "string") {
-      if (issueIds.has(issue.issueId)) {
-        errors.push(`Duplicate productDesignIssue issueId: ${issue.issueId}`);
-      }
-      issueIds.add(issue.issueId);
-    }
-    if (typeof issue.severity === "string" && !severities.has(issue.severity as ProductDesignIssueSeverity)) {
-      errors.push(`${path}.severity must be critical, warning, or optional.`);
-    }
-    checkOptionalStringReferences(issue.relatedNodeIds, `${path}.relatedNodeIds`, nodeIds, "node", errors, warnings);
-    checkOptionalStringReferences(issue.relatedEdgeIds, `${path}.relatedEdgeIds`, edgeIds, "edge", errors, warnings);
-    if ("sourceRefs" in issue) {
-      requireArray(issue, "sourceRefs", errors, path);
-    }
-  }
-}
-
-function checkOptionalStringReferences(
-  value: unknown,
-  path: string,
-  knownIds: Set<string>,
-  label: "node" | "edge",
-  errors: string[],
-  warnings: string[]
-): void {
-  if (value === undefined) {
-    return;
-  }
-  if (!Array.isArray(value)) {
-    errors.push(`${path} must be an array.`);
-    return;
-  }
-  for (const [index, item] of value.entries()) {
-    if (typeof item !== "string") {
-      errors.push(`${path}[${index}] must be a string.`);
-      continue;
-    }
-    if (!knownIds.has(item)) {
-      warnings.push(`${path}[${index}] references missing ${label} ${item}.`);
-    }
-  }
-}
-
-function checkArtifactIds(
-  value: unknown,
-  idField: "prdId" | "pencilId",
-  artifactIds: Set<string>,
-  errors: string[]
-): void {
-  if (!Array.isArray(value)) {
-    return;
-  }
-  for (const [index, artifact] of value.entries()) {
-    if (!isRecord(artifact)) {
-      errors.push(`artifacts.${idField === "prdId" ? "prds" : "pencils"}[${index}] must be an object.`);
-      continue;
-    }
-    const id = artifact[idField];
-    if (typeof id !== "string") {
-      errors.push(`Artifact at index ${index} is missing ${idField}.`);
-      continue;
-    }
-    if (artifactIds.has(id)) {
-      errors.push(`Duplicate artifact id: ${id}`);
-    }
-    artifactIds.add(id);
-  }
 }
 
 function checkEndpoint(

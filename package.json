@@ -1,7 +1,7 @@
 {
   "name": "mindflow-canvas-editor",
   "displayName": "MindFlow Canvas Editor",
-  "description": "Edit .mindflow ProductFlow node canvases in VSCode. AI generation and document workflows are exposed through the MindFlow MCP server.",
+  "description": "Edit .mindflow ProductFlow node canvases locally in VS Code.",
   "version": "0.1.0",
   "publisher": "mindflow",
   "repository": {
@@ -15,10 +15,6 @@
   "categories": [
     "Other"
   ],
-  "bin": {
-    "mindflow": "./out/src/mcp/server.js",
-    "mindflow-mcp": "./out/src/mcp/server.js"
-  },
   "activationEvents": [
     "onView:mindflow.sidebar",
     "onCommand:mindflow.newFlow",
@@ -124,9 +120,6 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "mcp:install": "npm run compile && node scripts/install-mcp.mjs",
-    "mcp:install:project": "npm run compile && node scripts/install-mcp.mjs --scope project",
-    "mcp:verify": "npm run compile && node scripts/verify-mcp.mjs",
     "test": "node scripts/run-tests.mjs"
   },
   "devDependencies": {

@@ -1,8 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { ProductFlow } from "../models/productFlow";
-import { validateProductFlow } from "../models/productFlow";
-import { ensureProjectOverview } from "../core/projectOverview";
+import { parseProductFlowText, serializeProductFlow } from "../models/productFlowCodec";
 import { nowIso, slugify } from "../utils/id";
 
 export const FLOW_FILE_EXTENSION = ".mindflow";
@@ -23,37 +22,21 @@ export class FlowRepository {
 
   public async save(flow: ProductFlow): Promise<string> {
     await this.ensureDirectories();
-    ensureProjectOverview(flow);
-    const validation = validateProductFlow(flow);
-    if (!validation.valid) {
-      throw new Error(`Cannot save invalid ProductFlow:\n${validation.errors.join("\n")}`);
-    }
     const fileName = `${slugify(flow.title, "flow")}-${flow.flowId}${FLOW_FILE_EXTENSION}`;
     const absolutePath = path.join(this.directoryPath, fileName);
     flow.updatedAt = nowIso();
-    await writeJsonAtomic(absolutePath, flow);
+    await writeTextAtomic(absolutePath, serializeProductFlow(flow));
     return absolutePath;
   }
 
   public async saveToPath(absolutePath: string, flow: ProductFlow): Promise<void> {
-    ensureProjectOverview(flow);
-    const validation = validateProductFlow(flow);
-    if (!validation.valid) {
-      throw new Error(`Cannot save invalid ProductFlow:\n${validation.errors.join("\n")}`);
-    }
     flow.updatedAt = nowIso();
-    await writeJsonAtomic(absolutePath, flow);
+    await writeTextAtomic(absolutePath, serializeProductFlow(flow));
   }
 
   public async load(absolutePath: string): Promise<ProductFlow> {
     const raw = await fs.readFile(absolutePath, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    ensureProjectOverview(parsed as ProductFlow);
-    const validation = validateProductFlow(parsed);
-    if (!validation.valid) {
-      throw new Error(`Invalid ProductFlow file ${absolutePath}:\n${validation.errors.join("\n")}`);
-    }
-    return parsed as ProductFlow;
+    return parseProductFlowText(raw, `ProductFlow file ${absolutePath}`).flow;
   }
 
   public async list(): Promise<string[]> {
@@ -86,8 +69,12 @@ export class FlowRepository {
 }
 
 export async function writeJsonAtomic(filePath: string, value: unknown): Promise<void> {
+  await writeTextAtomic(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+async function writeTextAtomic(filePath: string, value: string): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   const tmpPath = `${filePath}.tmp`;
-  await fs.writeFile(tmpPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  await fs.writeFile(tmpPath, value, "utf8");
   await fs.rename(tmpPath, filePath);
 }

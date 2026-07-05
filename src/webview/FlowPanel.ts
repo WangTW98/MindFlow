@@ -2,9 +2,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { MINDFLOW_FILE_EXTENSION, createUntitledMindFlowDocumentOptions } from "../core/untitledMindFlowDocument";
-import { ensureProjectOverview } from "../core/projectOverview";
 import type { ProductFlow } from "../models/productFlow";
-import { validateProductFlow } from "../models/productFlow";
+import { parseProductFlowText, serializeProductFlow, tryParseProductFlowText } from "../models/productFlowCodec";
 
 type OpenFlowCallback = (flowUri: vscode.Uri) => void;
 
@@ -151,16 +150,10 @@ class FlowEditorSession {
         }
         return;
       }
-      const parsed = JSON.parse(text) as unknown;
-      const migration = ensureProjectOverview(parsed as ProductFlow);
-      const validation = validateProductFlow(parsed);
-      if (!validation.valid) {
-        this.renderError(`Invalid ProductFlow:\n${validation.errors.join("\n")}`);
-        return;
-      }
-      this.flow = parsed as ProductFlow;
-      if (migration.changed) {
-        void this.replaceDocumentText(document, serializeFlow(this.flow));
+      const result = parseProductFlowText(text, "ProductFlow");
+      this.flow = result.flow;
+      if (result.migrated) {
+        void this.replaceDocumentText(document, serializeProductFlow(this.flow));
       }
       this.renderFlow(this.flow);
     } catch (error) {
@@ -170,10 +163,7 @@ class FlowEditorSession {
 
   public renderWithFallback(fallbackFlow: ProductFlow): void {
     try {
-      const parsed = JSON.parse(this.getRenderableDocumentText(this.document, fallbackFlow)) as unknown;
-      ensureProjectOverview(parsed as ProductFlow);
-      const validation = validateProductFlow(parsed);
-      const documentFlow = validation.valid ? parsed as ProductFlow : undefined;
+      const documentFlow = tryParseProductFlowText(this.getRenderableDocumentText(this.document, fallbackFlow));
       this.flow = documentFlow ? chooseFresherFlow(documentFlow, fallbackFlow) : fallbackFlow;
       this.renderFlow(this.flow);
     } catch {
@@ -214,7 +204,7 @@ class FlowEditorSession {
     }
 
     if (fallbackFlow) {
-      return serializeFlow(fallbackFlow);
+      return serializeProductFlow(fallbackFlow);
     }
 
     return undefined;
@@ -497,10 +487,6 @@ function escapeHtml(value: unknown): string {
     .replace(/"/g, "&quot;");
 }
 
-function serializeFlow(flow: ProductFlow): string {
-  return `${JSON.stringify(flow, null, 2)}\n`;
-}
-
 async function replaceDocumentText(document: vscode.TextDocument, text: string): Promise<boolean> {
   const edit = new vscode.WorkspaceEdit();
   const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
@@ -518,14 +504,7 @@ function isAssociatedMindFlowUntitled(document: vscode.TextDocument): boolean {
 }
 
 function parseValidFlow(text: string): ProductFlow | undefined {
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    ensureProjectOverview(parsed as ProductFlow);
-    const validation = validateProductFlow(parsed);
-    return validation.valid ? parsed as ProductFlow : undefined;
-  } catch {
-    return undefined;
-  }
+  return tryParseProductFlowText(text);
 }
 
 function chooseFresherFlow(documentFlow: ProductFlow, fallbackFlow: ProductFlow): ProductFlow {

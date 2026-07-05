@@ -8,26 +8,19 @@
     "flowId",
     "revision",
     "title",
-    "sourceDocumentId",
-    "sourceSummary",
     "createdAt",
     "updatedAt",
     "projectOverview",
     "domains",
     "roles",
     "nodes",
-    "edges",
-    "artifacts",
-    "changeHistory",
-    "syncState"
+    "edges"
   ],
   "properties": {
-    "schemaVersion": { "type": "string" },
+    "schemaVersion": { "type": "string", "const": "2.0" },
     "flowId": { "type": "string" },
     "revision": { "type": "number" },
     "title": { "type": "string" },
-    "sourceDocumentId": { "type": "string" },
-    "sourceSummary": { "type": "string" },
     "createdAt": { "type": "string" },
     "updatedAt": { "type": "string" },
     "projectOverview": {
@@ -71,50 +64,6 @@
       }
     },
     "nodes": { "type": "array" },
-    "edges": { "type": "array" },
-    "artifacts": {
-      "type": "object",
-      "required": ["prds", "pencils"],
-      "properties": {
-        "prds": { "type": "array" },
-        "pencils": { "type": "array" }
-      }
-    },
-    "changeHistory": { "type": "array" },
-    "syncState": {
-      "type": "object",
-      "required": ["issues"],
-      "properties": {
-        "lastSyncedAt": { "type": "string" },
-        "issues": { "type": "array" }
-      }
-    },
-    "productDesignIssues": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["issueId", "severity", "title", "description", "prompt"],
-        "properties": {
-          "issueId": { "type": "string" },
-          "severity": {
-            "type": "string",
-            "enum": ["critical", "warning", "optional"]
-          },
-          "title": { "type": "string" },
-          "description": { "type": "string" },
-          "prompt": { "type": "string" },
-          "relatedNodeIds": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "relatedEdgeIds": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "sourceRefs": { "type": "array" }
-        }
-      }
-    },
-    "openQuestions": { "type": "array" }
+    "edges": { "type": "array" }
   }
 }

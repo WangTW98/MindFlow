@@ -91,9 +91,7 @@ function createAppSurfaceEntryEdge(surface: AppSurface, node: PageNode): FlowEdg
     type: "navigate",
     appSurfaceIds: [surface.appId],
     domainIds: mergeUnique(surface.domainIds, node.domainIds),
-    roleIds: mergeUnique(surface.roleIds, node.roleIds),
-    sourceRefs: [{ sourceId: "mindflow", label: "MindFlow app surface entry", excerpt: `${surface.name} -> ${node.title}` }],
-    confidence: 1
+    roleIds: mergeUnique(surface.roleIds, node.roleIds)
   };
 }
 

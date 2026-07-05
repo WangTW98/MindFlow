@@ -70,11 +70,6 @@
   const APP_SURFACE_SOURCE_X = -360;
   const APP_SURFACE_SOURCE_Y = 0;
   const APP_SURFACE_SOURCE_GAP = 240;
-  const PRODUCT_ISSUE_SEVERITIES = [
-    { value: "critical", label: "严重", icon: "octagon-alert" },
-    { value: "warning", label: "警告", icon: "triangle-alert" },
-    { value: "optional", label: "可选", icon: "circle-help" }
-  ];
 
   let selectedNodeIds = readIdSelection(persisted.selectedNodeIds, state.selectedNodeId || persisted.selectedNodeId);
   let selectedNodeId = selectedNodeIds.includes(persisted.selectedNodeId)
@@ -108,8 +103,6 @@
   let nodeSearch = persisted.nodeSearch || "";
   let nodeSearchComposing = false;
   let leftPanelCollapsed = Boolean(persisted.leftPanelCollapsed);
-  let productIssuesPanelOpen = Boolean(persisted.productIssuesPanelOpen);
-  let activeProductIssueSeverity = normalizeProductIssueSeverity(persisted.activeProductIssueSeverity) || "critical";
   let zoom = clamp(Number(persisted.zoom || 1), MIN_ZOOM, MAX_ZOOM);
   let camera = persisted.camera && Number.isFinite(persisted.camera.x) && Number.isFinite(persisted.camera.y)
     ? { x: persisted.camera.x, y: persisted.camera.y }
@@ -133,7 +126,6 @@
   let pendingEdgeDetailsSaves = readPendingEdgeDetailsSaves(persisted.pendingEdgeDetailsSaves);
   let inspectorScrollState = readInspectorScrollState(persisted.inspectorScrollState);
   let framePending = false;
-  let toastTimer = null;
   const nodePositions = new Map();
   const appSurfacePositions = new Map();
   let projectOverviewPosition = null;
@@ -155,11 +147,9 @@
     const selectedRole = (flow.roles || []).find((role) => role.roleId === selectedRoleId) || null;
     const selectedStatusGroup = getStatusGroup(flow, selectedStatusGroupId);
     const visibleListNodes = activeNodes.filter((node) => matchesNodeSearch(flow, node, nodeSearch));
-    const productIssues = getProductDesignIssues(flow);
-    const productIssueCounts = countProductIssues(productIssues);
 
     app.innerHTML = `
-      <main class="app-shell ${leftPanelCollapsed ? "left-collapsed" : ""} ${selectedProjectOverview || selectedNode || selectedEdge || selectedAppSurface || selectedDomain || selectedRole || selectedStatusGroup ? "" : "inspector-collapsed"} ${productIssuesPanelOpen ? "product-issues-open" : ""}">
+      <main class="app-shell ${leftPanelCollapsed ? "left-collapsed" : ""} ${selectedProjectOverview || selectedNode || selectedEdge || selectedAppSurface || selectedDomain || selectedRole || selectedStatusGroup ? "" : "inspector-collapsed"}">
         <aside class="left-panel">
           <section class="node-sidebar">
             <header class="nodes-toolbar">
@@ -192,9 +182,6 @@
         <aside class="inspector">
           ${selectedProjectOverview ? renderProjectOverviewInspector(flow) : selectedAppSurface ? renderAppSurfaceInspector(flow, selectedAppSurface) : selectedDomain ? renderDomainInspector(selectedDomain) : selectedRole ? renderRoleInspector(flow, selectedRole) : selectedStatusGroup ? renderStatusGroupInspector(selectedStatusGroup) : selectedEdge ? renderEdgeInspector(flow, selectedEdge) : selectedNode ? renderNodeInspector(flow, selectedNode) : ""}
         </aside>
-
-        ${renderProductIssueFab(productIssueCounts)}
-        ${productIssuesPanelOpen ? renderProductIssuesPanel(productIssues, productIssueCounts) : ""}
       </main>
     `;
 
@@ -208,7 +195,7 @@
 
   function renderProjectOverviewCard(flow) {
     const overview = getProjectOverview(flow);
-    const summary = overview.summary || flow.sourceSummary || "暂无项目综述";
+    const summary = overview.summary || "暂无项目综述";
     const goal = overview.goal || "暂无项目目标";
     return `
       <article class="project-overview-card ${selectedProjectOverview ? "selected" : ""}"
@@ -276,9 +263,9 @@
   }
 
   function getProjectOverview(flow) {
-    flow.projectOverview = flow.projectOverview || { summary: flow.sourceSummary || "", goal: "" };
+    flow.projectOverview = flow.projectOverview || { summary: "", goal: "" };
     if (typeof flow.projectOverview.summary !== "string" || !flow.projectOverview.summary.trim()) {
-      flow.projectOverview.summary = flow.sourceSummary || "";
+      flow.projectOverview.summary = "";
     }
     if (typeof flow.projectOverview.goal !== "string") {
       flow.projectOverview.goal = "";
@@ -432,81 +419,6 @@
       <button type="button" class="icon-button feature-icon-button ${escapeAttr(className)}" ${attrs} title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">
         ${renderLucideIcon(iconName)}
       </button>
-    `;
-  }
-
-  function renderProductIssueFab(counts) {
-    return `
-      <div class="product-issue-fab" aria-label="产品设计问题">
-        ${PRODUCT_ISSUE_SEVERITIES.map((item) => {
-          const count = counts[item.value] || 0;
-          const active = productIssuesPanelOpen && activeProductIssueSeverity === item.value;
-          return `
-            <button type="button"
-              class="icon-button product-issue-button product-issue-button-${escapeAttr(item.value)} ${active ? "active" : ""}"
-              data-product-issue-toggle="${escapeAttr(item.value)}"
-              title="${escapeAttr(item.label)}"
-              aria-label="${escapeAttr(`${item.label} ${count} 条`)}"
-              aria-pressed="${active ? "true" : "false"}">
-              ${renderLucideIcon(item.icon)}
-              ${count > 0 ? `<span class="product-issue-badge">${count}</span>` : ""}
-            </button>
-          `;
-        }).join("")}
-      </div>
-    `;
-  }
-
-  function renderProductIssuesPanel(issues, counts) {
-    const activeSeverity = normalizeProductIssueSeverity(activeProductIssueSeverity) || "critical";
-    const activeMeta = PRODUCT_ISSUE_SEVERITIES.find((item) => item.value === activeSeverity) || PRODUCT_ISSUE_SEVERITIES[0];
-    const visibleIssues = issues.filter((issue) => issue.severity === activeSeverity);
-    return `
-      <section class="product-issue-panel" aria-label="产品设计问题列表">
-        <header class="product-issue-panel-head">
-          <div class="product-issue-title">
-            ${renderLucideIcon(activeMeta.icon)}
-            <strong>${escapeHtml(activeMeta.label)}问题</strong>
-            <span>${visibleIssues.length} 条</span>
-          </div>
-          <div class="product-issue-panel-actions">
-            <div class="product-issue-tabs" role="tablist" aria-label="问题等级">
-              ${PRODUCT_ISSUE_SEVERITIES.map((item) => `
-                <button type="button"
-                  class="product-issue-tab ${activeSeverity === item.value ? "active" : ""}"
-                  data-product-issue-tab="${escapeAttr(item.value)}"
-                  role="tab"
-                  aria-selected="${activeSeverity === item.value ? "true" : "false"}">
-                  ${escapeHtml(item.label)}
-                  <span>${counts[item.value] || 0}</span>
-                </button>
-              `).join("")}
-            </div>
-            ${renderIconButton("closeProductIssuePanel", "关闭问题列表", "x", "product-issue-close")}
-          </div>
-        </header>
-        <div class="product-issue-list" role="tabpanel">
-          ${visibleIssues.map((issue) => renderProductIssueRow(issue)).join("") || "<p class=\"empty product-issue-empty\">暂无该等级问题</p>"}
-        </div>
-      </section>
-    `;
-  }
-
-  function renderProductIssueRow(issue) {
-    return `
-      <article class="product-issue-row">
-        <div class="product-issue-row-copy">
-          <h4>${escapeHtml(issue.title)}</h4>
-          <p>${escapeHtml(issue.description)}</p>
-        </div>
-        <button type="button"
-          class="icon-button product-issue-copy"
-          data-product-issue-copy="${escapeAttr(issue.issueId)}"
-          title="复制处理提示词"
-          aria-label="复制处理提示词">
-          ${renderLucideIcon("copy")}
-        </button>
-      </article>
     `;
   }
 
@@ -945,7 +857,7 @@
         </header>
         <input id="projectOverviewTitle" type="hidden" value="${escapeAttr(flow.title || "项目概述")}">
         <label>项目综述
-          <textarea id="projectOverviewSummary" rows="5">${escapeHtml(overview.summary || flow.sourceSummary || "")}</textarea>
+          <textarea id="projectOverviewSummary" rows="5">${escapeHtml(overview.summary || "")}</textarea>
         </label>
         <label>项目目标
           <textarea id="projectOverviewGoal" rows="5">${escapeHtml(overview.goal || "")}</textarea>
@@ -1169,7 +1081,7 @@
 
   function renderEndpointProjectOverviewOption(flow, selectedValue) {
     const endpoint = { kind: "projectOverview", nodeId: PROJECT_OVERVIEW_NODE_ID };
-    const search = endpointSearchText([flow.title, flow.sourceSummary, flow.projectOverview?.goal]);
+    const search = endpointSearchText([flow.title, flow.projectOverview?.summary, flow.projectOverview?.goal]);
     return renderEndpointOption(endpoint, `项目概述 · ${flow.title || "项目概述"}`, search, selectedValue, "standalone-option");
   }
 
@@ -1330,15 +1242,8 @@
 
     bindTaxonomyPanelToggles(document);
     bindTaxonomyControls(document);
-    bindProductIssueControls(document);
     applyEdgeTypeColorSwatches(document);
     applyStatusGroupColorSwatches(document);
-
-    bindAction("closeProductIssuePanel", () => {
-      productIssuesPanelOpen = false;
-      persistUiState();
-      render();
-    });
 
     bindCanvasElements();
 
@@ -1509,53 +1414,6 @@
     range.selectNodeContents(element);
     selection.removeAllRanges();
     selection.addRange(range);
-  }
-
-  function bindProductIssueControls(root = document) {
-    root.querySelectorAll("[data-product-issue-toggle]").forEach((button) => {
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const severity = normalizeProductIssueSeverity(button.dataset.productIssueToggle);
-        if (!severity) {
-          return;
-        }
-        if (productIssuesPanelOpen && activeProductIssueSeverity === severity) {
-          productIssuesPanelOpen = false;
-        } else {
-          activeProductIssueSeverity = severity;
-          productIssuesPanelOpen = true;
-        }
-        persistUiState();
-        render();
-      });
-    });
-
-    root.querySelectorAll("[data-product-issue-tab]").forEach((button) => {
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const severity = normalizeProductIssueSeverity(button.dataset.productIssueTab);
-        if (!severity) {
-          return;
-        }
-        activeProductIssueSeverity = severity;
-        productIssuesPanelOpen = true;
-        persistUiState();
-        render();
-      });
-    });
-
-    root.querySelectorAll("[data-product-issue-copy]").forEach((button) => {
-      button.addEventListener("click", async (event) => {
-        event.stopPropagation();
-        const issue = getProductDesignIssues(state.flow).find((item) => item.issueId === button.dataset.productIssueCopy);
-        if (!issue) {
-          showToast("未找到处理提示词");
-          return;
-        }
-        await copyText(issue.prompt);
-        showToast("已复制处理提示词");
-      });
-    });
   }
 
   function bindCanvasElements(root = document) {
@@ -3456,7 +3314,6 @@
     state.flow.title = patch.title.trim() || state.flow.title || "项目概述";
     overview.summary = patch.summary.trim() || overview.summary;
     overview.goal = patch.goal.trim();
-    state.flow.sourceSummary = overview.summary;
     const title = document.getElementById("projectOverviewPanelTitle");
     const titleInput = document.getElementById("projectOverviewTitle");
     if (title && title.dataset.inlineEditing !== "true") {
@@ -4688,99 +4545,6 @@
       .join(" / ");
   }
 
-  function getProductDesignIssues(flow) {
-    const rawIssues = Array.isArray(flow?.productDesignIssues) ? flow.productDesignIssues : [];
-    return rawIssues
-      .map((issue, index) => normalizeProductDesignIssue(issue, index))
-      .filter(Boolean);
-  }
-
-  function normalizeProductDesignIssue(issue, index) {
-    if (!issue || typeof issue !== "object") {
-      return null;
-    }
-    const severity = normalizeProductIssueSeverity(issue.severity);
-    if (!severity) {
-      return null;
-    }
-    const title = String(issue.title || issue.name || "").trim();
-    const description = String(issue.description || issue.message || "").trim();
-    if (!title && !description) {
-      return null;
-    }
-    const prompt = String(issue.prompt || issue.resolutionPrompt || issue.instruction || "").trim() || buildProductIssuePrompt(title, description);
-    return {
-      issueId: String(issue.issueId || issue.id || `product_issue_${severity}_${index}`),
-      severity,
-      title: title || description.slice(0, 32) || "未命名问题",
-      description: description || title,
-      prompt
-    };
-  }
-
-  function normalizeProductIssueSeverity(value) {
-    const normalized = String(value || "").trim().toLowerCase();
-    if (normalized === "critical" || normalized === "severe" || normalized === "error" || normalized === "serious" || normalized === "严重") {
-      return "critical";
-    }
-    if (normalized === "warning" || normalized === "warn" || normalized === "警告") {
-      return "warning";
-    }
-    if (normalized === "optional" || normalized === "info" || normalized === "suggestion" || normalized === "可选") {
-      return "optional";
-    }
-    return "";
-  }
-
-  function countProductIssues(issues) {
-    return PRODUCT_ISSUE_SEVERITIES.reduce((result, item) => {
-      result[item.value] = issues.filter((issue) => issue.severity === item.value).length;
-      return result;
-    }, {});
-  }
-
-  function buildProductIssuePrompt(title, description) {
-    return `请基于当前 MindFlow 分析并完善以下产品设计问题：${title || description}。问题描述：${description || title}。请补充必要节点、连线、异常路径、角色权限、跨端状态和数据流转，并保持现有 schema 字段完整。`;
-  }
-
-  async function copyText(text) {
-    if (navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(text);
-        return;
-      } catch {
-        // Fall back to a temporary textarea when the webview clipboard API is unavailable.
-      }
-    }
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "true");
-    textarea.className = "clipboard-fallback";
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand("copy");
-    textarea.remove();
-  }
-
-  function showToast(message) {
-    const existing = document.querySelector(".mindflow-toast");
-    if (existing) {
-      existing.remove();
-    }
-    const toast = document.createElement("div");
-    toast.className = "mindflow-toast";
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    requestAnimationFrame(() => toast.classList.add("visible"));
-    if (toastTimer) {
-      clearTimeout(toastTimer);
-    }
-    toastTimer = setTimeout(() => {
-      toast.classList.remove("visible");
-      setTimeout(() => toast.remove(), 180);
-    }, 1600);
-  }
-
   function collectMultiSelect(id) {
     const select = document.getElementById(id);
     return Array.from(select?.selectedOptions || []).map((option) => option.value);
@@ -4894,8 +4658,6 @@
       selectedStatusGroupId,
       nodeSearch,
       leftPanelCollapsed,
-      productIssuesPanelOpen,
-      activeProductIssueSeverity,
       zoom,
       camera,
       connectingFrom,

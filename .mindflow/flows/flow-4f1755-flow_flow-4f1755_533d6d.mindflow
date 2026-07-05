@@ -1,10 +1,8 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "2.0",
   "flowId": "flow_flow-4f1755_533d6d",
   "revision": 90,
   "title": "多应用端采购协同平台",
-  "sourceDocumentId": "samples/example-requirements.md",
-  "sourceSummary": "从 samples/example-requirements.md 提取四个应用端、采购协同核心流程、业务域、角色、功能分组与跨应用端连线。",
   "createdAt": "2026-07-05T08:12:37.260Z",
   "updatedAt": "2026-07-05T09:34:44.880Z",
   "domains": [
@@ -277,25 +275,12 @@
       "inputs": [],
       "outputs": [],
       "permissions": [],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edit",
-          "excerpt": "手动创建的产品页面节点。"
-        }
-      ],
-      "artifacts": {
-        "prdIds": [],
-        "pencilIds": []
-      },
       "view": {
         "position": {
           "x": 262,
           "y": 9
         }
-      },
-      "confidence": 1,
-      "updatedByChangeSetId": "manual"
+      }
     },
     {
       "nodeId": "page_page-64451e_d5c1fd",
@@ -371,24 +356,12 @@
       "inputs": [],
       "outputs": [],
       "permissions": [],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edit",
-          "excerpt": "手动创建的产品页面节点。"
-        }
-      ],
-      "artifacts": {
-        "prdIds": [],
-        "pencilIds": []
-      },
       "view": {
         "position": {
           "x": 274,
           "y": 405
         }
-      },
-      "confidence": 1
+      }
     },
     {
       "nodeId": "page_page-64451e_99845a",
@@ -462,27 +435,13 @@
       "inputs": [],
       "outputs": [],
       "permissions": [],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edit",
-          "excerpt": "手动创建的产品页面节点。"
-        }
-      ],
-      "artifacts": {
-        "prdIds": [],
-        "pencilIds": []
-      },
       "view": {
         "position": {
           "x": -790,
           "y": 28
         }
       },
-      "confidence": 1,
-      "removedAt": "2026-07-05T08:37:00.176Z",
-      "removedByChangeSetId": "manual",
-      "updatedByChangeSetId": "manual"
+      "removedAt": "2026-07-05T08:37:00.176Z"
     },
     {
       "nodeId": "page_page-64451e_12461c",
@@ -556,27 +515,13 @@
       "inputs": [],
       "outputs": [],
       "permissions": [],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edit",
-          "excerpt": "手动创建的产品页面节点。"
-        }
-      ],
-      "artifacts": {
-        "prdIds": [],
-        "pencilIds": []
-      },
       "view": {
         "position": {
           "x": -590,
           "y": 134
         }
       },
-      "confidence": 1,
-      "removedAt": "2026-07-05T08:37:07.494Z",
-      "removedByChangeSetId": "manual",
-      "updatedByChangeSetId": "manual"
+      "removedAt": "2026-07-05T08:37:07.494Z"
     }
   ],
   "edges": [
@@ -612,16 +557,7 @@
         "role_procurement_manager",
         "role_finance_reviewer",
         "role_system_admin"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "管理后台 -> page_page-64451e_cdb276"
-        }
-      ],
-      "confidence": 1,
-      "updatedByChangeSetId": "manual"
+      ]
     },
     {
       "edgeId": "edge_75c6bb3826",
@@ -654,15 +590,7 @@
         "role_procurement_manager",
         "role_finance_reviewer",
         "role_system_admin"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "管理后台 -> page_page-64451e_d5c1fd"
-        }
-      ],
-      "confidence": 1
+      ]
     },
     {
       "edgeId": "edge_6a33e6ce27",
@@ -692,25 +620,11 @@
       ],
       "roleIds": [
         "role_guest_supplier"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "page_page-64451e_d5c1fd/group_group-6b9957_24d61b/item_item-da1a76_b49cb1 -> 公开采购网站"
-        }
-      ],
-      "confidence": 1
+      ]
     }
   ],
-  "artifacts": {
-    "prds": [],
-    "pencils": []
-  },
-  "changeHistory": [],
-  "syncState": {
-    "issues": []
-  },
-  "productDesignIssues": [],
-  "openQuestions": []
+  "projectOverview": {
+    "summary": "从 samples/example-requirements.md 提取四个应用端、采购协同核心流程、业务域、角色、功能分组与跨应用端连线。",
+    "goal": ""
+  }
 }

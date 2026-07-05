@@ -100,8 +100,6 @@ export function createManualNode(flow: ProductFlow, input: CreateNodeInput = {})
     inputs: [],
     outputs: [],
     permissions: normalizeStringArray(input.roleIds),
-    sourceRefs: [{ sourceId: "manual", label: "MindFlow manual edit", excerpt: purpose }],
-    artifacts: { prdIds: [], pencilIds: [] },
     ...(hasExplicitPosition
       ? {
           view: {
@@ -111,8 +109,7 @@ export function createManualNode(flow: ProductFlow, input: CreateNodeInput = {})
             }
           }
         }
-      : {}),
-    confidence: 1
+      : {})
   };
   flow.nodes.push(node);
   touchFlow(flow);
@@ -162,8 +159,6 @@ export function updateManualNodeDetails(flow: ProductFlow, nodeId: string, patch
     node.actions = featureGroupsToActions(node.nodeId, node.featureGroups);
   }
   node.version += 1;
-  node.updatedByChangeSetId = "manual";
-  markNodeArtifactsStale(flow, node, `节点 ${node.title} 已手动编辑。`);
   touchFlow(flow);
   return node;
 }
@@ -214,9 +209,7 @@ export function createManualEdge(flow: ProductFlow, input: CreateEdgeInput): Flo
     condition: input.condition,
     appSurfaceIds: mergeUnique(endpointAppSurfaceIds(flow, from), endpointAppSurfaceIds(flow, to)),
     domainIds: mergeUnique(endpointDomainIds(flow, from), endpointDomainIds(flow, to)),
-    roleIds: mergeUnique(endpointRoleIds(flow, from), endpointRoleIds(flow, to)),
-    sourceRefs: [{ sourceId: "manual", label: "MindFlow manual edge", excerpt: `${endpointLabel(flow, from)} -> ${endpointLabel(flow, to)}` }],
-    confidence: 1
+    roleIds: mergeUnique(endpointRoleIds(flow, from), endpointRoleIds(flow, to))
   };
   flow.edges.push(edge);
   touchFlow(flow);
@@ -260,7 +253,6 @@ export function updateManualEdgeDetails(flow: ProductFlow, edgeId: string, patch
   if (patch.roleIds !== undefined) {
     edge.roleIds = normalizeStringArray(patch.roleIds);
   }
-  edge.updatedByChangeSetId = "manual";
   touchFlow(flow);
   return edge;
 }
@@ -282,9 +274,6 @@ export function removeManualNode(flow: ProductFlow, nodeId: string): RemoveNodeR
   node.status = "removed";
   node.version += 1;
   node.removedAt = nowIso();
-  node.removedByChangeSetId = "manual";
-  node.updatedByChangeSetId = "manual";
-  markNodeArtifactsStale(flow, node, `节点 ${node.title} 已手动删除。`);
 
   const removedEdges: FlowEdge[] = [];
   for (const edge of flow.edges) {
@@ -582,31 +571,9 @@ function uniqueEdgeId(flow: ProductFlow, fromNodeId: string, toNodeId: string, t
   return `edge_${shortHash(`${baseId}:${nowIso()}`, 12)}`;
 }
 
-function markNodeArtifactsStale(flow: ProductFlow, node: PageNode, reason: string): void {
-  const now = nowIso();
-  for (const prd of flow.artifacts.prds) {
-    if (node.artifacts.prdIds.includes(prd.prdId)) {
-      prd.status = "stale";
-      prd.staleReason = reason;
-      prd.staleByChangeSetId = "manual";
-      prd.updatedAt = now;
-    }
-  }
-  for (const pencil of flow.artifacts.pencils) {
-    if (node.artifacts.pencilIds.includes(pencil.pencilId)) {
-      pencil.status = "stale";
-      pencil.staleReason = reason;
-      pencil.staleByChangeSetId = "manual";
-      pencil.updatedAt = now;
-    }
-  }
-}
-
 function markManualEdgeRemoved(edge: FlowEdge): void {
   edge.status = "removed";
   edge.removedAt = nowIso();
-  edge.removedByChangeSetId = "manual";
-  edge.updatedByChangeSetId = "manual";
 }
 
 function touchFlow(flow: ProductFlow): void {
