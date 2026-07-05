@@ -5,3 +5,5 @@ out/
 .DS_Store
 .mindflow/debug/
 .mindflow/tmp/
+.mindflow/flows/*.mindflow
+!.mindflow/flows/.gitkeep

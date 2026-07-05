@@ -20,7 +20,8 @@ import {
   removeManualNode,
   updateManualAppSurfacePosition,
   updateManualEdgeDetails,
-  updateManualNodeDetails
+  updateManualNodeDetails,
+  updateManualNodePosition
 } from "../src/core/flowEditing";
 import { applyTaxonomyRequest } from "../src/core/taxonomy";
 import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/core/taxonomyEditing";
@@ -30,7 +31,7 @@ import {
   createUntitledMindFlowDocumentOptions,
   createUntitledMindFlowFileName
 } from "../src/core/untitledMindFlowDocument";
-import { validateProductFlow } from "../src/models/productFlow";
+import { EDGE_TYPES, validateProductFlow } from "../src/models/productFlow";
 import { parseProductFlowText, serializeProductFlow } from "../src/models/productFlowCodec";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
 import { RecentFlowStore } from "../src/storage/recentFlows";
@@ -64,6 +65,33 @@ test("Empty ProductFlow starts as a valid blank canvas", () => {
   assert.equal(flow.appSurfaces?.length, 0);
   assert.equal(flow.statusGroups?.length, 0);
   assertNoLegacyFields(flow);
+});
+
+test("JSON schema edge type enum stays aligned with runtime validation", async () => {
+  const raw = await fs.readFile(path.join(process.cwd(), "src", "schema", "productFlow.schema.json"), "utf8");
+  const schema = JSON.parse(raw) as {
+    $defs?: {
+      edgeType?: {
+        enum?: string[];
+      };
+    };
+  };
+
+  assert.deepEqual(schema.$defs?.edgeType?.enum, [...EDGE_TYPES]);
+});
+
+test("ProductFlow validation rejects invalid enums and stale references", () => {
+  const flow = createEmptyProductFlow();
+  const node = createManualNode(flow, { title: "异常节点" });
+  const record = node as unknown as Record<string, unknown>;
+  record.status = "unknown";
+  node.domainIds = ["missing_domain"];
+
+  const validation = validateProductFlow(flow);
+
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((error) => error.includes("nodes[0].status must be")));
+  assert.ok(validation.errors.some((error) => error.includes("references missing domain missing_domain")));
 });
 
 test("Legacy ProductFlow missing projectOverview can be backfilled", () => {
@@ -137,6 +165,7 @@ test("Generated nodes without coordinates receive a structural canvas layout", (
 
   createManualEdge(flow, { from: { kind: "node", nodeId: start.nodeId }, to: { kind: "node", nodeId: review.nodeId } });
   createManualEdge(flow, { from: { kind: "node", nodeId: review.nodeId }, to: { kind: "node", nodeId: done.nodeId } });
+  const revisionBeforeLayout = flow.revision;
 
   const result = ensureReasonableNodeLayout(flow);
   const startPosition = start.view?.position;
@@ -151,9 +180,27 @@ test("Generated nodes without coordinates receive a structural canvas layout", (
   assert.ok(reviewPosition.x < donePosition.x);
   assert.ok(startPosition.x !== reviewPosition.x || startPosition.y !== reviewPosition.y);
   assert.ok(reviewPosition.x !== donePosition.x || reviewPosition.y !== donePosition.y);
+  assert.equal(flow.revision, revisionBeforeLayout + 1);
 
   const validation = validateProductFlow(flow);
   assert.equal(validation.valid, true, validation.errors.join("\n"));
+});
+
+test("Manual position changes bump revision consistently", () => {
+  const flow = createProcurementFlow();
+  const node = requireNodeByTitle(flow, "采购工作台");
+  const surface = flow.appSurfaces?.[0];
+  assert.ok(surface);
+
+  const beforeNodeMove = flow.revision;
+  updateManualNodePosition(flow, node.nodeId, 128.8, 256.2);
+  assert.equal(flow.revision, beforeNodeMove + 1);
+  assert.deepEqual(node.view?.position, { x: 129, y: 256 });
+
+  const beforeSurfaceMove = flow.revision;
+  updateManualAppSurfacePosition(flow, surface.appId, -420.4, 160.6);
+  assert.equal(flow.revision, beforeSurfaceMove + 1);
+  assert.deepEqual(surface.view?.position, { x: -420, y: 161 });
 });
 
 test("Canvas layout repair preserves explicit node positions", () => {
@@ -223,6 +270,39 @@ test("Taxonomy status group details can be created and updated", () => {
   assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
 
+test("Taxonomy updates keep only known domain and role references", () => {
+  const flow = createEmptyProductFlow();
+  flow.domains = [{ domainId: "domain_known", name: "已知业务域", description: "可引用业务域。" }];
+  flow.roles = [{ roleId: "role_known", name: "已知角色", description: "可引用角色。", domainIds: ["domain_known"] }];
+
+  applyTaxonomyRequest(flow, {
+    kind: "appSurface",
+    action: "create",
+    id: "app_known",
+    item: {
+      appId: "app_known",
+      name: "管理后台",
+      type: "admin",
+      description: "后台应用端。",
+      domainIds: ["domain_known", "domain_missing"],
+      roleIds: ["role_known", "role_missing"]
+    }
+  });
+  applyTaxonomyRequest(flow, {
+    kind: "role",
+    action: "update",
+    id: "role_known",
+    item: {
+      domainIds: ["domain_known", "domain_missing"]
+    }
+  });
+
+  assert.deepEqual(flow.appSurfaces?.[0]?.domainIds, ["domain_known"]);
+  assert.deepEqual(flow.appSurfaces?.[0]?.roleIds, ["role_known"]);
+  assert.deepEqual(flow.roles[0]?.domainIds, ["domain_known"]);
+  assert.equal(validateProductFlow(flow).valid, true);
+});
+
 test("Blank MindFlow opens as an untitled document without a target file path", () => {
   const flow = createEmptyProductFlow();
   const options = createUntitledMindFlowDocumentOptions(flow);
@@ -272,9 +352,11 @@ test("ProductFlow codec migrates legacy generation fields to local v2", () => {
 test("ensureAppSurfaceEntryEdges repairs missing app-surface entry links", () => {
   const flow = createProcurementFlow({ includeAppSurfaceEntryEdges: false });
   assert.equal(flow.edges.some((edge) => edge.from?.kind === "appSurface"), false);
+  const revisionBeforeRepair = flow.revision;
 
   const result = ensureAppSurfaceEntryEdges(flow);
   assert.equal(result.addedEdgeIds.length, 4);
+  assert.equal(flow.revision, revisionBeforeRepair + 1);
   assertAppSurfaceEntryEdge(flow, "app_admin", "采购工作台");
   assertAppSurfaceEntryEdge(flow, "app_supplier_portal", "供应商门户首页");
   assertAppSurfaceEntryEdge(flow, "app_mobile_approval", "移动审批待办");
@@ -487,6 +569,34 @@ test("Manual edge details update endpoints and new edge category types", () => {
   assert.equal(updated?.type, "nestedRelation");
 });
 
+test("Manual edge editing rejects unsupported edge types at runtime", () => {
+  const flow = createEmptyProductFlow();
+  const source = createManualNode(flow, { title: "来源页" });
+  const target = createManualNode(flow, { title: "目标页" });
+  const edgeCount = flow.edges.length;
+
+  assertThrows(() => {
+    createManualEdge(flow, {
+      from: { kind: "node", nodeId: source.nodeId },
+      toNodeId: target.nodeId,
+      trigger: "非法连线类型",
+      type: "teleport" as never
+    });
+  }, /Unsupported edge type/);
+  assert.equal(flow.edges.length, edgeCount);
+
+  const edge = createManualEdge(flow, {
+    from: { kind: "node", nodeId: source.nodeId },
+    toNodeId: target.nodeId,
+    trigger: "合法连线类型",
+    type: "interaction"
+  });
+  assertThrows(() => {
+    updateManualEdgeDetails(flow, edge.edgeId, { type: "teleport" as never });
+  }, /Unsupported edge type/);
+  assert.equal(edge.type, "interaction");
+});
+
 test("Manual node feature group edits preserve parent-child hierarchy and derived actions", () => {
   const flow = createProcurementFlow();
   const node = createManualNode(flow, {
@@ -607,6 +717,16 @@ test("FlowRepository saves and lists only .mindflow ProductFlow files", async ()
 
     assert.ok(listed.includes(savedPath));
     assert.equal(listed.includes(legacyPath), false);
+
+    const sharedPath = path.join(repository.directoryPath, `shared${FLOW_FILE_EXTENSION}`);
+    await Promise.all([
+      repository.saveToPath(sharedPath, createEmptyProductFlow("并发保存 A")),
+      repository.saveToPath(sharedPath, createEmptyProductFlow("并发保存 B"))
+    ]);
+    const loaded = await repository.load(sharedPath);
+    const entries = await fs.readdir(repository.directoryPath);
+    assert.equal(validateProductFlow(loaded).valid, true);
+    assert.equal(entries.some((entry) => entry.endsWith(".tmp")), false);
   } finally {
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
@@ -936,6 +1056,17 @@ function assertNoLegacyKeysInJson(json: string): void {
   ]) {
     assert.equal(json.includes(`"${key}"`), false, `Serialized flow still contains ${key}`);
   }
+}
+
+function assertThrows(fn: () => unknown, pattern: RegExp): void {
+  try {
+    fn();
+  } catch (error) {
+    assert.ok(error instanceof Error);
+    assert.ok(pattern.test(error.message), `Expected "${error.message}" to match ${pattern}`);
+    return;
+  }
+  assert.ok(false, "Expected function to throw.");
 }
 
 class FakeMemento {

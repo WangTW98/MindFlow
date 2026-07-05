@@ -23,47 +23,296 @@
     "title": { "type": "string" },
     "createdAt": { "type": "string" },
     "updatedAt": { "type": "string" },
+    "projectOverview": { "$ref": "#/$defs/projectOverview" },
+    "domains": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/domain" }
+    },
+    "roles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/role" }
+    },
+    "appSurfaces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/appSurface" }
+    },
+    "statusGroups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/statusGroup" }
+    },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/edge" }
+    }
+  },
+  "$defs": {
+    "entityStatus": {
+      "type": "string",
+      "enum": ["active", "deprecated", "removed"]
+    },
+    "edgeType": {
+      "type": "string",
+      "enum": [
+        "interaction",
+        "autoNavigate",
+        "dataFlow",
+        "statusChange",
+        "nestedRelation",
+        "navigate",
+        "submit",
+        "approve",
+        "reject",
+        "create",
+        "update",
+        "delete",
+        "system",
+        "branch"
+      ]
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "position": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "view": {
+      "type": "object",
+      "properties": {
+        "position": { "$ref": "#/$defs/position" }
+      }
+    },
     "projectOverview": {
       "type": "object",
       "required": ["summary", "goal"],
       "properties": {
         "summary": { "type": "string" },
         "goal": { "type": "string" },
-        "view": {
-          "type": "object",
-          "properties": {
-            "position": {
-              "type": "object",
-              "required": ["x", "y"],
-              "properties": {
-                "x": { "type": "number" },
-                "y": { "type": "number" }
-              }
-            }
-          }
+        "view": { "$ref": "#/$defs/view" }
+      }
+    },
+    "domain": {
+      "type": "object",
+      "required": ["domainId", "name", "description"],
+      "properties": {
+        "domainId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "role": {
+      "type": "object",
+      "required": ["roleId", "name", "description", "domainIds"],
+      "properties": {
+        "roleId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "domainIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "appSurface": {
+      "type": "object",
+      "required": ["appId", "name", "type", "description", "domainIds", "roleIds"],
+      "properties": {
+        "appId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["admin", "web", "app", "miniapp", "desktop", "other"]
+        },
+        "description": { "type": "string" },
+        "domainIds": { "$ref": "#/$defs/stringArray" },
+        "roleIds": { "$ref": "#/$defs/stringArray" },
+        "view": { "$ref": "#/$defs/view" }
+      }
+    },
+    "statusGroup": {
+      "type": "object",
+      "required": ["statusGroupId", "title", "color"],
+      "properties": {
+        "statusGroupId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
         }
       }
     },
-    "domains": { "type": "array" },
-    "roles": { "type": "array" },
-    "appSurfaces": { "type": "array" },
-    "statusGroups": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["statusGroupId", "title", "color"],
-        "properties": {
-          "statusGroupId": { "type": "string" },
-          "title": { "type": "string" },
-          "description": { "type": "string" },
-          "color": {
-            "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
-          }
+    "featureItem": {
+      "type": "object",
+      "required": ["itemId", "name", "type", "description"],
+      "properties": {
+        "itemId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "dataBinding": { "type": "string" },
+        "required": { "type": "boolean" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["actionId", "label", "type"],
+      "properties": {
+        "actionId": { "type": "string" },
+        "label": { "type": "string" },
+        "type": { "type": "string" },
+        "targetNodeId": { "type": "string" },
+        "preconditions": { "$ref": "#/$defs/stringArray" },
+        "result": { "type": "string" }
+      }
+    },
+    "featureGroup": {
+      "type": "object",
+      "required": ["groupId", "name", "type", "description", "items"],
+      "properties": {
+        "groupId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/featureItem" }
+        },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
         }
       }
     },
-    "nodes": { "type": "array" },
-    "edges": { "type": "array" }
+    "element": {
+      "type": "object",
+      "required": ["elementId", "name", "type", "description"],
+      "properties": {
+        "elementId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "dataBinding": { "type": "string" },
+        "required": { "type": "boolean" }
+      }
+    },
+    "state": {
+      "type": "object",
+      "required": ["stateId", "name", "description"],
+      "properties": {
+        "stateId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "exception": {
+      "type": "object",
+      "required": ["exceptionId", "name", "handling"],
+      "properties": {
+        "exceptionId": { "type": "string" },
+        "name": { "type": "string" },
+        "handling": { "type": "string" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": [
+        "nodeId",
+        "stableKey",
+        "status",
+        "version",
+        "title",
+        "pageType",
+        "domainIds",
+        "roleIds",
+        "purpose",
+        "elements",
+        "actions",
+        "states",
+        "exceptions",
+        "inputs",
+        "outputs",
+        "permissions"
+      ],
+      "properties": {
+        "nodeId": { "type": "string" },
+        "stableKey": { "type": "string" },
+        "status": { "$ref": "#/$defs/entityStatus" },
+        "version": { "type": "number" },
+        "title": { "type": "string" },
+        "pageType": { "type": "string" },
+        "appSurfaceIds": { "$ref": "#/$defs/stringArray" },
+        "statusGroupId": { "type": "string" },
+        "domainIds": { "$ref": "#/$defs/stringArray" },
+        "roleIds": { "$ref": "#/$defs/stringArray" },
+        "purpose": { "type": "string" },
+        "featureGroups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/featureGroup" }
+        },
+        "elements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/element" }
+        },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        },
+        "states": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/state" }
+        },
+        "exceptions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/exception" }
+        },
+        "inputs": { "$ref": "#/$defs/stringArray" },
+        "outputs": { "$ref": "#/$defs/stringArray" },
+        "permissions": { "$ref": "#/$defs/stringArray" },
+        "replacementNodeIds": { "$ref": "#/$defs/stringArray" },
+        "removedAt": { "type": "string" },
+        "view": { "$ref": "#/$defs/view" }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "required": ["kind", "nodeId"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["appSurface", "projectOverview", "node", "featureGroup", "featureItem"]
+        },
+        "nodeId": { "type": "string" },
+        "appId": { "type": "string" },
+        "groupId": { "type": "string" },
+        "itemId": { "type": "string" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["edgeId", "status", "fromNodeId", "toNodeId", "action", "type", "domainIds", "roleIds"],
+      "properties": {
+        "edgeId": { "type": "string" },
+        "status": { "$ref": "#/$defs/entityStatus" },
+        "fromNodeId": { "type": "string" },
+        "toNodeId": { "type": "string" },
+        "from": { "$ref": "#/$defs/endpoint" },
+        "to": { "$ref": "#/$defs/endpoint" },
+        "action": { "type": "string" },
+        "trigger": { "type": "string" },
+        "type": { "$ref": "#/$defs/edgeType" },
+        "condition": { "type": "string" },
+        "appSurfaceIds": { "$ref": "#/$defs/stringArray" },
+        "domainIds": { "$ref": "#/$defs/stringArray" },
+        "roleIds": { "$ref": "#/$defs/stringArray" },
+        "removedAt": { "type": "string" }
+      }
+    }
   }
 }

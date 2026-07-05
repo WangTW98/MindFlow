@@ -10,6 +10,7 @@ import type {
   PageNode,
   ProductFlow
 } from "../models/productFlow";
+import { isEdgeType } from "../models/productFlow";
 import { PROJECT_OVERVIEW_NODE_ID } from "./projectOverview";
 import {
   makeActionId,
@@ -172,6 +173,7 @@ export function updateManualNodePosition(flow: ProductFlow, nodeId: string, x: n
       y: Math.round(y)
     }
   };
+  touchFlow(flow);
   return node;
 }
 
@@ -184,6 +186,7 @@ export function updateManualAppSurfacePosition(flow: ProductFlow, appId: string,
       y: Math.round(y)
     }
   };
+  touchFlow(flow);
   return surface;
 }
 
@@ -205,7 +208,7 @@ export function createManualEdge(flow: ProductFlow, input: CreateEdgeInput): Flo
     to,
     action: trigger,
     trigger,
-    type: input.type ?? "interaction",
+    type: input.type === undefined ? "interaction" : requireEdgeType(input.type),
     condition: input.condition,
     appSurfaceIds: mergeUnique(endpointAppSurfaceIds(flow, from), endpointAppSurfaceIds(flow, to)),
     domainIds: mergeUnique(endpointDomainIds(flow, from), endpointDomainIds(flow, to)),
@@ -239,7 +242,7 @@ export function updateManualEdgeDetails(flow: ProductFlow, edgeId: string, patch
     edge.trigger = edge.action;
   }
   if (patch.type !== undefined) {
-    edge.type = patch.type;
+    edge.type = requireEdgeType(patch.type);
   }
   if (patch.condition !== undefined) {
     edge.condition = patch.condition.trim() || undefined;
@@ -574,6 +577,13 @@ function uniqueEdgeId(flow: ProductFlow, fromNodeId: string, toNodeId: string, t
 function markManualEdgeRemoved(edge: FlowEdge): void {
   edge.status = "removed";
   edge.removedAt = nowIso();
+}
+
+function requireEdgeType(value: unknown): EdgeType {
+  if (!isEdgeType(value)) {
+    throw new Error(`Unsupported edge type: ${String(value)}`);
+  }
+  return value;
 }
 
 function touchFlow(flow: ProductFlow): void {

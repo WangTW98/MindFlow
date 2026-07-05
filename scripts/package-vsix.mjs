@@ -7,14 +7,17 @@ const pkg = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"
 const tempRoot = path.join("/tmp", `mindflow-vsix-${Date.now()}`);
 const extensionRoot = path.join(tempRoot, "extension");
 const outPath = path.join(root, `${pkg.name}-${pkg.version}.vsix`);
+const outRoot = path.join(root, "out");
+const tsc = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc");
+
+await fs.rm(outRoot, { recursive: true, force: true });
+await run(tsc, ["-p", "./"]);
 
 await fs.rm(tempRoot, { recursive: true, force: true });
 await fs.mkdir(extensionRoot, { recursive: true });
 
 await copyFile("package.json", "extension/package.json");
 await copyFile("README.md", "extension/readme.md");
-await copyFile("tsconfig.json", "extension/tsconfig.json");
-await copyFile("tsconfig.test.json", "extension/tsconfig.test.json");
 await copyDir("src/schema", "extension/src/schema");
 await copyDir("src/webview/media", "extension/src/webview/media");
 await copyDir("out/src", "extension/out/src");
@@ -36,6 +39,20 @@ async function copyFile(from, to) {
 
 async function copyDir(from, to) {
   await fs.cp(path.join(root, from), path.join(tempRoot, to), { recursive: true });
+}
+
+function run(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd: root, stdio: "inherit" });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`${command} ${args.join(" ")} exited with ${code}`));
+      }
+    });
+  });
 }
 
 function zipDirectory(cwd, output) {

@@ -70,6 +70,8 @@ export function updateProjectOverviewPosition(flow: ProductFlow, x: number, y: n
       y: Math.round(y)
     }
   };
+  flow.revision += 1;
+  flow.updatedAt = nowIso();
   return overview;
 }
 

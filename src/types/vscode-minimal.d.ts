@@ -120,6 +120,7 @@ declare module "vscode" {
     };
     asWebviewUri(uri: Uri): Uri;
     onDidReceiveMessage(listener: (message: any) => any): Disposable;
+    postMessage(message: any): Thenable<boolean>;
   }
 
   export interface WebviewPanel {

@@ -615,6 +615,35 @@ small,
   user-select: none;
 }
 
+.command-status {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 7;
+  max-width: min(420px, calc(100% - 24px));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: var(--card-shadow);
+}
+
+.command-status.ok,
+.save-hint.ok {
+  color: var(--fg);
+  border-color: color-mix(in srgb, var(--vscode-charts-green), var(--border) 40%);
+}
+
+.command-status.error,
+.save-hint.error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger), var(--border) 35%);
+}
+
 .floating-taxonomy-controls {
   position: absolute;
   top: 12px;

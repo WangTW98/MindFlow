@@ -119,7 +119,9 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
+    "typecheck": "tsc -p ./ --noEmit",
     "watch": "tsc -watch -p ./",
+    "package": "node scripts/package-vsix.mjs",
     "test": "node scripts/run-tests.mjs"
   },
   "devDependencies": {

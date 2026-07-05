@@ -56,8 +56,8 @@ function applyAppSurfaceRequest(flow: ProductFlow, request: TaxonomyRequest): vo
     name,
     type: normalizeSurfaceType(readString(item.type, "other")),
     description: readString(item.description, ""),
-    domainIds: readStringArray(item.domainIds),
-    roleIds: readStringArray(item.roleIds),
+    domainIds: knownOnly(readStringArray(item.domainIds), new Set(flow.domains.map((domain) => domain.domainId))),
+    roleIds: knownOnly(readStringArray(item.roleIds), new Set(flow.roles.map((role) => role.roleId))),
     view: existing?.view
   };
   upsertById(flow.appSurfaces, (item) => item.appId, next);
@@ -119,7 +119,7 @@ function applyRoleRequest(flow: ProductFlow, request: TaxonomyRequest): void {
     roleId,
     name,
     description: readString(item.description, ""),
-    domainIds: readStringArray(item.domainIds)
+    domainIds: knownOnly(readStringArray(item.domainIds), new Set(flow.domains.map((domain) => domain.domainId)))
   };
   upsertById(flow.roles, (item) => item.roleId, next);
 }
@@ -185,6 +185,10 @@ function readStringArray(value: unknown): string[] {
     return [];
   }
   return value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+}
+
+function knownOnly(values: string[], knownIds: Set<string>): string[] {
+  return values.filter((value) => knownIds.has(value));
 }
 
 function readStatusGroupColor(value: unknown, fallback: string): string {

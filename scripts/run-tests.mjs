@@ -3,8 +3,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const tsc = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc");
 
-await run(path.join(root, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc"), ["-p", "./tsconfig.test.json"]);
+await run(tsc, ["-p", "./", "--noEmit"]);
+await run(tsc, ["-p", "./tsconfig.test.json"]);
 await run(process.execPath, ["--test", "out/test/core.test.js"]);
 
 function run(command, args) {

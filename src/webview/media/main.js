@@ -129,6 +129,12 @@
   const nodePositions = new Map();
   const appSurfacePositions = new Map();
   let projectOverviewPosition = null;
+  let commandStatus = readCommandStatus(persisted.commandStatus);
+  let commandStatusTimer = null;
+
+  window.addEventListener("message", (event) => {
+    handleHostMessage(event.data);
+  });
 
   function render() {
     const flow = state.flow;
@@ -177,6 +183,7 @@
             ${activeNodes.map((node) => renderNodeCard(flow, node)).join("")}
           </div>
           <div class="zoom-pill">${Math.round(zoom * 100)}%</div>
+          ${renderCommandStatus()}
         </section>
 
         <aside class="inspector">
@@ -367,8 +374,26 @@
       ${renderManagedList("appSurface", "应用端", appSurfaces, "appId", "name", "description", appFilters)}
       ${renderManagedList("domain", "业务域", domains, "domainId", "name", "description", domainFilters)}
       ${renderManagedList("role", "角色", roles, "roleId", "name", "description", roleFilters)}
-      <p class="save-hint">画布修改会写入 VSCode 文档缓冲区，使用文件保存落盘。</p>
+      ${renderSaveHint()}
     `;
+  }
+
+  function renderCommandStatus() {
+    if (!commandStatus) {
+      return "";
+    }
+    return `
+      <div class="command-status ${escapeAttr(commandStatus.kind)}" id="commandStatus" role="status">
+        ${escapeHtml(commandStatus.message)}
+      </div>
+    `;
+  }
+
+  function renderSaveHint() {
+    if (!commandStatus) {
+      return "<p class=\"save-hint\">画布修改会写入 VS Code 文档缓冲区，使用文件保存落盘。</p>";
+    }
+    return `<p class="save-hint ${escapeAttr(commandStatus.kind)}" role="status">${escapeHtml(commandStatus.message)}</p>`;
   }
 
   function renderFloatingTaxonomyControls() {
@@ -4642,6 +4667,84 @@
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   }
 
+  function handleHostMessage(message) {
+    if (!message || message.type !== "commandResult") {
+      return;
+    }
+    const replacementFlow = message.flow && typeof message.flow === "object" ? message.flow : null;
+    if (replacementFlow) {
+      state.flow = replacementFlow;
+      resetLayoutCaches();
+    }
+    setCommandStatus(message.ok === true, typeof message.message === "string" ? message.message : "");
+    if (replacementFlow) {
+      render();
+    } else {
+      updateCommandStatusElement();
+    }
+  }
+
+  function setCommandStatus(ok, message) {
+    clearTimeout(commandStatusTimer);
+    commandStatus = {
+      kind: ok ? "ok" : "error",
+      message: message || (ok ? "修改已写入 VS Code 文档缓冲区。" : "操作失败，文档未更新。"),
+      at: Date.now()
+    };
+    persistUiState();
+    if (ok) {
+      commandStatusTimer = setTimeout(() => {
+        commandStatus = null;
+        persistUiState();
+        updateCommandStatusElement();
+      }, 2600);
+    }
+  }
+
+  function updateCommandStatusElement() {
+    const existing = document.getElementById("commandStatus");
+    if (!commandStatus) {
+      existing?.remove();
+      return;
+    }
+    const canvas = document.getElementById("canvas");
+    if (!canvas) {
+      return;
+    }
+    const container = existing || document.createElement("div");
+    container.id = "commandStatus";
+    container.className = `command-status ${commandStatus.kind}`;
+    container.setAttribute("role", "status");
+    container.textContent = commandStatus.message;
+    if (!existing) {
+      canvas.appendChild(container);
+    }
+  }
+
+  function resetLayoutCaches() {
+    nodePositions.clear();
+    appSurfacePositions.clear();
+    projectOverviewPosition = null;
+  }
+
+  function readCommandStatus(value) {
+    if (!value || (value.kind !== "ok" && value.kind !== "error") || typeof value.message !== "string") {
+      return null;
+    }
+    const at = Number(value.at);
+    if (!Number.isFinite(at)) {
+      return null;
+    }
+    if (value.kind === "ok" && Date.now() - at > 3000) {
+      return null;
+    }
+    return {
+      kind: value.kind,
+      message: value.message,
+      at
+    };
+  }
+
   function persistUiState() {
     vscode.setState({
       appFilters,
@@ -4662,7 +4765,8 @@
       camera,
       connectingFrom,
       pendingEdgeDetailsSaves,
-      inspectorScrollState
+      inspectorScrollState,
+      commandStatus
     });
   }
 

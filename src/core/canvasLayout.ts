@@ -1,4 +1,5 @@
 import type { FlowEdge, FlowEndpoint, PageNode, ProductFlow } from "../models/productFlow";
+import { nowIso } from "../utils/id";
 
 const NODE_START_X = 0;
 const NODE_START_Y = 0;
@@ -61,6 +62,11 @@ export function ensureReasonableNodeLayout(flow: ProductFlow): LayoutRepairResul
     };
     occupied.push(position);
     updatedNodeIds.push(node.nodeId);
+  }
+
+  if (updatedNodeIds.length > 0) {
+    flow.revision += 1;
+    flow.updatedAt = nowIso();
   }
 
   return { updatedNodeIds };

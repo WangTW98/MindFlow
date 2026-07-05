@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { randomUUID } from "node:crypto";
 import type { ProductFlow } from "../models/productFlow";
 import { parseProductFlowText, serializeProductFlow } from "../models/productFlowCodec";
 import { nowIso, slugify } from "../utils/id";
@@ -74,7 +75,12 @@ export async function writeJsonAtomic(filePath: string, value: unknown): Promise
 
 async function writeTextAtomic(filePath: string, value: string): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const tmpPath = `${filePath}.tmp`;
-  await fs.writeFile(tmpPath, value, "utf8");
-  await fs.rename(tmpPath, filePath);
+  const tmpPath = `${filePath}.${randomUUID()}.tmp`;
+  try {
+    await fs.writeFile(tmpPath, value, "utf8");
+    await fs.rename(tmpPath, filePath);
+  } catch (error) {
+    await fs.rm(tmpPath, { force: true }).catch(() => undefined);
+    throw error;
+  }
 }

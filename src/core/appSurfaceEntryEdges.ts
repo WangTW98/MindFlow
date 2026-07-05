@@ -30,6 +30,7 @@ export function ensureAppSurfaceEntryEdges(flow: ProductFlow): EnsureAppSurfaceE
   }
 
   if (addedEdgeIds.length > 0) {
+    flow.revision += 1;
     flow.updatedAt = nowIso();
   }
   return { addedEdgeIds };

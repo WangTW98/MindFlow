@@ -2,22 +2,30 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { MINDFLOW_FILE_EXTENSION, createUntitledMindFlowDocumentOptions } from "../core/untitledMindFlowDocument";
-import type { ProductFlow } from "../models/productFlow";
+import type { EdgeType, FlowEndpoint, ProductFlow } from "../models/productFlow";
+import { isEdgeType, isFlowEndpointKind } from "../models/productFlow";
+import type { TaxonomyRequest } from "../core/taxonomy";
 import { parseProductFlowText, serializeProductFlow, tryParseProductFlowText } from "../models/productFlowCodec";
 
 type OpenFlowCallback = (flowUri: vscode.Uri) => void;
 
+interface FlowSelectionState {
+  selectedProjectOverview: boolean;
+  selectedNodeId?: string;
+  selectedEdgeId?: string;
+  selectedAppSurfaceId?: string;
+  selectedDomainId?: string;
+  selectedRoleId?: string;
+  selectedStatusGroupId?: string;
+}
+
+type FlowSelectionPatch = Partial<FlowSelectionState>;
+
 export class FlowPanel implements vscode.CustomTextEditorProvider {
   public static readonly viewType = "mindflow.productFlow";
-  public static selectedProjectOverview: boolean | undefined;
-  public static selectedNodeId: string | undefined;
-  public static selectedEdgeId: string | undefined;
-  public static selectedAppSurfaceId: string | undefined;
-  public static selectedDomainId: string | undefined;
-  public static selectedRoleId: string | undefined;
-  public static selectedStatusGroupId: string | undefined;
 
   private static provider: FlowPanel | undefined;
+  private static readonly selections = new Map<string, FlowSelectionState>();
 
   private readonly sessions = new Map<string, FlowEditorSession>();
 
@@ -45,6 +53,27 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
       return;
     }
     void vscode.commands.executeCommand("vscode.openWith", uri, FlowPanel.viewType);
+  }
+
+  public static getSelection(flowUri: vscode.Uri | string): FlowSelectionState {
+    return {
+      ...emptySelection(),
+      ...(FlowPanel.selections.get(selectionKey(flowUri)) ?? {})
+    };
+  }
+
+  public static setSelection(flowUri: vscode.Uri | string, selection: FlowSelectionPatch): void {
+    FlowPanel.selections.set(selectionKey(flowUri), {
+      ...emptySelection(),
+      ...selection
+    });
+  }
+
+  public static updateSelection(flowUri: vscode.Uri | string, patch: FlowSelectionPatch): void {
+    FlowPanel.setSelection(flowUri, {
+      ...FlowPanel.getSelection(flowUri),
+      ...patch
+    });
   }
 
   private constructor(
@@ -85,6 +114,7 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
       disposeListener.dispose();
       if (this.sessions.get(flowKey) === session) {
         this.sessions.delete(flowKey);
+        FlowPanel.selections.delete(flowKey);
       }
     });
 
@@ -136,7 +166,14 @@ class FlowEditorSession {
     private readonly document: vscode.TextDocument,
     private readonly panel: vscode.WebviewPanel
   ) {
-    this.panel.webview.onDidReceiveMessage((message: WebviewMessage) => this.enqueueMessage(message));
+    this.panel.webview.onDidReceiveMessage((message: unknown) => {
+      const parsed = parseWebviewMessage(message);
+      if (!parsed) {
+        console.warn("Ignored invalid MindFlow webview message", message);
+        return;
+      }
+      this.enqueueMessage(parsed);
+    });
   }
 
   public renderFromDocument(document: vscode.TextDocument): void {
@@ -227,98 +264,45 @@ class FlowEditorSession {
   private async handleMessage(message: WebviewMessage): Promise<void> {
     switch (message.type) {
       case "selectNode":
-        FlowPanel.selectedProjectOverview = false;
-        FlowPanel.selectedNodeId = message.nodeId;
-        FlowPanel.selectedEdgeId = undefined;
-        FlowPanel.selectedAppSurfaceId = undefined;
-        FlowPanel.selectedDomainId = undefined;
-        FlowPanel.selectedRoleId = undefined;
-        FlowPanel.selectedStatusGroupId = undefined;
+        this.setSelection({ selectedProjectOverview: false, selectedNodeId: message.nodeId });
         break;
       case "selectEdge":
-        FlowPanel.selectedProjectOverview = false;
-        FlowPanel.selectedEdgeId = message.edgeId;
-        FlowPanel.selectedNodeId = undefined;
-        FlowPanel.selectedAppSurfaceId = undefined;
-        FlowPanel.selectedDomainId = undefined;
-        FlowPanel.selectedRoleId = undefined;
-        FlowPanel.selectedStatusGroupId = undefined;
+        this.setSelection({ selectedProjectOverview: false, selectedEdgeId: message.edgeId });
         break;
       case "selectAppSurface":
-        FlowPanel.selectedProjectOverview = false;
-        FlowPanel.selectedAppSurfaceId = message.appId;
-        FlowPanel.selectedNodeId = undefined;
-        FlowPanel.selectedEdgeId = undefined;
-        FlowPanel.selectedDomainId = undefined;
-        FlowPanel.selectedRoleId = undefined;
-        FlowPanel.selectedStatusGroupId = undefined;
+        this.setSelection({ selectedProjectOverview: false, selectedAppSurfaceId: message.appId });
         break;
       case "selectDomain":
-        FlowPanel.selectedProjectOverview = false;
-        FlowPanel.selectedDomainId = message.domainId;
-        FlowPanel.selectedNodeId = undefined;
-        FlowPanel.selectedEdgeId = undefined;
-        FlowPanel.selectedAppSurfaceId = undefined;
-        FlowPanel.selectedRoleId = undefined;
-        FlowPanel.selectedStatusGroupId = undefined;
+        this.setSelection({ selectedProjectOverview: false, selectedDomainId: message.domainId });
         break;
       case "selectRole":
-        FlowPanel.selectedProjectOverview = false;
-        FlowPanel.selectedRoleId = message.roleId;
-        FlowPanel.selectedNodeId = undefined;
-        FlowPanel.selectedEdgeId = undefined;
-        FlowPanel.selectedAppSurfaceId = undefined;
-        FlowPanel.selectedDomainId = undefined;
-        FlowPanel.selectedStatusGroupId = undefined;
+        this.setSelection({ selectedProjectOverview: false, selectedRoleId: message.roleId });
         break;
       case "selectStatusGroup":
-        FlowPanel.selectedProjectOverview = false;
-        FlowPanel.selectedStatusGroupId = message.statusGroupId;
-        FlowPanel.selectedNodeId = undefined;
-        FlowPanel.selectedEdgeId = undefined;
-        FlowPanel.selectedAppSurfaceId = undefined;
-        FlowPanel.selectedDomainId = undefined;
-        FlowPanel.selectedRoleId = undefined;
+        this.setSelection({ selectedProjectOverview: false, selectedStatusGroupId: message.statusGroupId });
         break;
       case "clearSelection":
-        FlowPanel.selectedProjectOverview = false;
-        FlowPanel.selectedNodeId = undefined;
-        FlowPanel.selectedEdgeId = undefined;
-        FlowPanel.selectedAppSurfaceId = undefined;
-        FlowPanel.selectedDomainId = undefined;
-        FlowPanel.selectedRoleId = undefined;
-        FlowPanel.selectedStatusGroupId = undefined;
+        this.setSelection({});
         break;
       case "selectProjectOverview":
-        FlowPanel.selectedProjectOverview = true;
-        FlowPanel.selectedNodeId = undefined;
-        FlowPanel.selectedEdgeId = undefined;
-        FlowPanel.selectedAppSurfaceId = undefined;
-        FlowPanel.selectedDomainId = undefined;
-        FlowPanel.selectedRoleId = undefined;
-        FlowPanel.selectedStatusGroupId = undefined;
+        this.setSelection({ selectedProjectOverview: true });
         break;
       case "deleteNode":
-        FlowPanel.selectedProjectOverview = false;
-        FlowPanel.selectedNodeId = message.nodeId;
-        FlowPanel.selectedEdgeId = undefined;
-        FlowPanel.selectedAppSurfaceId = undefined;
-        FlowPanel.selectedDomainId = undefined;
-        FlowPanel.selectedRoleId = undefined;
-        FlowPanel.selectedStatusGroupId = undefined;
-        await vscode.commands.executeCommand("mindflow.removeNode", message.nodeId, this.document.uri);
+        this.setSelection({ selectedProjectOverview: false, selectedNodeId: message.nodeId });
+        await this.executeMindFlowCommand("删除节点", "mindflow.removeNode", message.nodeId, this.document.uri);
         break;
       case "saveNodePosition":
-        await vscode.commands.executeCommand("mindflow.updateNodePosition", message.nodeId, message.x, message.y, this.document.uri);
+        await this.executeMindFlowCommand("保存节点位置", "mindflow.updateNodePosition", message.nodeId, message.x, message.y, this.document.uri);
         break;
       case "saveAppSurfacePosition":
-        await vscode.commands.executeCommand("mindflow.updateAppSurfacePosition", message.appId, message.x, message.y, this.document.uri);
+        await this.executeMindFlowCommand("保存应用端位置", "mindflow.updateAppSurfacePosition", message.appId, message.x, message.y, this.document.uri);
         break;
       case "saveProjectOverviewPosition":
-        await vscode.commands.executeCommand("mindflow.updateProjectOverviewPosition", message.x, message.y, this.document.uri);
+        await this.executeMindFlowCommand("保存项目概述位置", "mindflow.updateProjectOverviewPosition", message.x, message.y, this.document.uri);
         break;
       case "createNodeAt":
-        await vscode.commands.executeCommand(
+        await this.executeMindFlowCommand(
+          "创建节点",
           "mindflow.createNodeAt",
           message.x,
           message.y,
@@ -329,16 +313,16 @@ class FlowEditorSession {
         );
         break;
       case "updateNodeDetails":
-        await vscode.commands.executeCommand("mindflow.updateNodeDetails", message.nodeId, message.patch, this.document.uri);
+        await this.executeMindFlowCommand("更新节点详情", "mindflow.updateNodeDetails", message.nodeId, message.patch, this.document.uri);
         break;
       case "updateProjectOverview":
-        await vscode.commands.executeCommand("mindflow.updateProjectOverview", message.patch, this.document.uri);
+        await this.executeMindFlowCommand("更新项目概述", "mindflow.updateProjectOverview", message.patch, this.document.uri);
         break;
       case "createEdge":
-        await vscode.commands.executeCommand("mindflow.createEdge", message.from, message.to, message.trigger, message.edgeType, this.document.uri);
+        await this.executeMindFlowCommand("创建连线", "mindflow.createEdge", message.from, message.to, message.trigger, message.edgeType, this.document.uri);
         break;
       case "createConnectedNodeAt":
-        await vscode.commands.executeCommand("mindflow.createConnectedNodeAt", message.request, this.document.uri);
+        await this.executeMindFlowCommand("创建连接节点", "mindflow.createConnectedNodeAt", message.request, this.document.uri);
         break;
       case "updateEdgeDetails":
         if (typeof message.revision === "number") {
@@ -348,28 +332,57 @@ class FlowEditorSession {
           }
           this.latestEdgeDetailsRevisions.set(message.edgeId, message.revision);
         }
-        await vscode.commands.executeCommand("mindflow.updateEdgeDetails", message.edgeId, message.patch, this.document.uri);
+        await this.executeMindFlowCommand("更新连线详情", "mindflow.updateEdgeDetails", message.edgeId, message.patch, this.document.uri);
         break;
       case "removeEdge":
-        await vscode.commands.executeCommand("mindflow.removeEdge", message.edgeId, this.document.uri);
+        await this.executeMindFlowCommand("删除连线", "mindflow.removeEdge", message.edgeId, this.document.uri);
         break;
       case "updateTaxonomy":
         if (message.request.action === "delete") {
+          const selection = FlowPanel.getSelection(this.document.uri);
           if (message.request.kind === "appSurface") {
-            FlowPanel.selectedAppSurfaceId = undefined;
+            selection.selectedAppSurfaceId = undefined;
           } else if (message.request.kind === "domain") {
-            FlowPanel.selectedDomainId = undefined;
+            selection.selectedDomainId = undefined;
           } else if (message.request.kind === "role") {
-            FlowPanel.selectedRoleId = undefined;
+            selection.selectedRoleId = undefined;
           } else if (message.request.kind === "statusGroup") {
-            FlowPanel.selectedStatusGroupId = undefined;
+            selection.selectedStatusGroupId = undefined;
           }
+          FlowPanel.setSelection(this.document.uri, selection);
         }
-        await vscode.commands.executeCommand("mindflow.updateTaxonomy", message.request, this.document.uri);
+        await this.executeMindFlowCommand("更新元数据", "mindflow.updateTaxonomy", message.request, this.document.uri);
         break;
       default:
         break;
     }
+  }
+
+  private setSelection(selection: FlowSelectionPatch): void {
+    FlowPanel.setSelection(this.document.uri, selection);
+  }
+
+  private async executeMindFlowCommand(label: string, command: string, ...args: unknown[]): Promise<void> {
+    try {
+      const ok = await vscode.commands.executeCommand<boolean | undefined>(command, ...args);
+      if (ok === false) {
+        this.postCommandResult(false, `${label}失败，文档未更新。`, true);
+        return;
+      }
+      this.postCommandResult(true, "修改已写入 VS Code 文档缓冲区。");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.postCommandResult(false, `${label}失败：${message}`, true);
+    }
+  }
+
+  private postCommandResult(ok: boolean, message: string, includeFlow = false): void {
+    void this.panel.webview.postMessage({
+      type: "commandResult",
+      ok,
+      message,
+      ...(includeFlow && this.flow ? { flow: this.flow } : {})
+    });
   }
 
   private renderFlow(flow: ProductFlow): void {
@@ -377,6 +390,7 @@ class FlowEditorSession {
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "src", "webview", "media", "main.js"));
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "src", "webview", "media", "styles.css"));
     const nonce = getNonce();
+    const selection = FlowPanel.getSelection(this.document.uri);
     this.panel.webview.html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -393,13 +407,13 @@ class FlowEditorSession {
       flow,
       flowPath: vscode.workspace.asRelativePath(this.document.uri, false),
       flowFileName: path.basename(this.document.uri.fsPath),
-      selectedProjectOverview: FlowPanel.selectedProjectOverview ?? false,
-      selectedNodeId: FlowPanel.selectedNodeId ?? null,
-      selectedEdgeId: FlowPanel.selectedEdgeId ?? null,
-      selectedAppSurfaceId: FlowPanel.selectedAppSurfaceId ?? null,
-      selectedDomainId: FlowPanel.selectedDomainId ?? null,
-      selectedRoleId: FlowPanel.selectedRoleId ?? null,
-      selectedStatusGroupId: FlowPanel.selectedStatusGroupId ?? null
+      selectedProjectOverview: selection.selectedProjectOverview,
+      selectedNodeId: selection.selectedNodeId ?? null,
+      selectedEdgeId: selection.selectedEdgeId ?? null,
+      selectedAppSurfaceId: selection.selectedAppSurfaceId ?? null,
+      selectedDomainId: selection.selectedDomainId ?? null,
+      selectedRoleId: selection.selectedRoleId ?? null,
+      selectedStatusGroupId: selection.selectedStatusGroupId ?? null
     })};
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
@@ -444,6 +458,22 @@ class FlowEditorSession {
   }
 }
 
+function emptySelection(): FlowSelectionState {
+  return {
+    selectedProjectOverview: false,
+    selectedNodeId: undefined,
+    selectedEdgeId: undefined,
+    selectedAppSurfaceId: undefined,
+    selectedDomainId: undefined,
+    selectedRoleId: undefined,
+    selectedStatusGroupId: undefined
+  };
+}
+
+function selectionKey(flowUri: vscode.Uri | string): string {
+  return typeof flowUri === "string" ? flowUri : flowUri.toString();
+}
+
 type WebviewMessage =
   | { type: "selectNode"; nodeId: string }
   | { type: "selectEdge"; edgeId: string }
@@ -460,11 +490,266 @@ type WebviewMessage =
   | { type: "createNodeAt"; x: number; y: number; appSurfaceIds?: string[]; domainIds?: string[]; roleIds?: string[] }
   | { type: "updateNodeDetails"; nodeId: string; patch: Record<string, unknown> }
   | { type: "updateProjectOverview"; patch: Record<string, unknown> }
-  | { type: "createEdge"; from: Record<string, unknown>; to: Record<string, unknown>; trigger?: string; edgeType?: string }
+  | { type: "createEdge"; from: FlowEndpoint; to: FlowEndpoint; trigger?: string; edgeType?: EdgeType }
   | { type: "createConnectedNodeAt"; request: Record<string, unknown> }
   | { type: "updateEdgeDetails"; edgeId: string; revision?: number; patch: Record<string, unknown> }
   | { type: "removeEdge"; edgeId: string }
-  | { type: "updateTaxonomy"; request: Record<string, unknown> };
+  | { type: "updateTaxonomy"; request: TaxonomyRequest };
+
+function parseWebviewMessage(message: unknown): WebviewMessage | undefined {
+  if (!isRecord(message) || typeof message.type !== "string") {
+    return undefined;
+  }
+
+  switch (message.type) {
+    case "selectNode": {
+      const nodeId = readString(message, "nodeId");
+      return nodeId ? { type: "selectNode", nodeId } : undefined;
+    }
+    case "selectEdge": {
+      const edgeId = readString(message, "edgeId");
+      return edgeId ? { type: "selectEdge", edgeId } : undefined;
+    }
+    case "selectAppSurface": {
+      const appId = readString(message, "appId");
+      return appId ? { type: "selectAppSurface", appId } : undefined;
+    }
+    case "selectDomain": {
+      const domainId = readString(message, "domainId");
+      return domainId ? { type: "selectDomain", domainId } : undefined;
+    }
+    case "selectRole": {
+      const roleId = readString(message, "roleId");
+      return roleId ? { type: "selectRole", roleId } : undefined;
+    }
+    case "selectStatusGroup": {
+      const statusGroupId = readString(message, "statusGroupId");
+      return statusGroupId ? { type: "selectStatusGroup", statusGroupId } : undefined;
+    }
+    case "selectProjectOverview":
+    case "clearSelection":
+      return { type: message.type };
+    case "deleteNode": {
+      const nodeId = readString(message, "nodeId");
+      return nodeId ? { type: "deleteNode", nodeId, nodeTitle: readOptionalString(message, "nodeTitle") } : undefined;
+    }
+    case "saveNodePosition": {
+      const nodeId = readString(message, "nodeId");
+      const x = readNumber(message, "x");
+      const y = readNumber(message, "y");
+      return nodeId && x !== undefined && y !== undefined ? { type: "saveNodePosition", nodeId, x, y } : undefined;
+    }
+    case "saveAppSurfacePosition": {
+      const appId = readString(message, "appId");
+      const x = readNumber(message, "x");
+      const y = readNumber(message, "y");
+      return appId && x !== undefined && y !== undefined ? { type: "saveAppSurfacePosition", appId, x, y } : undefined;
+    }
+    case "saveProjectOverviewPosition": {
+      const x = readNumber(message, "x");
+      const y = readNumber(message, "y");
+      return x !== undefined && y !== undefined ? { type: "saveProjectOverviewPosition", x, y } : undefined;
+    }
+    case "createNodeAt": {
+      const x = readNumber(message, "x");
+      const y = readNumber(message, "y");
+      return x !== undefined && y !== undefined
+        ? {
+            type: "createNodeAt",
+            x,
+            y,
+            appSurfaceIds: readOptionalStringArray(message, "appSurfaceIds"),
+            domainIds: readOptionalStringArray(message, "domainIds"),
+            roleIds: readOptionalStringArray(message, "roleIds")
+          }
+        : undefined;
+    }
+    case "updateNodeDetails": {
+      const nodeId = readString(message, "nodeId");
+      const patch = readRecord(message, "patch");
+      return nodeId && patch ? { type: "updateNodeDetails", nodeId, patch } : undefined;
+    }
+    case "updateProjectOverview": {
+      const patch = readRecord(message, "patch");
+      return patch ? { type: "updateProjectOverview", patch } : undefined;
+    }
+    case "createEdge": {
+      const from = readEndpoint(message.from);
+      const to = readEndpoint(message.to);
+      const edgeType = readOptionalEdgeType(message, "edgeType");
+      return from && to && edgeType !== false
+        ? { type: "createEdge", from, to, trigger: readOptionalString(message, "trigger"), edgeType: edgeType ?? undefined }
+        : undefined;
+    }
+    case "createConnectedNodeAt": {
+      const request = readConnectedNodeRequest(message.request);
+      return request ? { type: "createConnectedNodeAt", request } : undefined;
+    }
+    case "updateEdgeDetails": {
+      const edgeId = readString(message, "edgeId");
+      const patch = readEdgeDetailsPatch(message.patch);
+      const revision = readOptionalNumber(message, "revision");
+      return edgeId && patch && revision !== false ? { type: "updateEdgeDetails", edgeId, revision: revision ?? undefined, patch } : undefined;
+    }
+    case "removeEdge": {
+      const edgeId = readString(message, "edgeId");
+      return edgeId ? { type: "removeEdge", edgeId } : undefined;
+    }
+    case "updateTaxonomy": {
+      const request = readTaxonomyRequest(message.request);
+      return request ? { type: "updateTaxonomy", request } : undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+function readConnectedNodeRequest(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const from = value.from === undefined ? undefined : readEndpoint(value.from);
+  const to = value.to === undefined ? undefined : readEndpoint(value.to);
+  if (!from && !to) {
+    return undefined;
+  }
+  const type = value.type === undefined ? undefined : readEdgeType(value.type);
+  if (value.type !== undefined && !type) {
+    return undefined;
+  }
+  return {
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
+    ...(typeof value.x === "number" && Number.isFinite(value.x) ? { x: value.x } : {}),
+    ...(typeof value.y === "number" && Number.isFinite(value.y) ? { y: value.y } : {}),
+    ...(typeof value.trigger === "string" ? { trigger: value.trigger } : {}),
+    ...(type ? { type } : {}),
+    ...(readOptionalStringArray(value, "appSurfaceIds") ? { appSurfaceIds: readOptionalStringArray(value, "appSurfaceIds") } : {}),
+    ...(readOptionalStringArray(value, "domainIds") ? { domainIds: readOptionalStringArray(value, "domainIds") } : {}),
+    ...(readOptionalStringArray(value, "roleIds") ? { roleIds: readOptionalStringArray(value, "roleIds") } : {})
+  };
+}
+
+function readEdgeDetailsPatch(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const from = value.from === undefined ? undefined : readEndpoint(value.from);
+  const to = value.to === undefined ? undefined : readEndpoint(value.to);
+  const edgeType = value.type === undefined ? undefined : readEdgeType(value.type);
+  if ((value.from !== undefined && !from) || (value.to !== undefined && !to) || (value.type !== undefined && !edgeType)) {
+    return undefined;
+  }
+  return {
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
+    ...(typeof value.trigger === "string" ? { trigger: value.trigger } : {}),
+    ...(typeof value.action === "string" ? { action: value.action } : {}),
+    ...(edgeType ? { type: edgeType } : {}),
+    ...(typeof value.condition === "string" ? { condition: value.condition } : {}),
+    ...(readOptionalStringArray(value, "appSurfaceIds") ? { appSurfaceIds: readOptionalStringArray(value, "appSurfaceIds") } : {}),
+    ...(readOptionalStringArray(value, "domainIds") ? { domainIds: readOptionalStringArray(value, "domainIds") } : {}),
+    ...(readOptionalStringArray(value, "roleIds") ? { roleIds: readOptionalStringArray(value, "roleIds") } : {})
+  };
+}
+
+function readEndpoint(value: unknown): FlowEndpoint | undefined {
+  if (!isRecord(value) || !isFlowEndpointKind(value.kind)) {
+    return undefined;
+  }
+  const nodeId = readString(value, "nodeId");
+  if (!nodeId) {
+    return undefined;
+  }
+  if (value.kind === "appSurface") {
+    const appId = readOptionalString(value, "appId") ?? nodeId;
+    return { kind: "appSurface", nodeId: appId, appId };
+  }
+  if (value.kind === "projectOverview") {
+    return nodeId === "projectOverview" ? { kind: "projectOverview", nodeId } : undefined;
+  }
+  const groupId = readOptionalString(value, "groupId");
+  const itemId = readOptionalString(value, "itemId");
+  if (value.kind === "featureGroup" && !groupId) {
+    return undefined;
+  }
+  if (value.kind === "featureItem" && (!groupId || !itemId)) {
+    return undefined;
+  }
+  return {
+    kind: value.kind,
+    nodeId,
+    ...(groupId ? { groupId } : {}),
+    ...(itemId ? { itemId } : {})
+  };
+}
+
+function readTaxonomyRequest(value: unknown): TaxonomyRequest | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const kind = value.kind;
+  const action = value.action;
+  if (kind !== "appSurface" && kind !== "domain" && kind !== "role" && kind !== "statusGroup") {
+    return undefined;
+  }
+  if (action !== "create" && action !== "update" && action !== "delete") {
+    return undefined;
+  }
+  const id = readOptionalString(value, "id");
+  const item = readRecord(value, "item");
+  if (action === "delete" && !id) {
+    return undefined;
+  }
+  return { kind, action, ...(id ? { id } : {}), ...(item ? { item } : {}) };
+}
+
+function readOptionalEdgeType(obj: Record<string, unknown>, key: string): EdgeType | false | undefined {
+  if (obj[key] === undefined) {
+    return undefined;
+  }
+  return readEdgeType(obj[key]) ?? false;
+}
+
+function readEdgeType(value: unknown): EdgeType | undefined {
+  return isEdgeType(value) ? value : undefined;
+}
+
+function readString(obj: Record<string, unknown>, key: string): string | undefined {
+  return typeof obj[key] === "string" && obj[key].trim() ? obj[key] : undefined;
+}
+
+function readOptionalString(obj: Record<string, unknown>, key: string): string | undefined {
+  return typeof obj[key] === "string" ? obj[key] : undefined;
+}
+
+function readNumber(obj: Record<string, unknown>, key: string): number | undefined {
+  return typeof obj[key] === "number" && Number.isFinite(obj[key]) ? obj[key] : undefined;
+}
+
+function readOptionalNumber(obj: Record<string, unknown>, key: string): number | false | undefined {
+  if (obj[key] === undefined) {
+    return undefined;
+  }
+  return typeof obj[key] === "number" && Number.isFinite(obj[key]) ? obj[key] : false;
+}
+
+function readOptionalStringArray(obj: Record<string, unknown>, key: string): string[] | undefined {
+  const value = obj[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : undefined;
+}
+
+function readRecord(obj: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
+  const value = obj[key];
+  return isRecord(value) ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function getNonce(): string {
   let text = "";
