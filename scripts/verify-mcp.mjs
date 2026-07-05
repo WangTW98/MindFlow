@@ -3,7 +3,7 @@ import { once } from "node:events";
 import path from "node:path";
 
 const workspaceRoot = path.resolve(".");
-const server = spawn(process.execPath, ["out/src/mcp/server.js"], {
+const server = spawn(process.execPath, ["scripts/mindflow-mcp.mjs"], {
   cwd: workspaceRoot,
   stdio: ["pipe", "pipe", "pipe"]
 });

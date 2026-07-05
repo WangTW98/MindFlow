@@ -35,6 +35,12 @@ const serverInfo = {
   version: "0.1.0"
 };
 
+const serverInstructions = [
+  "Use MindFlow tools to inspect and update .mindflow ProductFlow JSON in the configured workspace.",
+  "Call mindflow_list_flows before mindflow_read_flow when the user does not provide a flowPath.",
+  "Prefer targeted node and edge tools over rewriting whole flow files, and write PRD/Pencil artifacts only when requested."
+].join(" ");
+
 const tools: ToolDefinition[] = [
   {
     name: "mindflow_analyze_document",
@@ -195,7 +201,8 @@ async function handleRequest(request: JsonRpcRequest): Promise<unknown> {
       return {
         protocolVersion: "2024-11-05",
         capabilities: { tools: {} },
-        serverInfo
+        serverInfo,
+        instructions: serverInstructions
       };
     case "tools/list":
       return { tools };

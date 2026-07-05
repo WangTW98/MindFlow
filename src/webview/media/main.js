@@ -434,7 +434,7 @@
         <div class="managed-list-body status-group-list" role="list" aria-label="状态组列表">
           ${groups.map((group) => `
             <div class="status-group-list-item" role="listitem">
-              <span class="status-group-color-square" style="--status-group-color: ${escapeAttr(normalizeStatusGroupColor(group.color))};" aria-hidden="true"></span>
+              <span class="status-group-color-square" data-status-group-color="${escapeAttr(normalizeStatusGroupColor(group.color))}" aria-hidden="true"></span>
               <strong title="${escapeAttr(group.title)}">${escapeHtml(group.title)}</strong>
               ${renderTaxonomyActionButton("statusGroup", "delete", `删除 ${group.title}`, "trash-2", false, "danger managed-list-row-action", `data-taxonomy-id="${escapeAttr(group.statusGroupId)}"`)}
             </div>
@@ -533,7 +533,7 @@
     const title = statusGroup.title || "未命名状态组";
     return `
       <div class="node-status-group" title="状态组: ${escapeAttr(title)}">
-        <span class="status-group-color-square small" style="--status-group-color: ${escapeAttr(normalizeStatusGroupColor(statusGroup.color))};" aria-hidden="true"></span>
+        <span class="status-group-color-square small" data-status-group-color="${escapeAttr(normalizeStatusGroupColor(statusGroup.color))}" aria-hidden="true"></span>
         <span>${escapeHtml(title)}</span>
       </div>
     `;
@@ -975,6 +975,7 @@
     bindTaxonomyPanelToggles(document);
     bindTaxonomyControls(document);
     bindProductIssueControls(document);
+    applyStatusGroupColorSwatches(document);
 
     bindAction("autoLayoutCanvas", autoLayoutCanvas);
     bindAction("closeProductIssuePanel", () => {
@@ -2813,6 +2814,7 @@
       seedAppSurfacePositions(state.flow);
       const activeNodes = state.flow.nodes.filter((node) => node.status !== "removed");
       world.innerHTML = `${renderAppSurfaceSourceCards(state.flow)}${activeNodes.map((node) => renderNodeCard(state.flow, node)).join("")}`;
+      applyStatusGroupColorSwatches(world);
       bindCanvasElements(world);
       positionCards();
       scheduleDrawEdges();
@@ -2831,6 +2833,7 @@
       ${taxonomyPanelsOpen.statusGroup === true ? renderStatusGroupList(getStatusGroups(state.flow)) : ""}
     `;
     bindTaxonomyControls(panels);
+    applyStatusGroupColorSwatches(panels);
   }
 
   function submitEdgeDetails(options = {}) {
@@ -3013,6 +3016,7 @@
     const nodeList = document.querySelector(".node-list");
     if (world) {
       world.innerHTML = `${renderAppSurfaceSourceCards(flow)}${activeNodes.map((node) => renderNodeCard(flow, node)).join("")}`;
+      applyStatusGroupColorSwatches(world);
     }
     if (nodeList) {
       nodeList.innerHTML = visibleListNodes.map((node) => renderNodeListItem(flow, node)).join("") || "<p class=\"empty\">无匹配节点</p>";
@@ -3680,17 +3684,44 @@
     return /^#[0-9a-fA-F]{6}$/.test(String(color || "").trim()) ? String(color).trim() : "#6b7280";
   }
 
+  function applyStatusGroupColorSwatches(root = document) {
+    root.querySelectorAll(".status-group-color-square[data-status-group-color]").forEach((swatch) => {
+      const color = normalizeStatusGroupColor(swatch.dataset.statusGroupColor);
+      swatch.style.backgroundColor = color;
+      swatch.style.borderColor = color;
+    });
+  }
+
   function randomStatusGroupColor(existingGroups = []) {
     const usedColors = new Set(existingGroups.map((group) => normalizeStatusGroupColor(group.color).toLowerCase()));
-    const seed = Math.floor(Math.random() * 0x1000000);
-    for (let attempt = 0; attempt < 0x1000000; attempt += 1) {
-      const value = (seed + attempt * 9973) % 0x1000000;
-      const color = `#${value.toString(16).padStart(6, "0")}`;
+    const hue = Math.floor(Math.random() * 360);
+    for (let attempt = 0; attempt < 360; attempt += 1) {
+      const color = hslToHex((hue + attempt * 37) % 360, 68, 54);
       if (!usedColors.has(color)) {
         return color;
       }
     }
-    return "#000000";
+    return hslToHex(hue, 68, 54);
+  }
+
+  function hslToHex(hue, saturation, lightness) {
+    const s = saturation / 100;
+    const l = lightness / 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
+    const m = l - c / 2;
+    const [r, g, b] = hue < 60
+      ? [c, x, 0]
+      : hue < 120
+        ? [x, c, 0]
+        : hue < 180
+          ? [0, c, x]
+          : hue < 240
+            ? [0, x, c]
+            : hue < 300
+              ? [x, 0, c]
+              : [c, 0, x];
+    return `#${[r, g, b].map((value) => Math.round((value + m) * 255).toString(16).padStart(2, "0")).join("")}`;
   }
 
   function namesByIds(items, idKey, ids) {

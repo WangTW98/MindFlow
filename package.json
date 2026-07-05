@@ -225,6 +225,9 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "mcp:install": "npm run compile && node scripts/install-mcp.mjs",
+    "mcp:install:project": "npm run compile && node scripts/install-mcp.mjs --scope project",
+    "mcp:verify": "npm run compile && node scripts/verify-mcp.mjs",
     "test": "node scripts/run-tests.mjs"
   },
   "devDependencies": {

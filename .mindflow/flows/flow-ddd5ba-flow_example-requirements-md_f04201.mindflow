@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.0.0",
   "flowId": "flow_example-requirements-md_f04201",
-  "revision": 27,
+  "revision": 29,
   "title": "多应用端采购协同平台需求示例",
   "sourceDocumentId": "/Users/wang/Documents/MindFlow/samples/example-requirements.md",
   "sourceSummary": "基于示例需求生成的多应用端采购协同平台产品流程。",
   "createdAt": "2026-07-04T18:03:20.124Z",
-  "updatedAt": "2026-07-04T23:50:24.519Z",
+  "updatedAt": "2026-07-05T00:09:28.777Z",
   "domains": [
     {
       "domainId": "domain_plan",
@@ -1010,7 +1010,7 @@
       "nodeId": "page_page-d501c4_d501c4",
       "stableKey": "147a4d50f15f",
       "status": "active",
-      "version": 1,
+      "version": 2,
       "title": "审批发起页",
       "pageType": "form",
       "appSurfaceIds": [
@@ -1064,28 +1064,28 @@
       ],
       "elements": [
         {
-          "elementId": "el_element-638af4_a33bd6",
+          "elementId": "el_element-638af4_743b72",
           "name": "推荐供应商",
           "type": "select",
           "description": "选择推荐中标供应商。",
           "required": true
         },
         {
-          "elementId": "el_element-ae9d4a_67b160",
+          "elementId": "el_element-ae9d4a_a57c34",
           "name": "预算差异",
           "type": "currency",
           "description": "展示预算差异。",
           "required": true
         },
         {
-          "elementId": "el_element-459a6f_f2b010",
+          "elementId": "el_element-459a6f_92268e",
           "name": "审批流选择",
           "type": "select",
           "description": "选择采购经理、财务审核员和总经理。",
           "required": true
         },
         {
-          "elementId": "el_element-71e3e4_fcea09",
+          "elementId": "el_element-71e3e4_6e1666",
           "name": "发起审批按钮",
           "type": "button",
           "description": "发送审批待办到移动审批 App。",
@@ -1094,7 +1094,7 @@
       ],
       "actions": [
         {
-          "actionId": "act_action-71e3e4_fcea09",
+          "actionId": "act_action-71e3e4_6e1666",
           "label": "发起审批按钮",
           "type": "user",
           "result": "发送审批待办到移动审批 App。"
@@ -1136,7 +1136,9 @@
           "x": 420,
           "y": 380
         }
-      }
+      },
+      "statusGroupId": "status_mr70lqrg_hkxro",
+      "updatedByChangeSetId": "manual"
     },
     {
       "nodeId": "page_page-4eb4bd_4eb4bd",
@@ -2271,6 +2273,97 @@
         "position": {
           "x": 784,
           "y": 1984
+        }
+      },
+      "confidence": 1
+    },
+    {
+      "nodeId": "page_page-64451e_5bb52b",
+      "stableKey": "18f938b039ef",
+      "status": "active",
+      "version": 1,
+      "title": "新建页面",
+      "pageType": "page",
+      "appSurfaceIds": [],
+      "domainIds": [],
+      "roleIds": [],
+      "purpose": "手动创建的产品页面节点。",
+      "featureGroups": [
+        {
+          "groupId": "group_group-6b9957_ed7cff",
+          "name": "基础功能",
+          "type": "section",
+          "description": "页面默认功能分组，可在右侧详情栏编辑。",
+          "items": [
+            {
+              "itemId": "item_item-da1a76_813538",
+              "name": "主要内容",
+              "type": "content",
+              "description": "承载此页面的核心业务内容。"
+            },
+            {
+              "itemId": "item_item-16de57_0740e0",
+              "name": "确认按钮",
+              "type": "button",
+              "description": "触发页面主要业务操作。"
+            }
+          ]
+        }
+      ],
+      "elements": [
+        {
+          "elementId": "el_element-da1a76_01a1db",
+          "name": "主要内容",
+          "type": "content",
+          "description": "承载此页面的核心业务内容。"
+        },
+        {
+          "elementId": "el_element-16de57_1c885c",
+          "name": "确认按钮",
+          "type": "button",
+          "description": "触发页面主要业务操作。"
+        }
+      ],
+      "actions": [
+        {
+          "actionId": "act_action-16de57_1c885c",
+          "label": "确认按钮",
+          "type": "user",
+          "result": "触发页面主要业务操作。"
+        }
+      ],
+      "states": [
+        {
+          "stateId": "state_7283121826c3",
+          "name": "默认态",
+          "description": "页面加载并可正常操作。"
+        }
+      ],
+      "exceptions": [
+        {
+          "exceptionId": "ex_e9b3cac59b72",
+          "name": "异常处理",
+          "handling": "按业务规则提示用户并支持重试。"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "permissions": [],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edit",
+          "excerpt": "手动创建的产品页面节点。"
+        }
+      ],
+      "artifacts": {
+        "prdIds": [],
+        "pencilIds": []
+      },
+      "view": {
+        "position": {
+          "x": 3941,
+          "y": -832
         }
       },
       "confidence": 1

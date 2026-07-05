@@ -64,13 +64,37 @@ Reload VSCode after installation, then run `MindFlow: Analyze Document` or `Mind
 
 ## MCP Server
 
-After `npm run compile`, start the MCP stdio server named `mindflow` with:
+MindFlow ships a local MCP stdio server named `mindflow`. MCP clients do not scan arbitrary local projects automatically; they load servers from their own MCP config. Register MindFlow with installed local agents with:
 
 ```bash
-node /Users/wang/Documents/MindFlow/out/src/mcp/server.js
+npm run mcp:install
 ```
 
-For MCP clients that support command configuration, set the command to `node`, args to `["/Users/wang/Documents/MindFlow/out/src/mcp/server.js"]`, and optionally set `MINDFLOW_WORKSPACE=/Users/wang/Documents/MindFlow`.
+The installer compiles the extension and registers the stable launcher `scripts/mindflow-mcp.mjs` with the local clients it finds:
+
+- Codex CLI: `codex mcp add mindflow ...`, visible in `codex mcp list` and the Codex TUI `/mcp` panel.
+- Gemini CLI: `gemini mcp add -s user mindflow ...`, visible in `gemini mcp list` and `/mcp`.
+- Claude Code: `claude mcp add --scope user mindflow ...`, visible in `claude mcp list` and `/mcp`.
+
+Register only one client:
+
+```bash
+node scripts/install-mcp.mjs --client codex
+```
+
+Write project-scoped config files instead of user-level CLI config:
+
+```bash
+npm run mcp:install:project
+```
+
+Verify the server protocol directly:
+
+```bash
+npm run mcp:verify
+```
+
+For manual MCP client configuration, use command `node`, args `["/Users/wang/Documents/MindFlow/scripts/mindflow-mcp.mjs"]`, and set `MINDFLOW_WORKSPACE=/Users/wang/Documents/MindFlow`.
 
 Available MCP tools:
 
