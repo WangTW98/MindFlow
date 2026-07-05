@@ -7,7 +7,7 @@ import type * as vscode from "vscode";
 import { ensureAppSurfaceEntryEdges } from "../src/core/appSurfaceEntryEdges";
 import { ensureReasonableNodeLayout } from "../src/core/canvasLayout";
 import { createEmptyProductFlow } from "../src/core/emptyFlow";
-import { createManualEdge, createManualNode, removeManualEdge, removeManualNode, updateManualAppSurfacePosition, updateManualEdgeDetails, updateManualNodeDetails, updateManualNodePosition } from "../src/core/flowEditing";
+import { createManualEdge, createManualNode, deriveFeatureGroups, removeManualEdge, removeManualNode, updateManualAppSurfacePosition, updateManualEdgeDetails, updateManualNodeDetails, updateManualNodePosition } from "../src/core/flowEditing";
 import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview, updateProjectOverviewPosition } from "../src/core/projectOverview";
 import { applyTaxonomyRequest } from "../src/core/taxonomy";
 import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/core/taxonomyEditing";
@@ -120,6 +120,33 @@ test("Manual position updates reject non-finite coordinates", () => {
 
   const fallback = createManualNode(flow, { title: "部分坐标页", x: Number.NaN, y: 240 });
   assert.deepEqual(fallback.view?.position, { x: 80, y: 240 });
+  assert.equal(validateProductFlow(flow).valid, true);
+});
+
+test("Project overview edits sanitize text and preserve required fallbacks", () => {
+  const flow = createEmptyProductFlow();
+  const revisionBeforeDetails = flow.revision;
+
+  updateProjectOverview(flow, {
+    title: "  ",
+    summary: "  新摘要  ",
+    goal: "  降低跨端协作成本  "
+  });
+
+  assert.equal(flow.title, "Untitled MindFlow");
+  assert.equal(flow.projectOverview.summary, "新摘要");
+  assert.equal(flow.projectOverview.goal, "降低跨端协作成本");
+  assert.equal(flow.revision, revisionBeforeDetails + 1);
+
+  const revisionBeforeEmptySummary = flow.revision;
+  updateProjectOverview(flow, { summary: "  " });
+  assert.equal(flow.projectOverview.summary, "新摘要");
+  assert.equal(flow.revision, revisionBeforeEmptySummary + 1);
+
+  const revisionBeforePosition = flow.revision;
+  updateProjectOverviewPosition(flow, -10.2, 99.8);
+  assert.deepEqual(flow.projectOverview.view?.position, { x: -10, y: 100 });
+  assert.equal(flow.revision, revisionBeforePosition + 1);
   assert.equal(validateProductFlow(flow).valid, true);
 });
 
@@ -368,6 +395,83 @@ test("Manual node feature group edits preserve parent-child hierarchy and derive
   assert.equal(updated?.featureGroups?.[1]?.items[0]?.name, "提交按钮");
   assert.ok(updated?.elements.some((element) => element.name === "供应商名称"));
   assert.ok(updated?.actions.some((action) => action.label === "提交按钮"));
+});
+
+test("Feature group normalization keeps malformed detail patches safe", () => {
+  const flow = createEmptyProductFlow();
+  const node = createManualNode(flow, { title: "功能归一化页" });
+
+  updateManualNodeDetails(flow, node.nodeId, {
+    featureGroups: [
+      {
+        groupId: "",
+        name: "  ",
+        type: "",
+        description: 123 as never,
+        items: [
+          {
+            itemId: "",
+            name: "  ",
+            type: "",
+            description: undefined as never,
+            dataBinding: 12 as never,
+            required: "yes" as never
+          }
+        ],
+        actions: [
+          {
+            actionId: "",
+            label: "  ",
+            type: "",
+            targetNodeId: 7 as never,
+            preconditions: [" 已登录 ", "", 9 as never],
+            result: 8 as never
+          }
+        ]
+      }
+    ]
+  });
+
+  const group = node.featureGroups?.[0];
+  const item = group?.items[0];
+  const action = group?.actions?.[0];
+  assert.ok(group?.groupId);
+  assert.equal(group.name, "功能分组 1");
+  assert.equal(group.type, "section");
+  assert.equal(group.description, "");
+  assert.ok(item?.itemId);
+  assert.equal(item?.name, "功能项 1");
+  assert.equal(item?.type, "text");
+  assert.equal(item?.description, "");
+  assert.equal(item?.dataBinding, undefined);
+  assert.equal(item?.required, undefined);
+  assert.ok(action?.actionId);
+  assert.equal(action?.label, "操作 1");
+  assert.equal(action?.type, "user");
+  assert.deepEqual(action?.preconditions, ["已登录"]);
+  assert.equal(validateProductFlow(flow).valid, true);
+});
+
+test("Legacy node elements still derive feature groups for endpoint compatibility", () => {
+  const flow = createEmptyProductFlow();
+  const node = createManualNode(flow, { title: "旧元素页" });
+  delete node.featureGroups;
+  node.elements = [
+    {
+      elementId: "element_primary",
+      name: "主按钮",
+      type: "button",
+      description: "旧版页面元素按钮。",
+      required: true
+    }
+  ];
+
+  const groups = deriveFeatureGroups(node);
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0]?.name, "页面元素");
+  assert.equal(groups[0]?.items[0]?.name, "主按钮");
+  assert.equal(groups[0]?.items[0]?.required, true);
 });
 
 test("Manual node deletion removes the node and all connected edges", () => {

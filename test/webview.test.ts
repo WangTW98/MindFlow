@@ -16,6 +16,8 @@ import { EDGE_TYPES, validateProductFlow } from "../src/models/productFlow";
 import { parseProductFlowText, serializeProductFlow } from "../src/models/productFlowCodec";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
 import { RecentFlowStore } from "../src/storage/recentFlows";
+import { dispatchFlowWebviewMessage } from "../src/webview/flowCommandDispatcher";
+import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/webview/flowSelection";
 import { recordEdgeDetailsRevision } from "../src/webview/flowMessageOrdering";
 import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/webview/flowWebviewHtml";
 import { parseWebviewMessage } from "../src/webview/flowWebviewMessages";
@@ -45,6 +47,27 @@ test("FlowPanel declared media resources exist on disk", async () => {
   for (const fileName of [...FLOW_WEBVIEW_STYLE_FILES, ...FLOW_WEBVIEW_SCRIPT_FILES]) {
     await fs.readFile(path.join(process.cwd(), "src", "webview", "media", fileName));
   }
+});
+
+test("FlowPanel media scripts keep dependency order explicit", () => {
+  const indexOf = (fileName: string) => {
+    const index = FLOW_WEBVIEW_SCRIPT_FILES.indexOf(fileName as never);
+    assert.ok(index !== -1, `${fileName} should be declared`);
+    return index;
+  };
+
+  assert.ok(indexOf("state/canvas-namespace.js") < indexOf("state/canvas-state.js"));
+  assert.ok(indexOf("state/canvas-state.js") < indexOf("render/canvas-render.js"));
+  assert.ok(indexOf("render/canvas-render.js") < indexOf("events/canvas-bindings.js"));
+  assert.ok(indexOf("events/canvas-bindings.js") < indexOf("view/canvas-endpoint-pickers.js"));
+  assert.ok(indexOf("view/canvas-endpoint-pickers.js") < indexOf("view/canvas-edge-view.js"));
+  assert.ok(indexOf("view/canvas-edge-view.js") < indexOf("view/canvas-view.js"));
+  assert.ok(indexOf("view/canvas-view.js") < indexOf("data/canvas-feature-data.js"));
+  assert.ok(indexOf("data/canvas-feature-data.js") < indexOf("data/canvas-taxonomy-data.js"));
+  assert.ok(indexOf("data/canvas-taxonomy-data.js") < indexOf("data/canvas-color-data.js"));
+  assert.ok(indexOf("data/canvas-color-data.js") < indexOf("data/canvas-ui-state.js"));
+  assert.ok(indexOf("data/canvas-ui-state.js") < indexOf("data/canvas-data.js"));
+  assert.equal(FLOW_WEBVIEW_SCRIPT_FILES[FLOW_WEBVIEW_SCRIPT_FILES.length - 1], "state/main.js");
 });
 
 test("Webview message parser rejects malformed messages before command dispatch", () => {
@@ -109,3 +132,119 @@ test("Edge detail revisions ignore stale webview saves", () => {
   assert.equal(recordEdgeDetailsRevision(revisions, "edge_a", 3), true);
   assert.equal(revisions.get("edge_a"), 3);
 });
+
+test("Flow webview command dispatcher maps selection and edit messages", async () => {
+  const dispatcher = createDispatcherHarness();
+  await dispatchFlowWebviewMessage({ type: "selectNode", nodeId: "node_a" }, dispatcher.dispatcher);
+  await dispatchFlowWebviewMessage({ type: "saveNodePosition", nodeId: "node_a", x: 12.2, y: 34.8 }, dispatcher.dispatcher);
+  await dispatchFlowWebviewMessage({
+    type: "createEdge",
+    from: { kind: "node", nodeId: "node_a" },
+    to: { kind: "node", nodeId: "node_b" },
+    trigger: "进入下一页",
+    edgeType: "navigate"
+  }, dispatcher.dispatcher);
+
+  assert.deepEqual(dispatcher.selection, {
+    ...emptyFlowSelection(),
+    selectedProjectOverview: false,
+    selectedNodeId: "node_a"
+  });
+  assert.deepEqual(dispatcher.commands, [
+    ["保存节点位置", "mindflow.updateNodePosition", "node_a", 12.2, 34.8, dispatcher.documentUri],
+    [
+      "创建连线",
+      "mindflow.createEdge",
+      { kind: "node", nodeId: "node_a" },
+      { kind: "node", nodeId: "node_b" },
+      "进入下一页",
+      "navigate",
+      dispatcher.documentUri
+    ]
+  ]);
+});
+
+test("Flow webview command dispatcher clears taxonomy selection before delete", async () => {
+  const dispatcher = createDispatcherHarness({
+    selectedAppSurfaceId: "app_admin",
+    selectedDomainId: "domain_ops",
+    selectedRoleId: "role_ops",
+    selectedStatusGroupId: "status_review"
+  });
+
+  await dispatchFlowWebviewMessage({
+    type: "updateTaxonomy",
+    request: { kind: "domain", action: "delete", id: "domain_ops" }
+  }, dispatcher.dispatcher);
+
+  assert.equal(dispatcher.selection.selectedAppSurfaceId, "app_admin");
+  assert.equal(dispatcher.selection.selectedDomainId, undefined);
+  assert.equal(dispatcher.selection.selectedRoleId, "role_ops");
+  assert.equal(dispatcher.selection.selectedStatusGroupId, "status_review");
+  assert.deepEqual(dispatcher.commands, [
+    ["更新元数据", "mindflow.updateTaxonomy", { kind: "domain", action: "delete", id: "domain_ops" }, dispatcher.documentUri]
+  ]);
+});
+
+test("Flow webview command dispatcher ignores stale edge detail updates", async () => {
+  const dispatcher = createDispatcherHarness();
+
+  await dispatchFlowWebviewMessage({
+    type: "updateEdgeDetails",
+    edgeId: "edge_a",
+    revision: 3,
+    patch: {
+      from: { kind: "node", nodeId: "node_a" },
+      to: { kind: "node", nodeId: "node_b" }
+    }
+  }, dispatcher.dispatcher);
+  await dispatchFlowWebviewMessage({
+    type: "updateEdgeDetails",
+    edgeId: "edge_a",
+    revision: 2,
+    patch: {
+      from: { kind: "node", nodeId: "node_stale" },
+      to: { kind: "node", nodeId: "node_b" }
+    }
+  }, dispatcher.dispatcher);
+
+  assert.deepEqual(dispatcher.commands, [
+    [
+      "更新连线详情",
+      "mindflow.updateEdgeDetails",
+      "edge_a",
+      {
+        from: { kind: "node", nodeId: "node_a" },
+        to: { kind: "node", nodeId: "node_b" }
+      },
+      dispatcher.documentUri
+    ]
+  ]);
+});
+
+function createDispatcherHarness(initialSelection: FlowSelectionPatch = emptyFlowSelection()) {
+  const documentUri = "file:///workspace/sample.mindflow" as unknown as vscode.Uri;
+  const commands: unknown[][] = [];
+  let selection: FlowSelectionState = { ...emptyFlowSelection(), ...initialSelection };
+
+  return {
+    documentUri,
+    commands,
+    get selection() {
+      return selection;
+    },
+    dispatcher: {
+      documentUri,
+      latestEdgeDetailsRevisions: new Map<string, number>(),
+      selectionController: {
+        getSelection: () => ({ ...selection }),
+        setSelection: (_flowUri: vscode.Uri | string, patch: FlowSelectionPatch) => {
+          selection = { ...emptyFlowSelection(), ...selection, ...patch };
+        }
+      },
+      executeCommand: async (label: string, command: string, ...args: unknown[]) => {
+        commands.push([label, command, ...args]);
+      }
+    }
+  };
+}

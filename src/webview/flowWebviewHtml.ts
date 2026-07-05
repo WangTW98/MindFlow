@@ -3,7 +3,10 @@ export const FLOW_WEBVIEW_STYLE_FILES = [
   "styles-layout.css",
   "styles-canvas.css",
   "styles-cards.css",
-  "styles-inspector.css"
+  "styles-project-overview.css",
+  "styles-inspector.css",
+  "styles-inspector-pickers.css",
+  "styles-inspector-forms.css"
 ] as const;
 
 export const FLOW_WEBVIEW_SCRIPT_FILES = [
@@ -33,7 +36,13 @@ export const FLOW_WEBVIEW_SCRIPT_FILES = [
   "details/canvas-node-details.js",
   "details/canvas-taxonomy-details.js",
   "details/canvas-edge-details.js",
+  "view/canvas-endpoint-pickers.js",
+  "view/canvas-edge-view.js",
   "view/canvas-view.js",
+  "data/canvas-feature-data.js",
+  "data/canvas-taxonomy-data.js",
+  "data/canvas-color-data.js",
+  "data/canvas-ui-state.js",
   "data/canvas-data.js",
   "state/main.js"
 ] as const;
