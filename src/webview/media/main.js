@@ -44,6 +44,14 @@
     { value: "page", label: "页面", icon: "file-text" },
     { value: "popup", label: "弹窗", icon: "panel-top" }
   ];
+  const APP_SURFACE_TYPE_OPTIONS = [
+    { value: "admin", label: "管理后台", icon: "shield-check" },
+    { value: "web", label: "Web 端", icon: "globe" },
+    { value: "app", label: "App 端", icon: "smartphone" },
+    { value: "miniapp", label: "小程序", icon: "scan-line" },
+    { value: "desktop", label: "桌面端", icon: "monitor" },
+    { value: "other", label: "其他端", icon: "monitor-smartphone" }
+  ];
   const PENDING_EDGE_DETAILS_TTL_MS = 15000;
   const APP_SURFACE_SOURCE_X = -360;
   const APP_SURFACE_SOURCE_Y = 0;
@@ -190,6 +198,7 @@
   function renderAppSurfaceSourceCard(surface, index) {
     const related = isAppSurfaceRelated(surface);
     const selected = selectedAppSurfaceId === surface.appId;
+    const surfaceType = getAppSurfaceTypeOption(surface.type);
     const surfaceEndpoint = { kind: "appSurface", nodeId: surface.appId, appId: surface.appId };
     const surfaceEndpointKey = endpointKey(surfaceEndpoint);
     const pos = appSurfacePositions.get(surface.appId) || appSurfaceSourcePosition(index);
@@ -205,8 +214,10 @@
             title="连线入口"
             aria-label="连线入口"></button>
           <div class="node-title">
-            <h3>${escapeHtml(surface.name)}</h3>
-            <small>${escapeHtml(surface.type || "other")}</small>
+            <div class="app-surface-title-row">
+              <h3>${escapeHtml(surface.name)}</h3>
+              ${renderAppSurfaceTypeBadge(surfaceType)}
+            </div>
           </div>
           <button class="origin-dot outlet-dot card-outlet ${connectingFrom && endpointKey(connectingFrom) === surfaceEndpointKey ? "active" : ""}"
             data-origin-kind="appSurface"
@@ -218,6 +229,15 @@
         </header>
         <p class="purpose">${escapeHtml(surface.description || "暂无介绍")}</p>
       </article>
+    `;
+  }
+
+  function renderAppSurfaceTypeBadge(type) {
+    return `
+      <span class="app-surface-type-badge" title="${escapeAttr(type.label)}">
+        ${renderLucideIcon(type.icon)}
+        <span>${escapeHtml(type.label)}</span>
+      </span>
     `;
   }
 
@@ -389,8 +409,10 @@
       copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>',
       "circle-help": '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 2-3 4"></path><path d="M12 17h.01"></path>',
       "file-text": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path>',
+      globe: '<circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path>',
       "globe-2": '<path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"></path><path d="M7 3.34V5a3 3 0 0 0 3 3 2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17"></path><path d="M11 21.95V18a2 2 0 0 0-2-2 2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"></path><circle cx="12" cy="12" r="10"></circle>',
       "grip-vertical": '<circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle>',
+      monitor: '<rect width="20" height="14" x="2" y="3" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path>',
       "monitor-smartphone": '<path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"></path><path d="M10 19v-4"></path><path d="M7 19h5"></path><rect width="6" height="10" x="16" y="12" rx="2"></rect>',
       network: '<rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path>',
       "octagon-alert": '<path d="M12 16h.01"></path><path d="M12 8v4"></path><path d="M15.31 2a2 2 0 0 1 1.42.59l4.68 4.68A2 2 0 0 1 22 8.69v6.62a2 2 0 0 1-.59 1.42l-4.68 4.68a2 2 0 0 1-1.42.59H8.69a2 2 0 0 1-1.42-.59l-4.68-4.68A2 2 0 0 1 2 15.31V8.69a2 2 0 0 1 .59-1.42l4.68-4.68A2 2 0 0 1 8.69 2Z"></path>',
@@ -398,6 +420,9 @@
       "panel-top": '<rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M3 9h18"></path>',
       "pen-line": '<path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>',
       plus: '<path d="M5 12h14"></path><path d="M12 5v14"></path>',
+      "scan-line": '<path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><path d="M7 12h10"></path>',
+      "shield-check": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path>',
+      smartphone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path>',
       "trash-2": '<path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
       "triangle-alert": '<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path>',
       user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>',
@@ -676,6 +701,45 @@
     `;
   }
 
+  function renderAppSurfaceTypePicker(surfaceType) {
+    const selected = getAppSurfaceTypeOption(surfaceType);
+    return `
+      <div class="app-surface-type-field">
+        <span class="field-label">应用端类型</span>
+        <input id="appSurfaceType" type="hidden" value="${escapeAttr(selected.value)}">
+        <div class="app-surface-type-picker" data-app-surface-type-picker>
+          <button type="button"
+            class="app-surface-type-trigger"
+            data-app-surface-type-value="${escapeAttr(selected.value)}"
+            aria-haspopup="listbox"
+            aria-expanded="false">
+            ${renderAppSurfaceTypeOptionContent(selected)}
+          </button>
+          <div class="app-surface-type-menu" role="listbox" aria-label="应用端类型">
+            ${APP_SURFACE_TYPE_OPTIONS.map((type) => `
+              <button type="button"
+                class="app-surface-type-option ${type.value === selected.value ? "selected" : ""}"
+                data-app-surface-type-option="${escapeAttr(type.value)}"
+                role="option"
+                aria-selected="${type.value === selected.value ? "true" : "false"}">
+                ${renderAppSurfaceTypeOptionContent(type)}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderAppSurfaceTypeOptionContent(type) {
+    return `
+      <span class="app-surface-type-icon" aria-hidden="true">${renderLucideIcon(type.icon)}</span>
+      <span class="app-surface-type-copy">
+        <strong>${escapeHtml(type.label)}</strong>
+      </span>
+    `;
+  }
+
   function renderStatusGroupSelect(flow, node) {
     const groups = getStatusGroups(flow);
     const selectedGroup = groups.find((group) => group.statusGroupId === node.statusGroupId) || null;
@@ -737,26 +801,18 @@
       <form class="details-form" id="appSurfaceDetailsForm">
         <header class="inspector-head">
           <div>
-            <h2 id="appSurfacePanelTitle">${escapeHtml(surface.name)}</h2>
+            <h2 id="appSurfacePanelTitle" class="inline-title-editor" tabindex="0" title="双击编辑标题">${escapeHtml(surface.name)}</h2>
             <code>${escapeHtml(surface.appId)}</code>
           </div>
           ${renderIconButton("closeInspector", "关闭详情", "x")}
         </header>
-        <label>应用端名称
-          <input id="appSurfaceName" value="${escapeAttr(surface.name)}">
-        </label>
-        <label>应用端类型
-          <select id="appSurfaceType">
-            ${["admin", "web", "app", "miniapp", "desktop", "other"].map((type) =>
-              `<option value="${type}" ${surface.type === type ? "selected" : ""}>${type}</option>`
-            ).join("")}
-          </select>
-        </label>
+        <input id="appSurfaceName" type="hidden" value="${escapeAttr(surface.name)}">
+        ${renderAppSurfaceTypePicker(surface.type)}
         <label>应用端介绍
           <textarea id="appSurfaceDescription" rows="4">${escapeHtml(surface.description || "")}</textarea>
         </label>
-        ${renderMultiSelect("appSurfaceDomainIds", "关联业务域", flow.domains || [], "domainId", "name", surface.domainIds || [])}
-        ${renderMultiSelect("appSurfaceRoleIds", "关联角色", flow.roles || [], "roleId", "name", surface.roleIds || [])}
+        ${renderTagMultiSelect("appSurfaceDomainIds", "关联业务域", flow.domains || [], "domainId", "name", surface.domainIds || [])}
+        ${renderTagMultiSelect("appSurfaceRoleIds", "关联角色", flow.roles || [], "roleId", "name", surface.roleIds || [])}
         <p class="form-error" id="appSurfaceFormError"></p>
       </form>
     `;
@@ -1463,15 +1519,38 @@
   }
 
   function bindAppSurfaceInspector(appSurfaceForm) {
+    bindInlineTitleEditor("appSurfacePanelTitle", "appSurfaceName", () => commitAppSurfaceDetailsChange({ immediate: true }));
     appSurfaceForm.addEventListener("submit", (event) => {
       event.preventDefault();
       commitAppSurfaceDetailsChange({ immediate: true });
     });
-    appSurfaceForm.addEventListener("input", () => {
+    appSurfaceForm.addEventListener("input", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
       commitAppSurfaceDetailsChange();
     });
-    appSurfaceForm.addEventListener("change", () => {
+    appSurfaceForm.addEventListener("change", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
       commitAppSurfaceDetailsChange({ immediate: true });
+    });
+    appSurfaceForm.querySelectorAll(".app-surface-type-trigger").forEach((trigger) => {
+      trigger.addEventListener("click", () => toggleAppSurfaceTypePicker(trigger));
+      trigger.addEventListener("keydown", (event) => event.stopPropagation());
+    });
+    appSurfaceForm.querySelectorAll(".app-surface-type-picker").forEach((picker) => {
+      picker.addEventListener("focusout", () => {
+        setTimeout(() => {
+          if (!picker.contains(document.activeElement)) {
+            closeAppSurfaceTypePicker(picker);
+          }
+        }, 0);
+      });
+    });
+    appSurfaceForm.querySelectorAll(".app-surface-type-option").forEach((option) => {
+      option.addEventListener("click", () => selectAppSurfaceTypeOption(option));
     });
   }
 
@@ -2670,8 +2749,8 @@
       name: document.getElementById("appSurfaceName").value,
       type: document.getElementById("appSurfaceType").value,
       description: document.getElementById("appSurfaceDescription").value,
-      domainIds: collectMultiSelect("appSurfaceDomainIds"),
-      roleIds: collectMultiSelect("appSurfaceRoleIds")
+      domainIds: collectTagMultiSelect("appSurfaceDomainIds"),
+      roleIds: collectTagMultiSelect("appSurfaceRoleIds")
     };
   }
 
@@ -2811,7 +2890,7 @@
       return;
     }
     surface.name = item.name.trim() || surface.name;
-    surface.type = item.type || surface.type || "other";
+    surface.type = getAppSurfaceTypeOption(item.type).value || surface.type || "other";
     surface.description = item.description.trim();
     surface.domainIds = item.domainIds;
     surface.roleIds = item.roleIds;
@@ -2819,9 +2898,13 @@
 
   function refreshAppSurfaceViews() {
     const title = document.getElementById("appSurfacePanelTitle");
+    const titleInput = document.getElementById("appSurfaceName");
     const surface = (state.flow.appSurfaces || []).find((candidate) => candidate.appId === selectedAppSurfaceId);
-    if (title && surface) {
+    if (title && surface && title.dataset.inlineEditing !== "true") {
       title.textContent = surface.name;
+    }
+    if (titleInput && surface) {
+      titleInput.value = surface.name;
     }
     refreshTaxonomyPanels();
     const world = document.getElementById("world");
@@ -3571,6 +3654,42 @@
     commitNodeDetailsChange({ immediate: true });
   }
 
+  function toggleAppSurfaceTypePicker(trigger) {
+    const picker = trigger.closest(".app-surface-type-picker");
+    if (!picker) {
+      return;
+    }
+    const open = !picker.classList.contains("open");
+    picker.classList.toggle("open", open);
+    trigger.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function closeAppSurfaceTypePicker(picker) {
+    picker.classList.remove("open");
+    picker.querySelector(".app-surface-type-trigger")?.setAttribute("aria-expanded", "false");
+  }
+
+  function selectAppSurfaceTypeOption(option) {
+    const picker = option.closest(".app-surface-type-picker");
+    const trigger = picker?.querySelector(".app-surface-type-trigger");
+    const input = document.getElementById("appSurfaceType");
+    if (!picker || !trigger || !input) {
+      return;
+    }
+    const type = getAppSurfaceTypeOption(option.dataset.appSurfaceTypeOption);
+    input.value = type.value;
+    trigger.dataset.appSurfaceTypeValue = type.value;
+    trigger.innerHTML = renderAppSurfaceTypeOptionContent(type);
+    picker.querySelectorAll(".app-surface-type-option.selected").forEach((item) => {
+      item.classList.remove("selected");
+      item.setAttribute("aria-selected", "false");
+    });
+    option.classList.add("selected");
+    option.setAttribute("aria-selected", "true");
+    closeAppSurfaceTypePicker(picker);
+    commitAppSurfaceDetailsChange({ immediate: true });
+  }
+
   function toggleStatusGroupPicker(trigger) {
     const picker = trigger.closest(".status-group-picker");
     if (!picker) {
@@ -3606,6 +3725,31 @@
     option.setAttribute("aria-selected", "true");
     closeStatusGroupPicker(picker);
     commitNodeDetailsChange({ immediate: true });
+  }
+
+  function getAppSurfaceTypeOption(type) {
+    const value = normalizeAppSurfaceTypeForSelect(type);
+    return APP_SURFACE_TYPE_OPTIONS.find((option) => option.value === value) || APP_SURFACE_TYPE_OPTIONS[APP_SURFACE_TYPE_OPTIONS.length - 1];
+  }
+
+  function normalizeAppSurfaceTypeForSelect(type) {
+    const value = String(type || "").trim().toLowerCase().replace(/\s+/g, "");
+    if (value === "admin" || value === "backend" || value === "console" || value === "后台" || value === "管理后台") {
+      return "admin";
+    }
+    if (value === "web" || value === "website" || value === "h5" || value === "网页" || value === "web端") {
+      return "web";
+    }
+    if (value === "app" || value === "mobile" || value === "ios" || value === "android" || value === "移动端" || value === "app端") {
+      return "app";
+    }
+    if (value === "miniapp" || value === "mini-app" || value === "miniprogram" || value === "小程序") {
+      return "miniapp";
+    }
+    if (value === "desktop" || value === "pc" || value === "桌面端" || value === "客户端") {
+      return "desktop";
+    }
+    return "other";
   }
 
   function getPageTypeOption(type) {

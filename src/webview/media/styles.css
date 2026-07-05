@@ -645,7 +645,7 @@ small,
 
 .app-surface-card-head {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: flex-start;
   gap: 8px;
 }
@@ -728,7 +728,7 @@ small,
 .feature-item > .outlet-dot {
   position: absolute;
   top: 50%;
-  right: -27px;
+  right: -29px;
   left: auto;
   margin-top: -5px;
 }
@@ -764,8 +764,8 @@ small,
 }
 
 .feature-item > .outlet-dot::after {
-  right: 50%;
-  width: 22px;
+  right: calc(100% + 2px);
+  width: 16px;
 }
 
 .origin-dot:hover,
@@ -803,6 +803,53 @@ small,
   display: grid;
   min-width: 0;
   gap: 2px;
+}
+
+.app-surface-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-surface-title-row h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.app-surface-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 96px;
+  border: 1px solid color-mix(in srgb, var(--outlet), var(--border) 48%);
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--outlet), transparent 86%);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.app-surface-type-badge .lucide-icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  color: var(--outlet);
+}
+
+.app-surface-type-badge span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .node-head h3 {
@@ -1327,6 +1374,7 @@ small,
 
 .edge-type-field,
 .page-type-field,
+.app-surface-type-field,
 .status-group-field {
   display: grid;
   gap: 5px;
@@ -1338,6 +1386,7 @@ small,
 
 .edge-type-picker,
 .page-type-picker,
+.app-surface-type-picker,
 .status-group-picker {
   position: relative;
   display: grid;
@@ -1348,6 +1397,8 @@ small,
 .edge-type-option,
 .page-type-trigger,
 .page-type-option,
+.app-surface-type-trigger,
+.app-surface-type-option,
 .status-group-trigger,
 .status-group-option {
   display: grid;
@@ -1371,6 +1422,9 @@ small,
 .page-type-trigger:hover,
 .page-type-option:hover,
 .page-type-option.selected,
+.app-surface-type-trigger:hover,
+.app-surface-type-option:hover,
+.app-surface-type-option.selected,
 .status-group-trigger:hover,
 .status-group-option:hover,
 .status-group-option.selected {
@@ -1380,6 +1434,7 @@ small,
 
 .edge-type-menu,
 .page-type-menu,
+.app-surface-type-menu,
 .status-group-menu {
   position: absolute;
   top: calc(100% + 4px);
@@ -1399,12 +1454,14 @@ small,
 
 .edge-type-picker.open .edge-type-menu,
 .page-type-picker.open .page-type-menu,
+.app-surface-type-picker.open .app-surface-type-menu,
 .status-group-picker.open .status-group-menu {
   display: grid;
 }
 
 .edge-type-option,
 .page-type-option,
+.app-surface-type-option,
 .status-group-option {
   background: transparent;
   color: var(--fg);
@@ -1437,12 +1494,15 @@ small,
 }
 
 .page-type-trigger,
-.page-type-option {
+.page-type-option,
+.app-surface-type-trigger,
+.app-surface-type-option {
   align-items: center;
   min-height: 38px;
 }
 
-.page-type-icon {
+.page-type-icon,
+.app-surface-type-icon {
   display: inline-flex;
   width: 18px;
   height: 18px;
@@ -1451,17 +1511,24 @@ small,
   color: var(--accent);
 }
 
-.page-type-icon .lucide-icon {
+.app-surface-type-icon {
+  color: var(--outlet);
+}
+
+.page-type-icon .lucide-icon,
+.app-surface-type-icon .lucide-icon {
   width: 16px;
   height: 16px;
 }
 
-.page-type-copy {
+.page-type-copy,
+.app-surface-type-copy {
   display: grid;
   min-width: 0;
 }
 
-.page-type-copy strong {
+.page-type-copy strong,
+.app-surface-type-copy strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
