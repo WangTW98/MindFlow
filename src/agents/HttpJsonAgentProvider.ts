@@ -77,7 +77,7 @@ export abstract class HttpJsonAgentProvider implements AgentProvider {
 
   protected async invokeJson(prompt: string): Promise<unknown> {
     if (!this.config.endpoint) {
-      throw new Error(`${this.id} provider requires mindflow.agent.endpoint.`);
+      throw new Error(`${this.id} provider requires an MCP provider endpoint such as MINDFLOW_AGENT_ENDPOINT.`);
     }
     let lastError: unknown;
     for (let attempt = 1; attempt <= 2; attempt += 1) {

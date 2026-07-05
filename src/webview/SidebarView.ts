@@ -1,6 +1,5 @@
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
-import { spawn } from "node:child_process";
 import * as vscode from "vscode";
 import { FlowRepository } from "../storage/flowRepository";
 import { RecentFlowStore, type RecentFlowRecord } from "../storage/recentFlows";
@@ -39,9 +38,6 @@ export class SidebarView implements vscode.WebviewViewProvider {
           break;
         case "removeRecent":
           await this.recentFlows.remove(message.flowPath);
-          await this.refresh();
-          break;
-        case "refreshAgents":
           await this.refresh();
           break;
         default:
@@ -102,30 +98,12 @@ export class SidebarView implements vscode.WebviewViewProvider {
         `).join("") || "<p class=\"empty\">暂无历史 MindFlow 文件</p>"}
       </div>
     </section>
-    <section>
-      <header>
-        <h2>已发现Agent</h2>
-        <button id="refreshAgents" class="icon-button" title="刷新已发现Agent">刷新</button>
-      </header>
-      <div class="list">
-        ${state.agents.map((agent) => `
-          <div class="agent-row">
-            <span class="status ${agent.available ? "ok" : "missing"}"></span>
-            <div>
-              <strong>${escapeHtml(agent.label)}</strong>
-              <small>${escapeHtml(agent.detail)}</small>
-            </div>
-          </div>
-        `).join("") || "<p class=\"empty\">未发现可用 Agent</p>"}
-      </div>
-    </section>
   </main>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     document.getElementById("newMindFlow").addEventListener("click", () => vscode.postMessage({ type: "newMindFlow" }));
     document.getElementById("openMindFlow").addEventListener("click", () => vscode.postMessage({ type: "openMindFlow" }));
     document.getElementById("clearRecent").addEventListener("click", () => vscode.postMessage({ type: "clearRecent" }));
-    document.getElementById("refreshAgents").addEventListener("click", () => vscode.postMessage({ type: "refreshAgents" }));
     document.querySelectorAll("[data-flow-path]").forEach((button) => {
       button.addEventListener("click", () => vscode.postMessage({ type: "openFlow", flowPath: button.dataset.flowPath }));
     });
@@ -154,17 +132,14 @@ export class SidebarView implements vscode.WebviewViewProvider {
     }
     const flows = await Promise.all((recentRecords ?? []).map((record) => toFlowItem(workspaceRoot, record)));
     flows.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
-    const detectedAgents = await Promise.all(MCP_CLIENT_CANDIDATES.map((candidate) => detectAgent(candidate)));
     return {
-      flows,
-      agents: detectedAgents.filter((agent) => agent.available)
+      flows
     };
   }
 }
 
 interface SidebarState {
   flows: FlowItem[];
-  agents: AgentStatus[];
 }
 
 interface FlowItem {
@@ -175,36 +150,12 @@ interface FlowItem {
   usedLabel: string;
 }
 
-interface AgentStatus {
-  label: string;
-  available: boolean;
-  detail: string;
-}
-
-interface AgentCandidate {
-  label: string;
-  commands: string[];
-  args: string[];
-}
-
 type SidebarMessage =
   | { type: "newMindFlow" }
   | { type: "openMindFlow" }
   | { type: "openFlow"; flowPath: string }
   | { type: "clearRecent" }
-  | { type: "removeRecent"; flowPath: string }
-  | { type: "refreshAgents" };
-
-const MCP_CLIENT_CANDIDATES: AgentCandidate[] = [
-  { label: "Codex CLI", commands: ["codex"], args: ["--version"] },
-  { label: "Claude Code", commands: ["claude"], args: ["--version"] },
-  { label: "Gemini CLI", commands: ["gemini"], args: ["--version"] },
-  { label: "Cursor", commands: ["cursor"], args: ["--version"] },
-  { label: "Windsurf", commands: ["windsurf"], args: ["--version"] },
-  { label: "OpenCode", commands: ["opencode"], args: ["--version"] },
-  { label: "Goose", commands: ["goose"], args: ["--version"] },
-  { label: "Qwen Code", commands: ["qwen", "qwen-code"], args: ["--version"] }
-];
+  | { type: "removeRecent"; flowPath: string };
 
 async function seedRecentFlowRecords(files: string[]): Promise<RecentFlowRecord[]> {
   const records = await Promise.all(
@@ -228,62 +179,6 @@ async function toFlowItem(workspaceRoot: string, record: RecentFlowRecord): Prom
   };
 }
 
-async function detectAgent(candidate: AgentCandidate): Promise<AgentStatus> {
-  const commands = unique(candidate.commands.flatMap((command) => getCommandCandidates(command)));
-  for (const command of commands) {
-    const status = await detectCommand(candidate.label, command, candidate.args);
-    if (status.available) {
-      return status;
-    }
-  }
-  return { label: candidate.label, available: false, detail: `${candidate.commands[0]} 未找到` };
-}
-
-function detectCommand(label: string, command: string, args: string[]): Promise<AgentStatus> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
-    let output = "";
-    const finish = (status: AgentStatus): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeout);
-      resolve(status);
-    };
-    const timeout = setTimeout(() => {
-      child.kill?.();
-      finish({ label, available: true, detail: `${path.basename(command)} 可执行，版本检测超时` });
-    }, 1500);
-    child.stdout?.on("data", (chunk) => {
-      output += chunk.toString();
-    });
-    child.stderr?.on("data", (chunk) => {
-      output += chunk.toString();
-    });
-    child.on("error", () => {
-      finish({ label, available: false, detail: `${command} 未找到` });
-    });
-    child.on("close", (code) => {
-      const firstLine = output.trim().split(/\r?\n/)[0];
-      finish({ label, available: true, detail: firstLine || `${path.basename(command)} detected (exit ${code ?? "unknown"})` });
-    });
-  });
-}
-
-function getCommandCandidates(command: string): string[] {
-  const home = process.env.HOME;
-  return [
-    command,
-    `/opt/homebrew/bin/${command}`,
-    `/usr/local/bin/${command}`,
-    `/usr/bin/${command}`,
-    home ? path.join(home, ".local", "bin", command) : "",
-    home ? path.join(home, ".npm-global", "bin", command) : ""
-  ].filter(Boolean);
-}
-
 function formatDateTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString("zh-CN", {
     month: "2-digit",
@@ -291,10 +186,6 @@ function formatDateTime(timestamp: number): string {
     hour: "2-digit",
     minute: "2-digit"
   });
-}
-
-function unique(values: string[]): string[] {
-  return Array.from(new Set(values));
 }
 
 function renderRemoveIcon(): string {

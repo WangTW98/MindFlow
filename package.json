@@ -1,7 +1,7 @@
 {
-  "name": "mindflow-product-flow-agent",
-  "displayName": "MindFlow Product Flow Agent",
-  "description": "Analyze product documents into editable product-flow JSON, generate PRDs and Pencil design specs, and keep artifacts synchronized.",
+  "name": "mindflow-canvas-editor",
+  "displayName": "MindFlow Canvas Editor",
+  "description": "Edit .mindflow ProductFlow node canvases in VSCode. AI generation and document workflows are exposed through the MindFlow MCP server.",
   "version": "0.1.0",
   "publisher": "mindflow",
   "repository": {
@@ -22,34 +22,10 @@
   "activationEvents": [
     "onView:mindflow.sidebar",
     "onCommand:mindflow.newFlow",
-    "onCommand:mindflow.analyzeDocument",
     "onCommand:mindflow.openFlow",
     "onCustomEditor:mindflow.productFlow",
     "onLanguage:mindflow",
-    "onCommand:mindflow.modifyFlowByInstruction",
-    "onCommand:mindflow.previewChangeSet",
-    "onCommand:mindflow.applyChangeSet",
-    "onCommand:mindflow.revertLastChangeSet",
-    "onCommand:mindflow.validateFlowJson",
-    "onCommand:mindflow.generateNodePrd",
-    "onCommand:mindflow.generateFullPrd",
-    "onCommand:mindflow.refreshStalePrd",
-    "onCommand:mindflow.generateNodePencil",
-    "onCommand:mindflow.generateFullPencil",
-    "onCommand:mindflow.refreshStalePencil",
-    "onCommand:mindflow.syncArtifacts",
-    "onCommand:mindflow.openArtifact",
-    "onCommand:mindflow.updateNodePosition",
-    "onCommand:mindflow.updateAppSurfacePosition",
-    "onCommand:mindflow.createNodeAt",
-    "onCommand:mindflow.updateNodeDetails",
-    "onCommand:mindflow.createEdge",
-    "onCommand:mindflow.createConnectedNodeAt",
-    "onCommand:mindflow.removeNode",
-    "onCommand:mindflow.updateEdgeDetails",
-    "onCommand:mindflow.removeEdge",
-    "onCommand:mindflow.updateTaxonomy",
-    "onCommand:mindflow.configureAgent"
+    "onCommand:mindflow.validateFlowJson"
   ],
   "main": "./out/src/extension.js",
   "contributes": {
@@ -113,112 +89,23 @@
         "title": "MindFlow: New Blank Flow"
       },
       {
-        "command": "mindflow.analyzeDocument",
-        "title": "MindFlow: Analyze Document"
-      },
-      {
         "command": "mindflow.openFlow",
         "title": "MindFlow: Open Product Flow"
       },
       {
-        "command": "mindflow.modifyFlowByInstruction",
-        "title": "MindFlow: Modify Product Flow by Instruction"
-      },
-      {
-        "command": "mindflow.previewChangeSet",
-        "title": "MindFlow: Preview ChangeSet"
-      },
-      {
-        "command": "mindflow.applyChangeSet",
-        "title": "MindFlow: Apply ChangeSet"
-      },
-      {
-        "command": "mindflow.revertLastChangeSet",
-        "title": "MindFlow: Revert Last ChangeSet"
-      },
-      {
         "command": "mindflow.validateFlowJson",
         "title": "MindFlow: Validate Flow JSON"
-      },
-      {
-        "command": "mindflow.generateNodePrd",
-        "title": "MindFlow: Generate Node PRD"
-      },
-      {
-        "command": "mindflow.generateFullPrd",
-        "title": "MindFlow: Generate Full PRD"
-      },
-      {
-        "command": "mindflow.refreshStalePrd",
-        "title": "MindFlow: Refresh Stale PRD"
-      },
-      {
-        "command": "mindflow.generateNodePencil",
-        "title": "MindFlow: Generate Node Pencil Design"
-      },
-      {
-        "command": "mindflow.generateFullPencil",
-        "title": "MindFlow: Generate Full Pencil Design"
-      },
-      {
-        "command": "mindflow.refreshStalePencil",
-        "title": "MindFlow: Refresh Stale Pencil Design"
-      },
-      {
-        "command": "mindflow.syncArtifacts",
-        "title": "MindFlow: Sync PRD/Pencil/JSON Artifacts"
-      },
-      {
-        "command": "mindflow.openArtifact",
-        "title": "MindFlow: Open Linked Artifact"
-      },
-      {
-        "command": "mindflow.configureAgent",
-        "title": "MindFlow: Configure AI Agent"
       }
     ],
     "configuration": {
       "title": "MindFlow",
       "properties": {
-        "mindflow.agent.provider": {
-          "type": "string",
-          "default": "codex",
-          "enum": [
-            "codex",
-            "gemini"
-          ],
-          "description": "AI Agent provider used for document analysis, flow changes, PRD generation, and Pencil design specs."
-        },
-        "mindflow.agent.model": {
-          "type": "string",
-          "default": "",
-          "description": "Provider-specific model name."
-        },
-        "mindflow.agent.endpoint": {
-          "type": "string",
-          "default": "",
-          "description": "Provider-specific HTTP endpoint. Leave empty to use Codex CLI when provider is codex."
-        },
-        "mindflow.agent.codexCliPath": {
-          "type": "string",
-          "default": "codex",
-          "description": "Path to Codex CLI used when provider is codex and no HTTP endpoint is configured."
-        },
         "mindflow.storage.flowDirectory": {
           "type": "string",
           "default": ".mindflow/flows",
           "description": "Workspace-relative directory where MindFlow ProductFlow files are stored."
         }
       }
-    },
-    "menus": {
-      "editor/context": [
-        {
-          "command": "mindflow.analyzeDocument",
-          "when": "editorTextFocus",
-          "group": "mindflow@1"
-        }
-      ]
     }
   },
   "scripts": {

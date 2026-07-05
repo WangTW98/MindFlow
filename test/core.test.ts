@@ -569,14 +569,16 @@ test("RecentFlowStore clears and removes recent MindFlow records", async () => {
   assert.deepEqual(store.get(), []);
 });
 
-test("Extension manifest contributes real providers and .mindflow custom editor only", async () => {
+test("Extension manifest contributes standalone .mindflow editor and sidebar only", async () => {
   const raw = await fs.readFile(path.join(process.cwd(), "package.json"), "utf8");
   const manifest = JSON.parse(raw) as {
+    activationEvents?: string[];
     contributes?: {
       viewsContainers?: { activitybar?: Array<{ id?: string; icon?: string }> };
       views?: Record<string, Array<{ id?: string; type?: string }>>;
       languages?: Array<{ id?: string; extensions?: string[]; icon?: { light?: string; dark?: string } }>;
       customEditors?: Array<{ viewType?: string; selector?: Array<{ filenamePattern?: string }> }>;
+      commands?: Array<{ command?: string }>;
       configuration?: { properties?: Record<string, { default?: string; enum?: string[] }> };
     };
   };
@@ -593,9 +595,13 @@ test("Extension manifest contributes real providers and .mindflow custom editor 
   assert.ok(editor.selector?.some((item) => item.filenamePattern === "*.mindflow"));
   assert.equal(editor.selector?.some((item) => String(item.filenamePattern || "").endsWith(".json")), false);
 
-  const provider = manifest.contributes?.configuration?.properties?.["mindflow.agent.provider"];
-  assert.equal(provider?.default, "codex");
-  assert.deepEqual(provider?.enum, ["codex", "gemini"]);
+  assert.deepEqual(manifest.contributes?.commands?.map((item) => item.command), [
+    "mindflow.newFlow",
+    "mindflow.openFlow",
+    "mindflow.validateFlowJson"
+  ]);
+  assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), ["mindflow.storage.flowDirectory"]);
+  assert.equal(manifest.activationEvents?.some((event) => event.includes("mindflow.agent")), false);
 });
 
 function createProcurementFlow(options: { includeAppSurfaceEntryEdges?: boolean } = {}): ProductFlow {

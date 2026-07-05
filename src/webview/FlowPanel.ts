@@ -1,6 +1,5 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import type { FlowChangePlan } from "../models/flowChange";
 import type { ProductFlow } from "../models/productFlow";
 import { validateProductFlow } from "../models/productFlow";
 
@@ -17,7 +16,6 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
   private static provider: FlowPanel | undefined;
 
   private readonly sessions = new Map<string, FlowEditorSession>();
-  private readonly pendingChanges = new Map<string, FlowChangePlan | undefined>();
 
   public static register(
     context: vscode.ExtensionContext,
@@ -35,12 +33,10 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
   public static createOrShow(
     _extensionUri: vscode.Uri,
     flow: ProductFlow,
-    flowPath: string,
-    pendingChange?: FlowChangePlan
+    flowPath: string
   ): void {
     const provider = FlowPanel.provider;
-    provider?.setPendingChange(flowPath, pendingChange);
-    if (provider?.renderSession(flowPath, flow, pendingChange)) {
+    if (provider?.renderSession(flowPath, flow)) {
       return;
     }
     void vscode.commands.executeCommand("vscode.openWith", vscode.Uri.file(flowPath), FlowPanel.viewType);
@@ -66,8 +62,7 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     const session = new FlowEditorSession(
       this.extensionUri,
       document,
-      webviewPanel,
-      this.pendingChanges.get(flowPath)
+      webviewPanel
     );
     this.sessions.set(flowPath, session);
 
@@ -87,14 +82,9 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     session.renderFromDocument(document);
   }
 
-  private setPendingChange(flowPath: string, pendingChange?: FlowChangePlan): void {
-    this.pendingChanges.set(flowPath, pendingChange);
-  }
-
-  private renderSession(flowPath: string, fallbackFlow: ProductFlow, pendingChange?: FlowChangePlan): boolean {
+  private renderSession(flowPath: string, fallbackFlow: ProductFlow): boolean {
     const session = this.sessions.get(flowPath);
     if (session) {
-      session.updatePendingChange(pendingChange);
       session.renderWithFallback(fallbackFlow);
       session.reveal();
       return true;
@@ -111,14 +101,9 @@ class FlowEditorSession {
   public constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly document: vscode.TextDocument,
-    private readonly panel: vscode.WebviewPanel,
-    private pendingChange?: FlowChangePlan
+    private readonly panel: vscode.WebviewPanel
   ) {
     this.panel.webview.onDidReceiveMessage((message: WebviewMessage) => this.enqueueMessage(message));
-  }
-
-  public updatePendingChange(pendingChange?: FlowChangePlan): void {
-    this.pendingChange = pendingChange;
   }
 
   public renderFromDocument(document: vscode.TextDocument): void {
@@ -204,40 +189,6 @@ class FlowEditorSession {
         FlowPanel.selectedDomainId = undefined;
         FlowPanel.selectedRoleId = undefined;
         break;
-      case "modifyInstruction":
-        await vscode.commands.executeCommand("mindflow.modifyFlowByInstruction", message.instruction, message.nodeId);
-        break;
-      case "applyChangeSet":
-        await vscode.commands.executeCommand("mindflow.applyChangeSet");
-        break;
-      case "previewChangeSet":
-        await vscode.commands.executeCommand("mindflow.previewChangeSet");
-        break;
-      case "revertLastChangeSet":
-        await vscode.commands.executeCommand("mindflow.revertLastChangeSet");
-        break;
-      case "generateNodePrd":
-        FlowPanel.selectedNodeId = message.nodeId;
-        FlowPanel.selectedEdgeId = undefined;
-        FlowPanel.selectedAppSurfaceId = undefined;
-        FlowPanel.selectedDomainId = undefined;
-        FlowPanel.selectedRoleId = undefined;
-        await vscode.commands.executeCommand("mindflow.generateNodePrd", message.nodeId);
-        break;
-      case "generateNodePencil":
-        FlowPanel.selectedNodeId = message.nodeId;
-        FlowPanel.selectedEdgeId = undefined;
-        FlowPanel.selectedAppSurfaceId = undefined;
-        FlowPanel.selectedDomainId = undefined;
-        FlowPanel.selectedRoleId = undefined;
-        await vscode.commands.executeCommand("mindflow.generateNodePencil", message.nodeId);
-        break;
-      case "generateFullPrd":
-        await vscode.commands.executeCommand("mindflow.generateFullPrd");
-        break;
-      case "generateFullPencil":
-        await vscode.commands.executeCommand("mindflow.generateFullPencil");
-        break;
       case "deleteNode":
         FlowPanel.selectedNodeId = message.nodeId;
         FlowPanel.selectedEdgeId = undefined;
@@ -245,15 +196,6 @@ class FlowEditorSession {
         FlowPanel.selectedDomainId = undefined;
         FlowPanel.selectedRoleId = undefined;
         await vscode.commands.executeCommand("mindflow.removeNode", message.nodeId);
-        break;
-      case "syncArtifacts":
-        await vscode.commands.executeCommand("mindflow.syncArtifacts");
-        break;
-      case "validateFlow":
-        await vscode.commands.executeCommand("mindflow.validateFlowJson");
-        break;
-      case "openArtifact":
-        await vscode.commands.executeCommand("mindflow.openArtifact", message.path);
         break;
       case "saveNodePosition":
         await vscode.commands.executeCommand("mindflow.updateNodePosition", message.nodeId, message.x, message.y);
@@ -337,8 +279,6 @@ class FlowEditorSession {
       flow,
       flowPath: vscode.workspace.asRelativePath(this.document.uri, false),
       flowFileName: path.basename(this.document.uri.fsPath),
-      provider: vscode.workspace.getConfiguration("mindflow.agent").get<string>("provider", "codex"),
-      pendingChange: this.pendingChange ?? null,
       selectedNodeId: FlowPanel.selectedNodeId ?? null,
       selectedEdgeId: FlowPanel.selectedEdgeId ?? null,
       selectedAppSurfaceId: FlowPanel.selectedAppSurfaceId ?? null,
@@ -377,18 +317,7 @@ type WebviewMessage =
   | { type: "selectDomain"; domainId: string }
   | { type: "selectRole"; roleId: string }
   | { type: "clearSelection" }
-  | { type: "modifyInstruction"; instruction: string; nodeId?: string }
-  | { type: "applyChangeSet" }
-  | { type: "previewChangeSet" }
-  | { type: "revertLastChangeSet" }
-  | { type: "generateNodePrd"; nodeId: string }
-  | { type: "generateNodePencil"; nodeId: string }
-  | { type: "generateFullPrd" }
-  | { type: "generateFullPencil" }
   | { type: "deleteNode"; nodeId: string; nodeTitle?: string }
-  | { type: "syncArtifacts" }
-  | { type: "validateFlow" }
-  | { type: "openArtifact"; path: string }
   | { type: "saveNodePosition"; nodeId: string; x: number; y: number }
   | { type: "saveAppSurfacePosition"; appId: string; x: number; y: number }
   | {

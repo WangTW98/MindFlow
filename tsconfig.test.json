@@ -10,7 +10,6 @@
   "exclude": [
     "src/extension.ts",
     "src/webview/FlowPanel.ts",
-    "src/agents/providerFactory.ts",
     "node_modules",
     "out"
   ]

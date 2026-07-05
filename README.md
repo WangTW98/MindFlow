@@ -1,45 +1,61 @@
-# MindFlow Product Flow Agent
+# MindFlow Canvas Editor
 
-MindFlow is a VSCode extension MVP that turns product or business documents into editable `.mindflow` ProductFlow files. A `.mindflow` file is still JSON internally, but opens in the MindFlow visual editor by default.
+MindFlow edits `.mindflow` ProductFlow JSON files in VS Code. The VS Code extension is a standalone visual editor with a sidebar for creating and reopening flows. AI-assisted document analysis, flow changes, PRD generation, Pencil spec generation, and artifact sync are exposed through the MindFlow MCP stdio server.
 
-## Capabilities
+## VS Code Surface
 
-- Analyze Markdown, text, or the active editor into `.mindflow/flows/*.mindflow`.
-- Select `.docx` files as input; for best fidelity convert them to Markdown or TXT before analysis in this MVP.
-- Open `.mindflow` files from VSCode Explorer in the current editor tab with a fixed three-panel custom editor: left node list, infinite canvas, draggable page cards, editable right-side details, app-surface filters, business-domain filters, and role filters.
-- Right-click blank canvas space to create a page card; connect cards manually from a card, feature group, or feature item to a target card.
-- Use the MindFlow Activity Bar icon to create a MindFlow, reopen historical `.mindflow` files, and inspect local AI CLI availability for Codex, Gemini, and Claude.
-- Edit feature groups and feature items as nested cards in the right inspector, including drag-moving items between groups.
-- Apply visual flow edits through VSCode document edits so File > Save and Edit > Undo/Redo work on the same `.mindflow` editor tab without opening a synchronized JSON editor tab.
-- Modify the flow with natural language through structured `FlowChangePlan` / `ChangeSet` previews.
-- Generate node-level or full-flow PRD Markdown files under `docs/prd/{flowId}`.
-- Generate node-level or full-flow Pencil design spec JSON files under `designs/pencil/{flowId}`.
-- Keep `.mindflow` nodes, PRDs, and Pencil specs linked through stable IDs and sync reports.
-- Expose an MCP stdio server so external AI agents can read and mutate `.mindflow` ProductFlow JSON and write PRD/Pencil artifacts without using visual inputs inside the Webview.
+### Command Palette
 
-## Commands
+| Command id | Command title | Purpose |
+| --- | --- | --- |
+| `mindflow.newFlow` | `MindFlow: New Blank Flow` | Create an untitled blank `.mindflow` ProductFlow and open it in the canvas editor. |
+| `mindflow.openFlow` | `MindFlow: Open Product Flow` | Pick an existing `.mindflow` file from the configured flow directory and open it in the canvas editor. |
+| `mindflow.validateFlowJson` | `MindFlow: Validate Flow JSON` | Validate the active `.mindflow` file and show schema errors or warnings. |
 
-- `MindFlow: Analyze Document`
-- `MindFlow: Open Product Flow`
-- `MindFlow: Modify Product Flow by Instruction`
-- `MindFlow: Preview ChangeSet`
-- `MindFlow: Apply ChangeSet`
-- `MindFlow: Revert Last ChangeSet`
-- `MindFlow: Validate Flow JSON`
-- `MindFlow: Generate Node PRD`
-- `MindFlow: Generate Full PRD`
-- `MindFlow: Refresh Stale PRD`
-- `MindFlow: Generate Node Pencil Design`
-- `MindFlow: Generate Full Pencil Design`
-- `MindFlow: Refresh Stale Pencil Design`
-- `MindFlow: Sync PRD/Pencil/JSON Artifacts`
-- `MindFlow: Configure AI Agent`
+### Editor-Internal Commands
 
-## AI Providers
+These commands are registered for the MindFlow custom editor webview. They are not contributed as command-palette AI workflows.
 
-Set `mindflow.agent.provider` to `codex` or `gemini`.
+| Command id | Purpose |
+| --- | --- |
+| `mindflow.updateNodePosition` | Persist a dragged node position. |
+| `mindflow.updateAppSurfacePosition` | Persist a dragged app-surface position. |
+| `mindflow.updateLayoutPositions` | Persist a batch of node and app-surface positions. |
+| `mindflow.createNodeAt` | Create a page node at a canvas position. |
+| `mindflow.updateNodeDetails` | Update a node's metadata, feature groups, roles, domains, and related details. |
+| `mindflow.createEdge` | Create an edge between two explicit flow endpoints. |
+| `mindflow.createConnectedNodeAt` | Create a node and connect it from or to an existing endpoint. |
+| `mindflow.removeNode` | Soft-remove a node and its active incident edges. |
+| `mindflow.updateEdgeDetails` | Update an edge's trigger, condition, type, roles, and domains. |
+| `mindflow.removeEdge` | Soft-remove an edge. |
+| `mindflow.updateTaxonomy` | Create, update, or delete app surfaces, domains, roles, and status groups. |
 
-The `codex` provider is the default. Without an HTTP endpoint, it uses the configured Codex CLI path. `codex` and `gemini` can also use configurable HTTP endpoints and store API keys through VSCode `SecretStorage`; no API key is written to the repository.
+## MCP Tools
+
+| Tool | Purpose |
+| --- | --- |
+| `mindflow_list_flows` | List `.mindflow` files in the workspace flow directory. |
+| `mindflow_read_flow` | Read the latest or specified ProductFlow file. |
+| `mindflow_create_flow` | Create a blank ProductFlow file for manual or agent-driven editing. |
+| `mindflow_generate_flow_from_document` | Use the configured AI provider to analyze requirements text or a document path into a ProductFlow file. |
+| `mindflow_validate_flow` | Validate a ProductFlow file and return errors and warnings. |
+| `mindflow_create_node` | Create a page node at a canvas position. |
+| `mindflow_update_node` | Patch node details, feature groups, taxonomy assignments, and related metadata. |
+| `mindflow_remove_node` | Soft-remove a node and active incident edges. |
+| `mindflow_create_edge` | Create an edge from one explicit `FlowEndpoint` to another explicit `FlowEndpoint`. |
+| `mindflow_update_edge` | Patch edge trigger text, condition, type, taxonomy assignments, and endpoint details. |
+| `mindflow_remove_edge` | Soft-remove an edge. |
+| `mindflow_create_connected_node` | Create a node and connect it from or to an explicit endpoint. |
+| `mindflow_update_layout_positions` | Batch update node and app-surface canvas positions. |
+| `mindflow_update_taxonomy` | Create, update, or delete app surfaces, domains, roles, and status groups. |
+| `mindflow_propose_change` | Use the configured AI provider to convert an instruction into a validated `FlowChangePlan`. |
+| `mindflow_apply_change_plan` | Apply a `FlowChangePlan`, increment revision, and write change history. |
+| `mindflow_revert_change_set` | Revert the latest applied change set from flow history. |
+| `mindflow_write_prd` | Write provided PRD Markdown and link it to the ProductFlow. |
+| `mindflow_generate_prd` | Use the configured AI provider to generate and write node-level or full-flow PRD Markdown. |
+| `mindflow_write_pencil` | Write a provided Pencil design spec object and link it to the ProductFlow. |
+| `mindflow_generate_pencil` | Use the configured AI provider to generate and write node-level or full-flow Pencil design specs. |
+| `mindflow_sync_artifacts` | Inspect linked PRD/Pencil artifacts, update artifact status, and write a sync report. |
 
 ## Development
 
@@ -49,34 +65,36 @@ npm run compile
 npm test
 ```
 
-Press F5 in VSCode to launch the extension host.
+Press F5 in VS Code to launch the extension host.
 
-## Install in VSCode
+## Install in VS Code
 
 ```bash
 npm install
 npm run compile
 npx vsce package
-code --install-extension mindflow-product-flow-agent-0.1.0.vsix --force
+code --install-extension mindflow-canvas-editor-0.1.0.vsix --force
 ```
 
-Reload VSCode after installation, then run `MindFlow: Analyze Document` or `MindFlow: Open Product Flow`.
+Reload VS Code after installation, then run `MindFlow: New Blank Flow` or `MindFlow: Open Product Flow`.
 
 ## MCP Server
 
-MindFlow ships a local MCP stdio server named `mindflow`. MCP clients do not scan arbitrary local projects automatically; they load servers from their own MCP config. Register MindFlow with installed local agents with:
+MindFlow ships a local MCP stdio server named `mindflow`. MCP clients load servers from their own MCP config. Register MindFlow with installed local agents with:
 
 ```bash
 npm run mcp:install
 ```
 
-The installer compiles the extension and registers the stable launcher `scripts/mindflow-mcp.mjs` with the local clients it finds:
+The installer compiles the extension and registers the stable launcher `scripts/mindflow-mcp.mjs` with local clients it finds:
 
-- Codex CLI: `codex mcp add mindflow ...`, visible in `codex mcp list` and the Codex TUI `/mcp` panel.
-- Gemini CLI: `gemini mcp add -s user mindflow ...`, visible in `gemini mcp list` and `/mcp`.
-- Claude Code: `claude mcp add --scope user mindflow ...`, visible in `claude mcp list` and `/mcp`.
+| Client | Registration path |
+| --- | --- |
+| Codex CLI | `codex mcp add mindflow ...` |
+| Gemini CLI | `gemini mcp add -s user mindflow ...` |
+| Claude Code | `claude mcp add --scope user mindflow ...` |
 
-Register only one client:
+Register one client:
 
 ```bash
 node scripts/install-mcp.mjs --client codex
@@ -88,7 +106,7 @@ Write project-scoped config files instead of user-level CLI config:
 npm run mcp:install:project
 ```
 
-Verify the server protocol directly:
+Verify the MCP protocol and local write tools:
 
 ```bash
 npm run mcp:verify
@@ -96,31 +114,18 @@ npm run mcp:verify
 
 For manual MCP client configuration, use command `node`, args `["/Users/wang/Documents/MindFlow/scripts/mindflow-mcp.mjs"]`, and set `MINDFLOW_WORKSPACE=/Users/wang/Documents/MindFlow`.
 
-MCP document analysis and generated PRD/Pencil drafts use real providers only. Configure them with:
+AI-backed MCP tools use real providers only. Configure them with:
 
-- `MINDFLOW_AGENT_PROVIDER=codex|gemini` (defaults to `codex`)
-- `MINDFLOW_AGENT_ENDPOINT` for HTTP providers, or omit it for Codex CLI
-- `MINDFLOW_AGENT_MODEL`
-- `MINDFLOW_AGENT_API_KEY`
-- `MINDFLOW_CODEX_CLI_PATH`
-
-If `npm run mcp:verify` fails while spawning the local Codex CLI, reinstall or repair the Codex CLI, set `MINDFLOW_CODEX_CLI_PATH` to a working executable, or configure `MINDFLOW_AGENT_ENDPOINT`/`MINDFLOW_AGENT_PROVIDER=gemini`. The MCP server no longer falls back to generated sample data.
-
-Available MCP tools:
-
-- `mindflow_list_flows`
-- `mindflow_analyze_document`
-- `mindflow_read_flow`
-- `mindflow_create_node`
-- `mindflow_update_node`
-- `mindflow_create_edge`
-- `mindflow_update_edge`
-- `mindflow_remove_edge`
-- `mindflow_write_prd`
-- `mindflow_write_pencil`
+| Variable | Purpose |
+| --- | --- |
+| `MINDFLOW_AGENT_PROVIDER=codex\|gemini` | Provider selection. Defaults to `codex`. |
+| `MINDFLOW_AGENT_ENDPOINT` | HTTP endpoint for HTTP providers. Omit for Codex CLI. |
+| `MINDFLOW_AGENT_MODEL` | Provider model name. |
+| `MINDFLOW_AGENT_API_KEY` | Provider API key. |
+| `MINDFLOW_CODEX_CLI_PATH` | Codex CLI path. Defaults to `codex`. |
 
 ## Synchronization Model
 
-The `.mindflow` file is the source of structural truth and contains ProductFlow JSON. PRD files contain YAML frontmatter with `flowId`, `nodeId` or `scope=full`, `prdId`, `linkedPencilIds`, and `linkedJsonPath`. Pencil design specs contain metadata with `flowId`, `nodeId` or `scope=full`, `pencilId`, `linkedPrdIds`, and `linkedJsonPath`.
+The `.mindflow` file is the structural source of truth. PRD files contain frontmatter with `flowId`, `nodeId` or `scope=full`, `prdId`, `linkedPencilIds`, and `linkedJsonPath`. Pencil design specs contain metadata with `flowId`, `nodeId` or `scope=full`, `pencilId`, `linkedPrdIds`, and `linkedJsonPath`.
 
-Natural-language flow edits are never applied by replacing the full JSON. Providers return a `FlowChangePlan`; the extension previews it, validates it, applies it deterministically, increments `revision`, writes `changeHistory`, and marks affected PRD/Pencil artifacts as `stale`.
+Natural-language flow edits are applied through MCP as structured `FlowChangePlan` objects. Plans are validated, applied deterministically, written to `changeHistory`, and can mark affected PRD/Pencil artifacts as stale.

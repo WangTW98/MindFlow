@@ -40,55 +40,97 @@ try {
   const init = await request("initialize", {});
   assert(init.serverInfo?.name === "mindflow", "MCP server name must be mindflow.");
   const listed = await request("tools/list", {});
-  assert(listed.tools.some((tool) => tool.name === "mindflow_analyze_document"), "analyze tool missing.");
-
-  const analyzed = await callTool("mindflow_analyze_document", {
-    workspaceRoot,
-    documentPath: "samples/example-requirements.md"
-  }, 180000);
-  assert(analyzed.flowPath.endsWith(".mindflow"), "analyzed flow should use .mindflow extension.");
-  assert(analyzed.nodeCount >= 12, "sample analysis should create multi-surface nodes.");
-
-  const read = await callTool("mindflow_read_flow", {
-    workspaceRoot,
-    flowPath: analyzed.flowPath
-  });
-  const flow = read.flow;
-  assert((flow.appSurfaces || []).length >= 4, "flow should contain at least four app surfaces.");
-  assert(flow.domains.length >= 6, "flow should contain multiple domains.");
-  assert(flow.roles.length >= 6, "flow should contain multiple roles.");
-  const entryNodesByApp = findEntryNodesByApp(flow);
-  for (const surface of flow.appSurfaces || []) {
-    assert((entryNodesByApp.get(surface.appId) || []).length >= 1, `app surface ${surface.appId} should have an entry node.`);
+  const toolNames = listed.tools.map((tool) => tool.name);
+  const expectedTools = [
+    "mindflow_list_flows",
+    "mindflow_read_flow",
+    "mindflow_create_flow",
+    "mindflow_generate_flow_from_document",
+    "mindflow_validate_flow",
+    "mindflow_create_node",
+    "mindflow_update_node",
+    "mindflow_remove_node",
+    "mindflow_create_edge",
+    "mindflow_update_edge",
+    "mindflow_remove_edge",
+    "mindflow_create_connected_node",
+    "mindflow_update_layout_positions",
+    "mindflow_update_taxonomy",
+    "mindflow_propose_change",
+    "mindflow_apply_change_plan",
+    "mindflow_revert_change_set",
+    "mindflow_write_prd",
+    "mindflow_generate_prd",
+    "mindflow_write_pencil",
+    "mindflow_generate_pencil",
+    "mindflow_sync_artifacts"
+  ];
+  for (const toolName of expectedTools) {
+    assert(toolNames.includes(toolName), `${toolName} tool missing.`);
   }
-  assertAppSurfaceEntryEdges(flow);
+  assert(!toolNames.includes("mindflow_analyze_document"), "legacy analyze tool must not be exposed.");
+  assert(!JSON.stringify(listed.tools).includes("toNodeId"), "legacy toNodeId shorthand must not be exposed.");
 
-  const { originNode, origin, targetA, targetB } = findVerificationEndpoints(flow);
-  const originGroup = originNode.featureGroups?.find((group) => group.groupId === origin.groupId);
-  const originItem = originGroup?.items.find((item) => item.itemId === origin.itemId);
-  assert(originGroup && originItem, "feature item origin missing.");
-
-  const createdNode = await callTool("mindflow_create_node", {
+  const created = await callTool("mindflow_create_flow", {
     workspaceRoot,
-    flowPath: analyzed.flowPath,
-    title: "MCP 验证页",
-    pageType: "debug",
-    purpose: "用于验证 MCP 创建节点和画布渲染。",
-    x: 1880,
-    y: 760,
-    appSurfaceIds: ["app_admin"],
-    domainIds: ["domain_sourcing"],
-    roleIds: ["role_buyer"],
+    title: "MCP 验证 Flow",
+    sourceDocumentId: "mcp-verify",
+    sourceSummary: "本地 MCP 协议和写入验证。"
+  });
+  assert(created.flowPath.endsWith(".mindflow"), "created flow should use .mindflow extension.");
+
+  await callTool("mindflow_update_taxonomy", {
+    workspaceRoot,
+    flowPath: created.flowPath,
+    kind: "domain",
+    action: "create",
+    id: "domain_verify",
+    item: { name: "验证业务域", description: "MCP 验证业务域。" }
+  });
+  await callTool("mindflow_update_taxonomy", {
+    workspaceRoot,
+    flowPath: created.flowPath,
+    kind: "role",
+    action: "create",
+    id: "role_verify",
+    item: { name: "验证角色", description: "MCP 验证角色。", domainIds: ["domain_verify"] }
+  });
+  await callTool("mindflow_update_taxonomy", {
+    workspaceRoot,
+    flowPath: created.flowPath,
+    kind: "appSurface",
+    action: "create",
+    id: "app_verify",
+    item: {
+      name: "验证工作台",
+      type: "desktop",
+      description: "MCP 验证应用端。",
+      domainIds: ["domain_verify"],
+      roleIds: ["role_verify"]
+    }
+  });
+
+  const origin = await callTool("mindflow_create_node", {
+    workspaceRoot,
+    flowPath: created.flowPath,
+    title: "验证起点",
+    pageType: "form",
+    purpose: "发起 MCP 验证动作。",
+    x: 120,
+    y: 160,
+    appSurfaceIds: ["app_verify"],
+    domainIds: ["domain_verify"],
+    roleIds: ["role_verify"],
     featureGroups: [
       {
-        groupId: "group_mcp_verify",
-        name: "验证功能",
+        groupId: "group_verify",
+        name: "验证操作",
         type: "section",
-        description: "MCP 自动化验证分组。",
+        description: "MCP 验证分组。",
         items: [
           {
-            itemId: "item_mcp_verify_submit",
-            name: "验证按钮",
+            itemId: "item_verify_submit",
+            name: "提交验证",
             type: "button",
             description: "触发验证动作。"
           }
@@ -96,72 +138,135 @@ try {
       }
     ]
   });
-  const createdNodeId = createdNode.result.node.nodeId;
+  const targetA = await callTool("mindflow_create_node", {
+    workspaceRoot,
+    flowPath: created.flowPath,
+    title: "验证目标 A",
+    pageType: "debug",
+    purpose: "验证第一个目标页面。",
+    x: 520,
+    y: 120,
+    appSurfaceIds: ["app_verify"],
+    domainIds: ["domain_verify"],
+    roleIds: ["role_verify"]
+  });
+  const targetB = await callTool("mindflow_create_node", {
+    workspaceRoot,
+    flowPath: created.flowPath,
+    title: "验证目标 B",
+    pageType: "debug",
+    purpose: "验证第二个目标页面。",
+    x: 520,
+    y: 380,
+    appSurfaceIds: ["app_verify"],
+    domainIds: ["domain_verify"],
+    roleIds: ["role_verify"]
+  });
+
+  const originNodeId = origin.result.node.nodeId;
+  const targetAId = targetA.result.node.nodeId;
+  const targetBId = targetB.result.node.nodeId;
+  const featureOrigin = {
+    kind: "featureItem",
+    nodeId: originNodeId,
+    groupId: "group_verify",
+    itemId: "item_verify_submit"
+  };
 
   await callTool("mindflow_create_edge", {
     workspaceRoot,
-    flowPath: analyzed.flowPath,
-    from: origin,
-    toNodeId: targetA.nodeId,
+    flowPath: created.flowPath,
+    from: featureOrigin,
+    to: { kind: "node", nodeId: targetAId },
     trigger: "同一功能项出口进入目标 A",
     type: "submit"
   });
   await callTool("mindflow_create_edge", {
     workspaceRoot,
-    flowPath: analyzed.flowPath,
-    from: origin,
-    toNodeId: targetB.nodeId,
+    flowPath: created.flowPath,
+    from: featureOrigin,
+    to: { kind: "node", nodeId: targetBId },
     trigger: "同一功能项出口进入目标 B",
     type: "navigate"
   });
-  await callTool("mindflow_create_edge", {
+  const connected = await callTool("mindflow_create_connected_node", {
     workspaceRoot,
-    flowPath: analyzed.flowPath,
-    from: { kind: "node", nodeId: createdNodeId },
-    toNodeId: originNode.nodeId,
-    trigger: "MCP 验证回到原始页面",
-    type: "navigate"
+    flowPath: created.flowPath,
+    from: { kind: "node", nodeId: targetAId },
+    x: 920,
+    y: 220,
+    trigger: "创建后自动连接",
+    type: "navigate",
+    appSurfaceIds: ["app_verify"],
+    domainIds: ["domain_verify"],
+    roleIds: ["role_verify"]
+  });
+  const connectedNodeId = connected.result.node.nodeId;
+
+  await callTool("mindflow_update_layout_positions", {
+    workspaceRoot,
+    flowPath: created.flowPath,
+    nodes: [
+      { nodeId: originNodeId, x: 160, y: 180 },
+      { nodeId: connectedNodeId, x: 960, y: 260 }
+    ],
+    appSurfaces: [
+      { appId: "app_verify", x: 80, y: 80 }
+    ]
   });
   await callTool("mindflow_write_prd", {
     workspaceRoot,
-    flowPath: analyzed.flowPath,
+    flowPath: created.flowPath,
     scope: "node",
-    nodeId: createdNodeId,
+    nodeId: connectedNodeId,
     markdown: "# MCP 验证页 PRD\n\n用于验证 MindFlow MCP 写入节点级 PRD。"
   });
   await callTool("mindflow_write_pencil", {
     workspaceRoot,
-    flowPath: analyzed.flowPath,
+    flowPath: created.flowPath,
     scope: "node",
-    nodeId: createdNodeId,
+    nodeId: connectedNodeId,
     spec: {
       page: "MCP 验证页",
-      nodeId: createdNodeId,
+      nodeId: connectedNodeId,
       layout: "single-column",
       components: ["验证按钮"]
     }
   });
+  await callTool("mindflow_sync_artifacts", {
+    workspaceRoot,
+    flowPath: created.flowPath
+  });
+
+  const validation = await callTool("mindflow_validate_flow", {
+    workspaceRoot,
+    flowPath: created.flowPath
+  });
+  assert(validation.valid, `created flow should validate: ${(validation.errors || []).join("; ")}`);
 
   const finalRead = await callTool("mindflow_read_flow", {
     workspaceRoot,
-    flowPath: analyzed.flowPath
+    flowPath: created.flowPath
   });
   const finalFlow = finalRead.flow;
   const sameOriginEdges = finalFlow.edges.filter((edge) =>
     edge.status === "active" &&
-    edge.from?.kind === origin.kind &&
-    edge.from?.nodeId === origin.nodeId &&
-    edge.from?.groupId === origin.groupId &&
-    edge.from?.itemId === origin.itemId
+    edge.from?.kind === featureOrigin.kind &&
+    edge.from?.nodeId === featureOrigin.nodeId &&
+    edge.from?.groupId === featureOrigin.groupId &&
+    edge.from?.itemId === featureOrigin.itemId
   );
   assert(sameOriginEdges.length >= 2, "same outlet should connect multiple target nodes.");
-  assert(finalFlow.nodes.some((node) => node.nodeId === createdNodeId), "MCP-created node missing.");
-  assert(finalFlow.artifacts.prds.some((prd) => prd.nodeId === createdNodeId), "MCP-created PRD ref missing.");
-  assert(finalFlow.artifacts.pencils.some((pencil) => pencil.nodeId === createdNodeId), "MCP-created Pencil ref missing.");
+  assert(finalFlow.domains.some((domain) => domain.domainId === "domain_verify"), "MCP-created domain missing.");
+  assert(finalFlow.roles.some((role) => role.roleId === "role_verify"), "MCP-created role missing.");
+  assert((finalFlow.appSurfaces || []).some((surface) => surface.appId === "app_verify"), "MCP-created app surface missing.");
+  assert(finalFlow.nodes.some((node) => node.nodeId === connectedNodeId), "MCP-created connected node missing.");
+  assert(finalFlow.artifacts.prds.some((prd) => prd.nodeId === connectedNodeId), "MCP-created PRD ref missing.");
+  assert(finalFlow.artifacts.pencils.some((pencil) => pencil.nodeId === connectedNodeId), "MCP-created Pencil ref missing.");
 
   console.log(JSON.stringify({
     ok: true,
-    flowPath: analyzed.flowPath,
+    flowPath: created.flowPath,
     nodeCount: finalFlow.nodes.length,
     edgeCount: finalFlow.edges.filter((edge) => edge.status === "active").length,
     sameOriginEdgeCount: sameOriginEdges.length,
@@ -206,67 +311,4 @@ function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
-}
-
-function findEntryNodesByApp(flow) {
-  const activeEdges = flow.edges.filter((edge) => edge.status === "active");
-  const activeNodes = flow.nodes.filter((node) => node.status === "active");
-  const nodesById = new Map(activeNodes.map((node) => [node.nodeId, node]));
-  const entries = new Map((flow.appSurfaces || []).map((surface) => [surface.appId, []]));
-  for (const node of activeNodes) {
-    for (const appId of node.appSurfaceIds || []) {
-      const hasSameAppIncoming = activeEdges.some((edge) => {
-        if (edge.toNodeId !== node.nodeId) {
-          return false;
-        }
-        const fromNode = nodesById.get(edge.fromNodeId);
-        return (fromNode?.appSurfaceIds || []).includes(appId);
-      });
-      if (!hasSameAppIncoming) {
-        const items = entries.get(appId) || [];
-        items.push(node.nodeId);
-        entries.set(appId, items);
-      }
-    }
-  }
-  return entries;
-}
-
-function assertAppSurfaceEntryEdges(flow) {
-  const activeNodes = flow.nodes.filter((node) => node.status === "active");
-  const nodesById = new Map(activeNodes.map((node) => [node.nodeId, node]));
-  const activeEdges = flow.edges.filter((edge) => edge.status === "active");
-  for (const surface of flow.appSurfaces || []) {
-    const edge = activeEdges.find((candidate) => {
-      const target = nodesById.get(candidate.toNodeId);
-      return candidate.from?.kind === "appSurface" &&
-        (candidate.from.appId || candidate.from.nodeId) === surface.appId &&
-        target &&
-        (target.appSurfaceIds || []).includes(surface.appId);
-    });
-    assert(edge, `app surface ${surface.appId} should connect to its own entry page.`);
-  }
-}
-
-function findVerificationEndpoints(flow) {
-  const activeNodes = flow.nodes.filter((node) => node.status === "active");
-  const originNode = activeNodes.find((node) =>
-    node.featureGroups?.some((group) => group.items?.length > 0)
-  );
-  assert(originNode, "verification origin node with feature items missing.");
-  const originGroup = originNode.featureGroups.find((group) => group.items?.length > 0);
-  const originItem = originGroup.items[0];
-  const targets = activeNodes.filter((node) => node.nodeId !== originNode.nodeId).slice(0, 2);
-  assert(targets.length >= 2, "verification needs at least two target nodes.");
-  return {
-    originNode,
-    origin: {
-      kind: "featureItem",
-      nodeId: originNode.nodeId,
-      groupId: originGroup.groupId,
-      itemId: originItem.itemId
-    },
-    targetA: targets[0],
-    targetB: targets[1]
-  };
 }

@@ -52,7 +52,11 @@
     { value: "optional", label: "可选", icon: "circle-help" }
   ];
 
-  let selectedNodeId = state.selectedNodeId || "";
+  let selectedNodeIds = readIdSelection(persisted.selectedNodeIds, state.selectedNodeId || persisted.selectedNodeId);
+  let selectedNodeId = state.selectedNodeId || persisted.selectedNodeId || selectedNodeIds[0] || "";
+  if (selectedNodeId && !selectedNodeIds.includes(selectedNodeId)) {
+    selectedNodeIds = [selectedNodeId];
+  }
   let selectedEdgeId = state.selectedEdgeId || "";
   let selectedAppSurfaceId = state.selectedAppSurfaceId || persisted.selectedAppSurfaceId || "";
   let selectedDomainId = state.selectedDomainId || persisted.selectedDomainId || "";
@@ -99,12 +103,14 @@
     seedAppSurfacePositions(flow);
     normalizeFilters();
 
-    const selectedNode = flow.nodes.find((node) => node.nodeId === selectedNodeId && node.status !== "removed") || null;
+    const activeNodes = flow.nodes.filter((node) => node.status !== "removed");
+    const selectedNode = selectedNodeIds.length === 1
+      ? activeNodes.find((node) => node.nodeId === selectedNodeIds[0]) || null
+      : null;
     const selectedEdge = flow.edges.find((edge) => edge.edgeId === selectedEdgeId && edge.status === "active") || null;
     const selectedAppSurface = (flow.appSurfaces || []).find((surface) => surface.appId === selectedAppSurfaceId) || null;
     const selectedDomain = (flow.domains || []).find((domain) => domain.domainId === selectedDomainId) || null;
     const selectedRole = (flow.roles || []).find((role) => role.roleId === selectedRoleId) || null;
-    const activeNodes = flow.nodes.filter((node) => node.status !== "removed");
     const visibleListNodes = activeNodes.filter((node) => matchesNodeSearch(flow, node, nodeSearch));
     const productIssues = getProductDesignIssues(flow);
     const productIssueCounts = countProductIssues(productIssues);
@@ -158,8 +164,9 @@
   function renderNodeListItem(flow, node) {
     const related = isNodeRelated(node);
     return `
-      <button class="node-list-item ${selectedNodeId === node.nodeId ? "selected" : ""} ${related ? "" : "dimmed"}"
-        data-list-node-id="${escapeAttr(node.nodeId)}">
+      <button class="node-list-item ${isNodeSelected(node.nodeId) ? "selected" : ""} ${related ? "" : "dimmed"}"
+        data-list-node-id="${escapeAttr(node.nodeId)}"
+        aria-pressed="${isNodeSelected(node.nodeId) ? "true" : "false"}">
         <span>${escapeHtml(node.title)}</span>
       </button>
     `;
@@ -494,7 +501,7 @@
     const nodeOriginKey = endpointKey(nodeOrigin);
     const entryAppNames = getEntryAppSurfaceNames(flow, node);
     return `
-      <article class="node-card ${selectedNodeId === node.nodeId ? "selected" : ""} ${related ? "" : "dimmed"}"
+      <article class="node-card ${isNodeSelected(node.nodeId) ? "selected" : ""} ${related ? "" : "dimmed"}"
         data-node-id="${escapeAttr(node.nodeId)}">
         <header class="node-head">
           <button class="target-dot inlet-dot"
@@ -1105,10 +1112,14 @@
 
   function bindCanvasElements(root = document) {
     root.querySelectorAll(".node-list-item").forEach((button) => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", (event) => {
         const nodeId = button.dataset.listNodeId;
         if (nodeId) {
-          selectNode(nodeId, true);
+          const multi = isNodeMultiSelectEvent(event);
+          if (multi) {
+            event.preventDefault();
+          }
+          selectNode(nodeId, true, { multi });
         }
       });
     });
@@ -1121,7 +1132,11 @@
         }
         const nodeId = card.dataset.nodeId;
         if (nodeId && !dragState) {
-          selectNode(nodeId, false);
+          const multi = isNodeMultiSelectEvent(event);
+          if (multi) {
+            event.preventDefault();
+          }
+          selectNode(nodeId, false, { multi });
         }
       });
     });
@@ -1298,7 +1313,7 @@
       selectAppSurface(id);
       return;
     }
-    selectedNodeId = "";
+    clearNodeSelectionState();
     selectedEdgeId = "";
     selectedAppSurfaceId = "";
     if (kind === "domain") {
@@ -2362,7 +2377,7 @@
     selectedDomainId = "";
     selectedRoleId = "";
     if (kind === "appSurface") {
-      selectedNodeId = "";
+      clearNodeSelectionState();
       taxonomySelection = {
         appSurface: id,
         domain: "",
@@ -2431,7 +2446,7 @@
       selectedEdgeId = "";
       if (kind === "appSurface") {
         selectedAppSurfaceId = id;
-        selectedNodeId = "";
+        clearNodeSelectionState();
         selectedDomainId = "";
         selectedRoleId = "";
         taxonomySelection = {
@@ -2443,7 +2458,7 @@
         vscode.postMessage({ type: "saveAppSurfacePosition", appId: id, x: pos.x, y: pos.y });
         vscode.postMessage({ type: "selectAppSurface", appId: id });
       } else {
-        selectedNodeId = id;
+        setSelectedNodes([id], id);
         selectedAppSurfaceId = "";
         selectedDomainId = "";
         selectedRoleId = "";
@@ -2500,7 +2515,7 @@
   }
 
   function clearSelection() {
-    selectedNodeId = "";
+    clearNodeSelectionState();
     selectedEdgeId = "";
     selectedAppSurfaceId = "";
     selectedDomainId = "";
@@ -2518,14 +2533,18 @@
     if (isEditingTarget(event.target)) {
       return;
     }
-    if (selectedNodeId) {
-      const node = state.flow.nodes.find((item) => item.nodeId === selectedNodeId);
+    if (selectedNodeIds.length > 1) {
+      event.preventDefault();
+      return;
+    }
+    if (selectedNodeIds.length === 1) {
+      const nodeId = selectedNodeIds[0];
+      const node = state.flow.nodes.find((item) => item.nodeId === nodeId);
       if (node && node.status !== "removed") {
         event.preventDefault();
         clearTimeout(nodeDetailsSaveTimer);
         nodeDetailsSaveTimer = null;
-        const nodeId = selectedNodeId;
-        selectedNodeId = "";
+        clearNodeSelectionState();
         selectedEdgeId = "";
         vscode.postMessage({ type: "deleteNode", nodeId, nodeTitle: node.title });
       }
@@ -2562,7 +2581,7 @@
     }
     cancelPendingTaxonomyDetailsSave(kind);
     clearTaxonomySelection(kind, id);
-    selectedNodeId = "";
+    clearNodeSelectionState();
     selectedEdgeId = "";
     selectedAppSurfaceId = "";
     selectedDomainId = "";
@@ -2595,7 +2614,7 @@
   }
 
   function commitNodeDetailsChange(options = {}) {
-    if (!selectedNodeId) {
+    if (!selectedNodeId || selectedNodeIds.length !== 1) {
       return;
     }
     const nodeId = selectedNodeId;
@@ -3031,26 +3050,65 @@
     }
   }
 
-  function selectNode(nodeId, center) {
-    selectedNodeId = nodeId;
+  function selectNode(nodeId, center, options = {}) {
+    if (options.multi) {
+      toggleNodeSelection(nodeId);
+    } else {
+      setSelectedNodes([nodeId], nodeId);
+    }
     selectedEdgeId = "";
     selectedAppSurfaceId = "";
     selectedDomainId = "";
     selectedRoleId = "";
     taxonomySelection = clearAllTaxonomySelections();
-    vscode.postMessage({ type: "selectNode", nodeId });
+    if (selectedNodeId) {
+      vscode.postMessage({ type: "selectNode", nodeId: selectedNodeId });
+    } else {
+      vscode.postMessage({ type: "clearSelection" });
+    }
     render();
     requestAnimationFrame(() => {
       focusCanvas();
-      if (center) {
+      if (center && selectedNodeIds.includes(nodeId)) {
         centerNode(nodeId);
       }
     });
   }
 
+  function setSelectedNodes(nodeIds, primaryNodeId) {
+    selectedNodeIds = uniqueStringIds(nodeIds);
+    selectedNodeId = selectedNodeIds.includes(primaryNodeId)
+      ? primaryNodeId
+      : selectedNodeIds[0] || "";
+  }
+
+  function toggleNodeSelection(nodeId) {
+    const current = new Set(selectedNodeIds);
+    if (current.has(nodeId)) {
+      current.delete(nodeId);
+      const nextIds = selectedNodeIds.filter((id) => id !== nodeId);
+      setSelectedNodes(nextIds, nextIds.includes(selectedNodeId) ? selectedNodeId : nextIds[nextIds.length - 1]);
+      return;
+    }
+    setSelectedNodes([...selectedNodeIds, nodeId], nodeId);
+  }
+
+  function clearNodeSelectionState() {
+    selectedNodeIds = [];
+    selectedNodeId = "";
+  }
+
+  function isNodeSelected(nodeId) {
+    return selectedNodeIds.includes(nodeId);
+  }
+
+  function isNodeMultiSelectEvent(event) {
+    return Boolean(event?.metaKey || event?.ctrlKey || event?.shiftKey);
+  }
+
   function selectEdge(edgeId) {
     selectedEdgeId = edgeId;
-    selectedNodeId = "";
+    clearNodeSelectionState();
     selectedAppSurfaceId = "";
     selectedDomainId = "";
     selectedRoleId = "";
@@ -3062,7 +3120,7 @@
 
   function selectAppSurface(appId) {
     selectedAppSurfaceId = appId;
-    selectedNodeId = "";
+    clearNodeSelectionState();
     selectedEdgeId = "";
     selectedDomainId = "";
     selectedRoleId = "";
@@ -3532,6 +3590,15 @@
 
   function normalizeFilters() {
     const flow = state.flow;
+    const activeNodeIds = new Set(flow.nodes.filter((node) => node.status !== "removed").map((node) => node.nodeId));
+    selectedNodeIds = selectedNodeIds.filter((id) => activeNodeIds.has(id));
+    if (selectedNodeId && !activeNodeIds.has(selectedNodeId)) {
+      selectedNodeId = selectedNodeIds[0] || "";
+    } else if (selectedNodeId && !selectedNodeIds.includes(selectedNodeId)) {
+      selectedNodeIds = [selectedNodeId];
+    } else if (!selectedNodeId && selectedNodeIds.length === 1) {
+      selectedNodeId = selectedNodeIds[0];
+    }
     appFilters = appFilters.filter((id) => (flow.appSurfaces || []).some((surface) => surface.appId === id));
     domainFilters = domainFilters.filter((id) => getAvailableDomains(flow).some((domain) => domain.domainId === id));
     roleFilters = roleFilters.filter((id) => getAvailableRoles(flow).some((role) => role.roleId === id));
@@ -3836,9 +3903,13 @@
 
   function readIdSelection(value, legacyValue) {
     if (Array.isArray(value)) {
-      return Array.from(new Set(value.filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim())));
+      return uniqueStringIds(value);
     }
     return typeof legacyValue === "string" && legacyValue.trim() ? [legacyValue.trim()] : [];
+  }
+
+  function uniqueStringIds(value) {
+    return Array.from(new Set((value || []).filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim())));
   }
 
   function readTaxonomySelection(value) {
@@ -3870,6 +3941,8 @@
       roleFilters,
       taxonomyPanelsOpen,
       taxonomySelection,
+      selectedNodeId,
+      selectedNodeIds,
       selectedAppSurfaceId,
       selectedDomainId,
       selectedRoleId,
