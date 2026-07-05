@@ -35,6 +35,13 @@ import { EDGE_TYPES, validateProductFlow } from "../src/models/productFlow";
 import { parseProductFlowText, serializeProductFlow } from "../src/models/productFlowCodec";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
 import { RecentFlowStore } from "../src/storage/recentFlows";
+import { recordEdgeDetailsRevision } from "../src/webview/flowMessageOrdering";
+import {
+  FLOW_WEBVIEW_SCRIPT_FILES,
+  FLOW_WEBVIEW_STYLE_FILES,
+  renderFlowWebviewHtml
+} from "../src/webview/flowWebviewHtml";
+import { parseWebviewMessage } from "../src/webview/flowWebviewMessages";
 
 test("real-provider fixture creates a valid ProductFlow with app-surface entry edges", () => {
   const flow = createProcurementFlow();
@@ -78,6 +85,67 @@ test("JSON schema edge type enum stays aligned with runtime validation", async (
   };
 
   assert.deepEqual(schema.$defs?.edgeType?.enum, [...EDGE_TYPES]);
+});
+
+test("FlowPanel webview HTML loads declared media resources in order", () => {
+  const html = renderFlowWebviewHtml({
+    cspSource: "vscode-resource:",
+    nonce: "test-nonce",
+    styleUris: FLOW_WEBVIEW_STYLE_FILES.map((fileName) => `media/${fileName}`),
+    scriptUris: FLOW_WEBVIEW_SCRIPT_FILES.map((fileName) => `media/${fileName}`),
+    initialState: { flowPath: "sample.mindflow", dangerous: "<script>" }
+  });
+
+  let previousIndex = -1;
+  for (const fileName of [...FLOW_WEBVIEW_STYLE_FILES, ...FLOW_WEBVIEW_SCRIPT_FILES]) {
+    const index = html.indexOf(`media/${fileName}`);
+    assert.ok(index > previousIndex, `${fileName} should appear after the previous media resource`);
+    previousIndex = index;
+  }
+  assert.ok(html.includes("nonce=\"test-nonce\""));
+  assert.ok(html.includes("\\u003cscript>"));
+});
+
+test("Webview message parser rejects malformed messages before command dispatch", () => {
+  assert.equal(parseWebviewMessage(null), undefined);
+  assert.equal(parseWebviewMessage({ type: "saveNodePosition", nodeId: "node_a", x: Number.NaN, y: 20 }), undefined);
+  assert.equal(parseWebviewMessage({
+    type: "createEdge",
+    from: { kind: "node", nodeId: "node_a" },
+    to: { kind: "featureItem", nodeId: "node_b", groupId: "group_a" }
+  }), undefined);
+  assert.equal(parseWebviewMessage({
+    type: "createEdge",
+    from: { kind: "node", nodeId: "node_a" },
+    to: { kind: "node", nodeId: "node_b" },
+    edgeType: "unsupported"
+  }), undefined);
+  assert.equal(parseWebviewMessage({ type: "updateTaxonomy", request: { kind: "domain", action: "delete" } }), undefined);
+
+  assert.deepEqual(parseWebviewMessage({
+    type: "createEdge",
+    from: { kind: "appSurface", nodeId: "app_admin" },
+    to: { kind: "node", nodeId: "node_b" },
+    trigger: "进入",
+    edgeType: "navigate"
+  }), {
+    type: "createEdge",
+    from: { kind: "appSurface", nodeId: "app_admin", appId: "app_admin" },
+    to: { kind: "node", nodeId: "node_b" },
+    trigger: "进入",
+    edgeType: "navigate"
+  });
+});
+
+test("Edge detail revisions ignore stale webview saves", () => {
+  const revisions = new Map<string, number>();
+
+  assert.equal(recordEdgeDetailsRevision(revisions, "edge_a", undefined), true);
+  assert.equal(recordEdgeDetailsRevision(revisions, "edge_a", 2), true);
+  assert.equal(recordEdgeDetailsRevision(revisions, "edge_a", 1), false);
+  assert.equal(recordEdgeDetailsRevision(revisions, "edge_a", 2), true);
+  assert.equal(recordEdgeDetailsRevision(revisions, "edge_a", 3), true);
+  assert.equal(revisions.get("edge_a"), 3);
 });
 
 test("ProductFlow validation rejects invalid enums and stale references", () => {
