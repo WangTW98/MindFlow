@@ -4,6 +4,7 @@
   border-left: 1px solid var(--border);
   overflow: auto;
   padding: 16px;
+  overflow-wrap: anywhere;
 }
 
 .inspector-collapsed .inspector {

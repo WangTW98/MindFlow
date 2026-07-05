@@ -139,8 +139,8 @@ function endCardDrag(event) {
         statusGroup: ""
       };
       persistUiState();
-      vscode.postMessage({ type: "saveAppSurfacePosition", appId: id, x: pos.x, y: pos.y });
-      vscode.postMessage({ type: "selectAppSurface", appId: id });
+      postWebviewMessage({ type: "saveAppSurfacePosition", appId: id, x: pos.x, y: pos.y });
+      postWebviewMessage({ type: "selectAppSurface", appId: id });
     } else if (kind === "projectOverview") {
       selectedProjectOverview = true;
       clearNodeSelectionState();
@@ -150,15 +150,15 @@ function endCardDrag(event) {
       selectedStatusGroupId = "";
       taxonomySelection = clearAllTaxonomySelections();
       persistUiState();
-      vscode.postMessage({ type: "saveProjectOverviewPosition", x: pos.x, y: pos.y });
-      vscode.postMessage({ type: "selectProjectOverview" });
+      postWebviewMessage({ type: "saveProjectOverviewPosition", x: pos.x, y: pos.y });
+      postWebviewMessage({ type: "selectProjectOverview" });
     } else {
       const multi = Boolean(multiSelect || isNodeMultiSelectEvent(event));
       if (multi) {
         event.preventDefault();
       }
       suppressNextNodeCardGeneratedClick();
-      vscode.postMessage({ type: "saveNodePosition", nodeId: id, x: pos.x, y: pos.y });
+      postWebviewMessage({ type: "saveNodePosition", nodeId: id, x: pos.x, y: pos.y });
       selectNode(id, false, { multi });
     }
     return;

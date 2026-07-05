@@ -167,12 +167,12 @@ function postCreateEdge(from, to) {
   if (!from || !to) {
     return;
   }
-  vscode.postMessage({ type: "createEdge", from, to, trigger: "手动连接", edgeType: "interaction" });
+  postWebviewMessage({ type: "createEdge", from, to, trigger: "手动连接", edgeType: "interaction" });
 }
 
 function postCreateConnectedNode(link, event) {
   const point = screenToWorld(event.clientX, event.clientY);
-  vscode.postMessage({
+  postWebviewMessage({
     type: "createConnectedNodeAt",
     request: {
       ...link,

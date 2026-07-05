@@ -38,9 +38,9 @@ function commitAppSurfaceDetailsChange(options = {}) {
 function collectAppSurfaceDetailsPatch() {
   return {
     appId: selectedAppSurfaceId,
-    name: document.getElementById("appSurfaceName").value,
-    type: document.getElementById("appSurfaceType").value,
-    description: document.getElementById("appSurfaceDescription").value,
+    name: requireInputValue("appSurfaceName"),
+    type: requireInputValue("appSurfaceType"),
+    description: requireInputValue("appSurfaceDescription"),
     domainIds: collectTagMultiSelect("appSurfaceDomainIds"),
     roleIds: collectTagMultiSelect("appSurfaceRoleIds")
   };
@@ -49,7 +49,7 @@ function collectAppSurfaceDetailsPatch() {
 function postAppSurfaceDetails(appId, item) {
   clearTimeout(appSurfaceDetailsSaveTimer);
   appSurfaceDetailsSaveTimer = null;
-  vscode.postMessage({
+  postWebviewMessage({
     type: "updateTaxonomy",
     request: {
       kind: "appSurface",
@@ -84,15 +84,15 @@ function commitDomainDetailsChange(options = {}) {
 function collectDomainDetailsPatch() {
   return {
     domainId: selectedDomainId,
-    name: document.getElementById("domainName").value,
-    description: document.getElementById("domainDescription").value
+    name: requireInputValue("domainName"),
+    description: requireInputValue("domainDescription")
   };
 }
 
 function postDomainDetails(domainId, item) {
   clearTimeout(domainDetailsSaveTimer);
   domainDetailsSaveTimer = null;
-  vscode.postMessage({
+  postWebviewMessage({
     type: "updateTaxonomy",
     request: {
       kind: "domain",
@@ -150,8 +150,8 @@ function commitRoleDetailsChange(options = {}) {
 function collectRoleDetailsPatch() {
   return {
     roleId: selectedRoleId,
-    name: document.getElementById("roleName").value,
-    description: document.getElementById("roleDescription").value,
+    name: requireInputValue("roleName"),
+    description: requireInputValue("roleDescription"),
     domainIds: collectMultiSelect("roleDomainIds")
   };
 }
@@ -159,7 +159,7 @@ function collectRoleDetailsPatch() {
 function postRoleDetails(roleId, item) {
   clearTimeout(roleDetailsSaveTimer);
   roleDetailsSaveTimer = null;
-  vscode.postMessage({
+  postWebviewMessage({
     type: "updateTaxonomy",
     request: {
       kind: "role",
@@ -218,16 +218,16 @@ function commitStatusGroupDetailsChange(options = {}) {
 function collectStatusGroupDetailsPatch() {
   return {
     statusGroupId: selectedStatusGroupId,
-    title: document.getElementById("statusGroupTitle").value,
-    description: document.getElementById("statusGroupDescription").value,
-    color: normalizeStatusGroupColor(document.getElementById("statusGroupColor").value)
+    title: requireInputValue("statusGroupTitle"),
+    description: requireInputValue("statusGroupDescription"),
+    color: normalizeStatusGroupColor(requireInputValue("statusGroupColor"))
   };
 }
 
 function postStatusGroupDetails(statusGroupId, item) {
   clearTimeout(statusGroupDetailsSaveTimer);
   statusGroupDetailsSaveTimer = null;
-  vscode.postMessage({
+  postWebviewMessage({
     type: "updateTaxonomy",
     request: {
       kind: "statusGroup",

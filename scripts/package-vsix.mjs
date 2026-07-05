@@ -11,6 +11,7 @@ const outRoot = path.join(root, "out");
 const tsc = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc");
 
 await fs.rm(outRoot, { recursive: true, force: true });
+await run(process.execPath, ["scripts/build-webview.mjs"]);
 await run(tsc, ["-p", "./"]);
 
 await fs.rm(tempRoot, { recursive: true, force: true });

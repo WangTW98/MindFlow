@@ -9,7 +9,7 @@ function handleContextMenu(event) {
   event.preventDefault();
   event.stopPropagation();
   const point = screenToWorld(event.clientX, event.clientY);
-  vscode.postMessage({
+  postWebviewMessage({
     type: "createNodeAt",
     x: Math.round(point.x),
     y: Math.round(point.y),
@@ -48,7 +48,7 @@ function clearSelection() {
   selectedStatusGroupId = "";
   taxonomySelection = clearAllTaxonomySelections();
   connectingFrom = null;
-  vscode.postMessage({ type: "clearSelection" });
+  postWebviewMessage({ type: "clearSelection" });
   render();
 }
 
@@ -72,7 +72,7 @@ function handleKeyDown(event) {
       nodeDetailsSaveTimer = null;
       clearNodeSelectionState();
       selectedEdgeId = "";
-      vscode.postMessage({ type: "deleteNode", nodeId, nodeTitle: node.title });
+      postWebviewMessage({ type: "deleteNode", nodeId, nodeTitle: node.title });
     }
     return;
   }
@@ -82,7 +82,7 @@ function handleKeyDown(event) {
     edgeDetailsSaveTimer = null;
     const edgeId = selectedEdgeId;
     selectedEdgeId = "";
-    vscode.postMessage({ type: "removeEdge", edgeId });
+    postWebviewMessage({ type: "removeEdge", edgeId });
     return;
   }
   if (selectedProjectOverview) {
@@ -124,6 +124,6 @@ function deleteSelectedTaxonomy(kind, id) {
   selectedRoleId = "";
   selectedStatusGroupId = "";
   connectingFrom = null;
-  vscode.postMessage({ type: "updateTaxonomy", request: { kind, action: "delete", id } });
+  postWebviewMessage({ type: "updateTaxonomy", request: { kind, action: "delete", id } });
   render();
 }

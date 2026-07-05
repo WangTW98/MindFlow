@@ -2,8 +2,9 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import type { ProductFlow } from "../models/productFlow";
 import type { FlowSelectionState } from "./flowSelection";
+import type { FlowWebviewInitialState } from "./messages/protocol";
 
-export function createFlowWebviewState(flow: ProductFlow, document: vscode.TextDocument, selection: FlowSelectionState): unknown {
+export function createFlowWebviewState(flow: ProductFlow, document: vscode.TextDocument, selection: FlowSelectionState): FlowWebviewInitialState {
   return {
     flow,
     flowPath: vscode.workspace.asRelativePath(document.uri, false),

@@ -49,32 +49,20 @@ test("FlowPanel declared media resources exist on disk", async () => {
   }
 });
 
-test("FlowPanel media scripts keep dependency order explicit", () => {
-  const indexOf = (fileName: string) => {
-    const index = FLOW_WEBVIEW_SCRIPT_FILES.indexOf(fileName as never);
-    assert.ok(index !== -1, `${fileName} should be declared`);
-    return index;
-  };
+test("FlowPanel webview uses one bundled script instead of legacy multi-script entrypoints", () => {
+  assert.deepEqual([...FLOW_WEBVIEW_SCRIPT_FILES], ["dist/flowEditor.js"]);
 
-  assert.ok(indexOf("state/canvas-namespace.js") < indexOf("state/canvas-state.js"));
-  assert.ok(indexOf("state/canvas-state.js") < indexOf("render/canvas-render.js"));
-  assert.ok(indexOf("render/canvas-render.js") < indexOf("events/canvas-camera.js"));
-  assert.ok(indexOf("events/canvas-camera.js") < indexOf("events/canvas-pan.js"));
-  assert.ok(indexOf("events/canvas-pan.js") < indexOf("events/canvas-connections.js"));
-  assert.ok(indexOf("events/canvas-connections.js") < indexOf("events/canvas-card-drag.js"));
-  assert.ok(indexOf("events/canvas-card-drag.js") < indexOf("events/canvas-interactions.js"));
-  assert.ok(indexOf("events/canvas-interactions.js") < indexOf("events/canvas-bindings.js"));
-  assert.ok(indexOf("events/canvas-bindings.js") < indexOf("view/canvas-endpoint-codec.js"));
-  assert.ok(indexOf("view/canvas-endpoint-codec.js") < indexOf("view/canvas-picker-controls.js"));
-  assert.ok(indexOf("view/canvas-picker-controls.js") < indexOf("view/canvas-endpoint-pickers.js"));
-  assert.ok(indexOf("view/canvas-endpoint-pickers.js") < indexOf("view/canvas-edge-view.js"));
-  assert.ok(indexOf("view/canvas-edge-view.js") < indexOf("view/canvas-view.js"));
-  assert.ok(indexOf("view/canvas-view.js") < indexOf("data/canvas-feature-data.js"));
-  assert.ok(indexOf("data/canvas-feature-data.js") < indexOf("data/canvas-taxonomy-data.js"));
-  assert.ok(indexOf("data/canvas-taxonomy-data.js") < indexOf("data/canvas-color-data.js"));
-  assert.ok(indexOf("data/canvas-color-data.js") < indexOf("data/canvas-ui-state.js"));
-  assert.ok(indexOf("data/canvas-ui-state.js") < indexOf("data/canvas-data.js"));
-  assert.equal(FLOW_WEBVIEW_SCRIPT_FILES[FLOW_WEBVIEW_SCRIPT_FILES.length - 1], "state/main.js");
+  const html = renderFlowWebviewHtml({
+    cspSource: "vscode-resource:",
+    nonce: "test-nonce",
+    styleUris: FLOW_WEBVIEW_STYLE_FILES.map((fileName) => `media/${fileName}`),
+    scriptUris: FLOW_WEBVIEW_SCRIPT_FILES.map((fileName) => `media/${fileName}`),
+    initialState: { flowPath: "sample.mindflow" }
+  });
+
+  assert.ok(html.includes("media/dist/flowEditor.js"));
+  assert.equal(html.includes("media/state/canvas-state.js"), false);
+  assert.equal(html.includes("media/events/canvas-bindings.js"), false);
 });
 
 test("Webview endpoint codec falls back when encoded values are malformed", async () => {
@@ -290,7 +278,7 @@ interface EndpointCodecHelpers {
 
 async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "webview", "media", "view", "canvas-endpoint-codec.js"),
+    path.join(process.cwd(), "src", "webview", "client", "view", "canvas-endpoint-codec.js"),
     "utf8"
   );
   const factory = new Function(

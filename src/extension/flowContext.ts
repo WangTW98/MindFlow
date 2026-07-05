@@ -2,6 +2,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import type { ProductFlow } from "../models/productFlow";
 import { parseProductFlowText, serializeProductFlow } from "../models/productFlowCodec";
+import { assertValidProductFlowForSave } from "../models/productFlowSaveGuard";
 import { pruneMissingAppSurfaceReferences } from "../core/taxonomyEditing";
 import { createUntitledMindFlowFileName } from "../core/untitledMindFlowDocument";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../storage/flowRepository";
@@ -37,6 +38,7 @@ export async function loadCurrentFlow(sourceUri?: FlowUriArgument): Promise<{ fl
 export async function applyFlowDocumentEdit(flowUri: vscode.Uri, flow: ProductFlow): Promise<void> {
   flow.updatedAt = nowIso();
   pruneMissingAppSurfaceReferences(flow);
+  assertValidProductFlowForSave(flow);
   const document = await vscode.workspace.openTextDocument(flowUri);
   const edit = new vscode.WorkspaceEdit();
   const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
@@ -46,6 +48,7 @@ export async function applyFlowDocumentEdit(flowUri: vscode.Uri, flow: ProductFl
     throw new Error("VSCode refused the ProductFlow document edit.");
   }
 }
+
 
 export async function pickMindFlowFile(): Promise<string | undefined> {
   const picked = await vscode.window.showOpenDialog({

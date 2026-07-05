@@ -10,6 +10,7 @@ docs/**
 designs/**
 .mindflow/**
 src/**/*.ts
+src/webview/client/**
 !src/webview/media/**
 out/**/*.map
 plan.md

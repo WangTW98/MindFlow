@@ -25,9 +25,9 @@ function commitProjectOverviewDetailsChange(options = {}) {
 
 function collectProjectOverviewDetailsPatch() {
   return {
-    title: document.getElementById("projectOverviewTitle").value,
-    summary: document.getElementById("projectOverviewSummary").value,
-    goal: document.getElementById("projectOverviewGoal").value
+    title: requireInputValue("projectOverviewTitle"),
+    summary: requireInputValue("projectOverviewSummary"),
+    goal: requireInputValue("projectOverviewGoal")
   };
 }
 
@@ -35,7 +35,7 @@ function postProjectOverviewDetails(patch) {
   persistCurrentInspectorScroll();
   clearTimeout(projectOverviewDetailsSaveTimer);
   projectOverviewDetailsSaveTimer = null;
-  vscode.postMessage({
+  postWebviewMessage({
     type: "updateProjectOverview",
     patch
   });
@@ -64,9 +64,9 @@ function commitNodeDetailsChange(options = {}) {
 
 function collectNodeDetailsPatch() {
   return {
-    title: document.getElementById("nodeTitle").value,
-    pageType: document.getElementById("nodePageType").value,
-    purpose: document.getElementById("nodePurpose").value,
+    title: requireInputValue("nodeTitle"),
+    pageType: requireInputValue("nodePageType"),
+    purpose: requireInputValue("nodePurpose"),
     statusGroupId: document.getElementById("nodeStatusGroupId")?.value || "",
     appSurfaceIds: collectTagMultiSelect("nodeAppSurfaceIds"),
     domainIds: collectTagMultiSelect("nodeDomainIds"),
@@ -79,7 +79,7 @@ function postNodeDetails(nodeId, patch) {
   persistCurrentInspectorScroll();
   clearTimeout(nodeDetailsSaveTimer);
   nodeDetailsSaveTimer = null;
-  vscode.postMessage({
+  postWebviewMessage({
     type: "updateNodeDetails",
     nodeId,
     patch

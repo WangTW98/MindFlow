@@ -6,6 +6,7 @@ import path from "node:path";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const tsc = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc");
 
+await run(process.execPath, ["scripts/build-webview.mjs"]);
 await run(tsc, ["-p", "./", "--noEmit"]);
 for (const script of await listJavaScriptFiles(path.join(root, "src", "webview", "media"))) {
   await run(process.execPath, ["--check", path.relative(root, script)]);

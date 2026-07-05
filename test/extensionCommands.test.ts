@@ -1,6 +1,10 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
+import { createEmptyProductFlow } from "../src/core/emptyFlow";
+import { createManualNode } from "../src/core/flowEditing";
 import { hasOptionalFiniteCoordinates, isPlainObject, readFiniteCoordinates } from "../src/extension/commands/guards";
+import { assertValidProductFlowForSave } from "../src/models/productFlowSaveGuard";
+import { assertThrows } from "./helpers";
 
 test("Command guards reject non-finite coordinates and non-object patches", () => {
   assert.deepEqual(readFiniteCoordinates(12.5, -4), { x: 12.5, y: -4 });
@@ -14,4 +18,14 @@ test("Command guards reject non-finite coordinates and non-object patches", () =
   assert.equal(isPlainObject<Record<string, unknown>>({ title: "采购工作台" }), true);
   assert.equal(isPlainObject<Record<string, unknown>>([]), false);
   assert.equal(isPlainObject<Record<string, unknown>>(null), false);
+});
+
+test("Flow document save guard rejects invalid ProductFlow before writing", () => {
+  const flow = createEmptyProductFlow();
+  createManualNode(flow, { title: "非法引用页", domainIds: ["missing_domain"] });
+
+  assertThrows(
+    () => assertValidProductFlowForSave(flow),
+    /Refusing to save invalid ProductFlow/
+  );
 });

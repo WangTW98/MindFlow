@@ -28,12 +28,15 @@ function collectEdgeDetailsPatch() {
   const edge = state.flow.edges.find((item) => item.edgeId === selectedEdgeId);
   const fallbackFrom = edge?.from || (edge?.fromNodeId ? { kind: "node", nodeId: edge.fromNodeId } : undefined);
   const fallbackTo = edge?.to || (edge?.toNodeId ? { kind: "node", nodeId: edge.toNodeId } : undefined);
+  const fromInput = requireElementById("edgeFromEndpoint");
+  const toInput = requireElementById("edgeToEndpoint");
+  const edgeTypeInput = requireElementById("edgeType");
   return {
-    trigger: document.getElementById("edgeTriggerRule").value,
-    from: parseEndpointValue(document.getElementById("edgeFromEndpoint").dataset.endpointValue, fallbackFrom),
-    to: parseEndpointValue(document.getElementById("edgeToEndpoint").dataset.endpointValue, fallbackTo),
-    type: document.getElementById("edgeType").dataset.edgeTypeValue || "interaction",
-    condition: document.getElementById("edgeCondition").value,
+    trigger: requireInputValue("edgeTriggerRule"),
+    from: parseEndpointValue(fromInput.dataset.endpointValue, fallbackFrom),
+    to: parseEndpointValue(toInput.dataset.endpointValue, fallbackTo),
+    type: edgeTypeInput.dataset.edgeTypeValue || "interaction",
+    condition: requireInputValue("edgeCondition"),
     appSurfaceIds: collectTagMultiSelect("edgeAppSurfaceIds"),
     domainIds: collectTagMultiSelect("edgeDomainIds"),
     roleIds: collectTagMultiSelect("edgeRoleIds")
@@ -45,7 +48,7 @@ function postEdgeDetails(edgeId, patch, revision) {
   clearTimeout(edgeDetailsSaveTimer);
   edgeDetailsSaveTimer = null;
   rememberPendingEdgeDetailsSave(edgeId, patch, revision);
-  vscode.postMessage({
+  postWebviewMessage({
     type: "updateEdgeDetails",
     edgeId,
     revision,

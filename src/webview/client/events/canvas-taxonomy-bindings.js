@@ -102,7 +102,7 @@ function selectTaxonomyItem(kind, id) {
       role: "",
       statusGroup: ""
     };
-    vscode.postMessage({ type: "selectDomain", domainId: id });
+    postWebviewMessage({ type: "selectDomain", domainId: id });
   } else {
     selectedDomainId = "";
     selectedRoleId = id;
@@ -112,7 +112,7 @@ function selectTaxonomyItem(kind, id) {
       role: id,
       statusGroup: ""
     };
-    vscode.postMessage({ type: "selectRole", roleId: id });
+    postWebviewMessage({ type: "selectRole", roleId: id });
   }
   persistUiState();
   render();
@@ -131,7 +131,7 @@ function manageTaxonomy(kind, action, targetId = "") {
     const id = getTaxonomyId(kind, item);
     addTaxonomyItemLocally(flow, kind, item);
     selectTaxonomyItem(kind, id);
-    vscode.postMessage({ type: "updateTaxonomy", request: { kind, action, id, item } });
+    postWebviewMessage({ type: "updateTaxonomy", request: { kind, action, id, item } });
     return;
   }
   if (!current) {
@@ -140,7 +140,7 @@ function manageTaxonomy(kind, action, targetId = "") {
   if (action === "delete") {
     clearTaxonomySelection(kind, currentId);
     removeTaxonomyItemLocally(flow, kind, currentId);
-    vscode.postMessage({ type: "updateTaxonomy", request: { kind, action, id: currentId } });
+    postWebviewMessage({ type: "updateTaxonomy", request: { kind, action, id: currentId } });
     render();
     return;
   }

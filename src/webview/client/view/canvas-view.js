@@ -39,9 +39,9 @@ function selectNode(nodeId, center, options = {}) {
   selectedStatusGroupId = "";
   taxonomySelection = clearAllTaxonomySelections();
   if (selectedNodeId) {
-    vscode.postMessage({ type: "selectNode", nodeId: selectedNodeId });
+    postWebviewMessage({ type: "selectNode", nodeId: selectedNodeId });
   } else {
-    vscode.postMessage({ type: "clearSelection" });
+    postWebviewMessage({ type: "clearSelection" });
   }
   render();
   requestAnimationFrame(() => {
@@ -101,7 +101,7 @@ function selectEdge(edgeId) {
   selectedRoleId = "";
   selectedStatusGroupId = "";
   taxonomySelection = clearAllTaxonomySelections();
-  vscode.postMessage({ type: "selectEdge", edgeId });
+  postWebviewMessage({ type: "selectEdge", edgeId });
   render();
   requestAnimationFrame(() => focusCanvas());
 }
@@ -121,7 +121,7 @@ function selectAppSurface(appId) {
     statusGroup: ""
   };
   persistUiState();
-  vscode.postMessage({ type: "selectAppSurface", appId });
+  postWebviewMessage({ type: "selectAppSurface", appId });
   render();
   requestAnimationFrame(() => focusCanvas());
 }
@@ -141,7 +141,7 @@ function selectStatusGroup(statusGroupId) {
     statusGroup: statusGroupId
   };
   persistUiState();
-  vscode.postMessage({ type: "selectStatusGroup", statusGroupId });
+  postWebviewMessage({ type: "selectStatusGroup", statusGroupId });
   render();
   requestAnimationFrame(() => focusCanvas());
 }
@@ -156,7 +156,7 @@ function selectProjectOverview() {
   selectedStatusGroupId = "";
   taxonomySelection = clearAllTaxonomySelections();
   persistUiState();
-  vscode.postMessage({ type: "selectProjectOverview" });
+  postWebviewMessage({ type: "selectProjectOverview" });
   render();
   requestAnimationFrame(() => focusCanvas());
 }

@@ -1,6 +1,6 @@
 const vscode = acquireVsCodeApi();
 const state = window.__MINDFLOW_STATE__;
-const app = document.getElementById("app");
+const app = requireElementById("app");
 const persisted = vscode.getState() || {};
 
 const CARD_WIDTH = 300;
@@ -134,4 +134,3 @@ let commandStatusTimer = null;
 window.addEventListener("message", (event) => {
   handleHostMessage(event.data);
 });
-
