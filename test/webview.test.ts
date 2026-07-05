@@ -19,6 +19,7 @@ import { RecentFlowStore } from "../src/storage/recentFlows";
 import { recordEdgeDetailsRevision } from "../src/webview/flowMessageOrdering";
 import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/webview/flowWebviewHtml";
 import { parseWebviewMessage } from "../src/webview/flowWebviewMessages";
+import { parseSidebarMessage } from "../src/webview/sidebar/sidebarMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("FlowPanel webview HTML loads declared media resources in order", () => {
@@ -75,6 +76,26 @@ test("Webview message parser rejects malformed messages before command dispatch"
     to: { kind: "node", nodeId: "node_b" },
     trigger: "进入",
     edgeType: "navigate"
+  });
+});
+
+test("Sidebar message parser rejects malformed messages before command dispatch", () => {
+  assert.equal(parseSidebarMessage(null), undefined);
+  assert.equal(parseSidebarMessage({ type: "openFlow" }), undefined);
+  assert.equal(parseSidebarMessage({ type: "openFlow", flowPath: "" }), undefined);
+  assert.equal(parseSidebarMessage({ type: "removeRecent", flowPath: 123 }), undefined);
+  assert.equal(parseSidebarMessage({ type: "unknown" }), undefined);
+
+  assert.deepEqual(parseSidebarMessage({ type: "newMindFlow" }), { type: "newMindFlow" });
+  assert.deepEqual(parseSidebarMessage({ type: "openMindFlow" }), { type: "openMindFlow" });
+  assert.deepEqual(parseSidebarMessage({ type: "clearRecent" }), { type: "clearRecent" });
+  assert.deepEqual(parseSidebarMessage({ type: "openFlow", flowPath: "/tmp/example.mindflow" }), {
+    type: "openFlow",
+    flowPath: "/tmp/example.mindflow"
+  });
+  assert.deepEqual(parseSidebarMessage({ type: "removeRecent", flowPath: "/tmp/example.mindflow" }), {
+    type: "removeRecent",
+    flowPath: "/tmp/example.mindflow"
   });
 });
 

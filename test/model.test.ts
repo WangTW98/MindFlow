@@ -79,6 +79,43 @@ test("ProductFlow validation rejects invalid enums and stale references", () => 
   assert.ok(validation.errors.some((error) => error.includes("references missing domain missing_domain")));
 });
 
+test("ProductFlow validation catches duplicate ids, invalid views, and endpoint references", () => {
+  const flow = createEmptyProductFlow();
+  flow.domains = [
+    { domainId: "domain_ops", name: "运营", description: "运营业务域。" },
+    { domainId: "domain_ops", name: "重复运营", description: "重复业务域。" }
+  ];
+  flow.roles = [{ roleId: "role_ops", name: "运营", description: "运营角色。", domainIds: ["domain_ops"] }];
+  flow.appSurfaces = [
+    { appId: "app_admin", name: "后台", type: "admin", description: "后台。", domainIds: ["domain_ops"], roleIds: ["role_ops"] },
+    { appId: "app_admin", name: "重复后台", type: "admin", description: "重复后台。", domainIds: ["domain_ops"], roleIds: ["role_ops"] }
+  ];
+  flow.statusGroups = [{ statusGroupId: "status_review", title: "评审中", color: "#33aa55" }];
+  const node = createManualNode(flow, { title: "异常页面" });
+  node.appSurfaceIds = ["missing_app"];
+  node.statusGroupId = "missing_status";
+  node.view = { position: { x: 12, y: Number.NaN } };
+  const edge = createManualEdge(flow, {
+    from: { kind: "node", nodeId: node.nodeId },
+    to: { kind: "node", nodeId: node.nodeId },
+    trigger: "异常连线",
+    type: "navigate"
+  });
+  edge.from = { kind: "featureGroup", nodeId: node.nodeId, groupId: "missing_group" };
+  edge.to = { kind: "featureItem", nodeId: node.nodeId, groupId: "missing_group", itemId: "missing_item" };
+
+  const validation = validateProductFlow(flow);
+
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((error) => error.includes("Duplicate domainId: domain_ops")));
+  assert.ok(validation.errors.some((error) => error.includes("Duplicate appId: app_admin")));
+  assert.ok(validation.errors.some((error) => error.includes("nodes[0].appSurfaceIds references missing app surface missing_app.")));
+  assert.ok(validation.errors.some((error) => error.includes("nodes[0].view.position.y must be a number.")));
+  assert.ok(validation.errors.some((error) => error.includes("edges[0].from.groupId references missing feature group missing_group")));
+  assert.ok(validation.errors.some((error) => error.includes("edges[0].to.groupId references missing feature group missing_group")));
+  assert.ok(validation.warnings.some((warning) => warning.includes("nodes[0].statusGroupId references missing status group missing_status.")));
+});
+
 test("Legacy ProductFlow missing projectOverview can be backfilled", () => {
   const flow = createEmptyProductFlow();
   delete (flow as unknown as { projectOverview?: unknown }).projectOverview;

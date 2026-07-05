@@ -1,6 +1,8 @@
 import type { TaxonomyRequest } from "../core/taxonomy";
 import type { EdgeType, FlowEndpoint } from "../models/productFlow";
-import { isEdgeType, isFlowEndpointKind } from "../models/productFlow";
+import { readEndpoint, readOptionalEdgeType } from "./messages/endpointPayload";
+import { readConnectedNodeRequest, readEdgeDetailsPatch, readTaxonomyRequest } from "./messages/messagePayloads";
+import { isRecord, readNumber, readOptionalNumber, readOptionalString, readOptionalStringArray, readRecord, readString } from "./messages/readers";
 
 export type WebviewMessage =
   | { type: "selectNode"; nodeId: string }
@@ -30,30 +32,18 @@ export function parseWebviewMessage(message: unknown): WebviewMessage | undefine
   }
 
   switch (message.type) {
-    case "selectNode": {
-      const nodeId = readString(message, "nodeId");
-      return nodeId ? { type: "selectNode", nodeId } : undefined;
-    }
-    case "selectEdge": {
-      const edgeId = readString(message, "edgeId");
-      return edgeId ? { type: "selectEdge", edgeId } : undefined;
-    }
-    case "selectAppSurface": {
-      const appId = readString(message, "appId");
-      return appId ? { type: "selectAppSurface", appId } : undefined;
-    }
-    case "selectDomain": {
-      const domainId = readString(message, "domainId");
-      return domainId ? { type: "selectDomain", domainId } : undefined;
-    }
-    case "selectRole": {
-      const roleId = readString(message, "roleId");
-      return roleId ? { type: "selectRole", roleId } : undefined;
-    }
-    case "selectStatusGroup": {
-      const statusGroupId = readString(message, "statusGroupId");
-      return statusGroupId ? { type: "selectStatusGroup", statusGroupId } : undefined;
-    }
+    case "selectNode":
+      return readIdMessage(message, "nodeId", "selectNode");
+    case "selectEdge":
+      return readIdMessage(message, "edgeId", "selectEdge");
+    case "selectAppSurface":
+      return readIdMessage(message, "appId", "selectAppSurface");
+    case "selectDomain":
+      return readIdMessage(message, "domainId", "selectDomain");
+    case "selectRole":
+      return readIdMessage(message, "roleId", "selectRole");
+    case "selectStatusGroup":
+      return readIdMessage(message, "statusGroupId", "selectStatusGroup");
     case "selectProjectOverview":
     case "clearSelection":
       return { type: message.type };
@@ -132,149 +122,11 @@ export function parseWebviewMessage(message: unknown): WebviewMessage | undefine
   }
 }
 
-function readConnectedNodeRequest(value: unknown): Record<string, unknown> | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  const from = value.from === undefined ? undefined : readEndpoint(value.from);
-  const to = value.to === undefined ? undefined : readEndpoint(value.to);
-  if (!from && !to) {
-    return undefined;
-  }
-  const type = value.type === undefined ? undefined : readEdgeType(value.type);
-  if (value.type !== undefined && !type) {
-    return undefined;
-  }
-  return {
-    ...(from ? { from } : {}),
-    ...(to ? { to } : {}),
-    ...(typeof value.x === "number" && Number.isFinite(value.x) ? { x: value.x } : {}),
-    ...(typeof value.y === "number" && Number.isFinite(value.y) ? { y: value.y } : {}),
-    ...(typeof value.trigger === "string" ? { trigger: value.trigger } : {}),
-    ...(type ? { type } : {}),
-    ...(readOptionalStringArray(value, "appSurfaceIds") ? { appSurfaceIds: readOptionalStringArray(value, "appSurfaceIds") } : {}),
-    ...(readOptionalStringArray(value, "domainIds") ? { domainIds: readOptionalStringArray(value, "domainIds") } : {}),
-    ...(readOptionalStringArray(value, "roleIds") ? { roleIds: readOptionalStringArray(value, "roleIds") } : {})
-  };
-}
-
-function readEdgeDetailsPatch(value: unknown): Record<string, unknown> | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  const from = value.from === undefined ? undefined : readEndpoint(value.from);
-  const to = value.to === undefined ? undefined : readEndpoint(value.to);
-  const edgeType = value.type === undefined ? undefined : readEdgeType(value.type);
-  if ((value.from !== undefined && !from) || (value.to !== undefined && !to) || (value.type !== undefined && !edgeType)) {
-    return undefined;
-  }
-  return {
-    ...(from ? { from } : {}),
-    ...(to ? { to } : {}),
-    ...(typeof value.trigger === "string" ? { trigger: value.trigger } : {}),
-    ...(typeof value.action === "string" ? { action: value.action } : {}),
-    ...(edgeType ? { type: edgeType } : {}),
-    ...(typeof value.condition === "string" ? { condition: value.condition } : {}),
-    ...(readOptionalStringArray(value, "appSurfaceIds") ? { appSurfaceIds: readOptionalStringArray(value, "appSurfaceIds") } : {}),
-    ...(readOptionalStringArray(value, "domainIds") ? { domainIds: readOptionalStringArray(value, "domainIds") } : {}),
-    ...(readOptionalStringArray(value, "roleIds") ? { roleIds: readOptionalStringArray(value, "roleIds") } : {})
-  };
-}
-
-function readEndpoint(value: unknown): FlowEndpoint | undefined {
-  if (!isRecord(value) || !isFlowEndpointKind(value.kind)) {
-    return undefined;
-  }
-  const nodeId = readString(value, "nodeId");
-  if (!nodeId) {
-    return undefined;
-  }
-  if (value.kind === "appSurface") {
-    const appId = readOptionalString(value, "appId") ?? nodeId;
-    return { kind: "appSurface", nodeId: appId, appId };
-  }
-  if (value.kind === "projectOverview") {
-    return nodeId === "projectOverview" ? { kind: "projectOverview", nodeId } : undefined;
-  }
-  const groupId = readOptionalString(value, "groupId");
-  const itemId = readOptionalString(value, "itemId");
-  if (value.kind === "featureGroup" && !groupId) {
-    return undefined;
-  }
-  if (value.kind === "featureItem" && (!groupId || !itemId)) {
-    return undefined;
-  }
-  return {
-    kind: value.kind,
-    nodeId,
-    ...(groupId ? { groupId } : {}),
-    ...(itemId ? { itemId } : {})
-  };
-}
-
-function readTaxonomyRequest(value: unknown): TaxonomyRequest | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  const kind = value.kind;
-  const action = value.action;
-  if (kind !== "appSurface" && kind !== "domain" && kind !== "role" && kind !== "statusGroup") {
-    return undefined;
-  }
-  if (action !== "create" && action !== "update" && action !== "delete") {
-    return undefined;
-  }
-  const id = readOptionalString(value, "id");
-  const item = readRecord(value, "item");
-  if (action === "delete" && !id) {
-    return undefined;
-  }
-  return { kind, action, ...(id ? { id } : {}), ...(item ? { item } : {}) };
-}
-
-function readOptionalEdgeType(obj: Record<string, unknown>, key: string): EdgeType | false | undefined {
-  if (obj[key] === undefined) {
-    return undefined;
-  }
-  return readEdgeType(obj[key]) ?? false;
-}
-
-function readEdgeType(value: unknown): EdgeType | undefined {
-  return isEdgeType(value) ? value : undefined;
-}
-
-function readString(obj: Record<string, unknown>, key: string): string | undefined {
-  return typeof obj[key] === "string" && obj[key].trim() ? obj[key] : undefined;
-}
-
-function readOptionalString(obj: Record<string, unknown>, key: string): string | undefined {
-  return typeof obj[key] === "string" ? obj[key] : undefined;
-}
-
-function readNumber(obj: Record<string, unknown>, key: string): number | undefined {
-  return typeof obj[key] === "number" && Number.isFinite(obj[key]) ? obj[key] : undefined;
-}
-
-function readOptionalNumber(obj: Record<string, unknown>, key: string): number | false | undefined {
-  if (obj[key] === undefined) {
-    return undefined;
-  }
-  return typeof obj[key] === "number" && Number.isFinite(obj[key]) ? obj[key] : false;
-}
-
-function readOptionalStringArray(obj: Record<string, unknown>, key: string): string[] | undefined {
-  const value = obj[key];
-  if (value === undefined) {
-    return undefined;
-  }
-  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : undefined;
-}
-
-function readRecord(obj: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
-  const value = obj[key];
-  return isRecord(value) ? value : undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function readIdMessage<TType extends WebviewMessage["type"], TKey extends string>(
+  message: Record<string, unknown>,
+  key: TKey,
+  type: TType
+): Extract<WebviewMessage, { type: TType }> | undefined {
+  const id = readString(message, key);
+  return id ? ({ type, [key]: id } as Extract<WebviewMessage, { type: TType }>) : undefined;
 }
