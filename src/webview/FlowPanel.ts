@@ -1,8 +1,6 @@
 import * as vscode from "vscode";
-import { createUntitledMindFlowDocumentOptions } from "../core/untitledMindFlowDocument";
 import type { ProductFlow } from "../models/productFlow";
 import { FlowEditorSession } from "./FlowEditorSession";
-import { isAssociatedMindFlowUntitled, parseValidFlow } from "./flowDocument";
 import { emptyFlowSelection, flowSelectionKey, type FlowSelectionPatch, type FlowSelectionState } from "./flowSelection";
 
 type OpenFlowCallback = (flowUri: vscode.Uri) => void;
@@ -73,7 +71,6 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     _token: vscode.CancellationToken
   ): void {
     const flowKey = document.uri.toString();
-    let migrationQueued = false;
     this.onDidOpenFlow(document.uri);
     webviewPanel.webview.options = {
       enableScripts: true,
@@ -93,9 +90,6 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
 
     const changeListener = vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.document.uri.toString() === document.uri.toString()) {
-        if (queueMindFlowUntitledMigration(event.document)) {
-          return;
-        }
         session.renderFromDocument(event.document);
       }
     });
@@ -108,25 +102,7 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
       }
     });
 
-    if (!queueMindFlowUntitledMigration(document)) {
-      session.renderFromDocument(document);
-    }
-
-    function queueMindFlowUntitledMigration(candidate: vscode.TextDocument): boolean {
-      if (migrationQueued || !isAssociatedMindFlowUntitled(candidate)) {
-        return false;
-      }
-      const flow = parseValidFlow(candidate.getText());
-      if (!flow) {
-        return false;
-      }
-      migrationQueued = true;
-      void FlowPanel.provider?.reopenAsMindFlowUntitled(flow, webviewPanel).catch(() => {
-        migrationQueued = false;
-        session.renderFromDocument(candidate);
-      });
-      return true;
-    }
+    session.renderFromDocument(document);
   }
 
   private renderSession(flowUri: vscode.Uri, fallbackFlow: ProductFlow): boolean {
@@ -139,9 +115,4 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     return false;
   }
 
-  private async reopenAsMindFlowUntitled(flow: ProductFlow, webviewPanel: vscode.WebviewPanel): Promise<void> {
-    const replacementDocument = await vscode.workspace.openTextDocument(createUntitledMindFlowDocumentOptions(flow));
-    await vscode.commands.executeCommand("vscode.openWith", replacementDocument.uri, FlowPanel.viewType);
-    webviewPanel.dispose();
-  }
 }

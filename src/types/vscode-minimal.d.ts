@@ -28,6 +28,7 @@ declare module "vscode" {
     static file(path: string): Uri;
     static parse(value: string): Uri;
     static joinPath(base: Uri, ...pathSegments: string[]): Uri;
+    with(change: { scheme?: string; authority?: string; path?: string; query?: string; fragment?: string }): Uri;
     toString(): string;
   }
 

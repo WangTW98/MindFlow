@@ -33,6 +33,7 @@ test("Extension manifest contributes standalone .mindflow editor and sidebar onl
       languages?: Array<{ id?: string; extensions?: string[]; icon?: { light?: string; dark?: string } }>;
       customEditors?: Array<{ viewType?: string; selector?: Array<{ filenamePattern?: string }> }>;
       commands?: Array<{ command?: string }>;
+      keybindings?: Array<{ command?: string; key?: string; mac?: string; when?: string }>;
       configuration?: { properties?: Record<string, { default?: string; enum?: string[] }> };
     };
   };
@@ -55,6 +56,10 @@ test("Extension manifest contributes standalone .mindflow editor and sidebar onl
     "mindflow.saveFlowAs",
     "mindflow.validateFlowJson"
   ]);
+  assert.equal(
+    manifest.contributes?.keybindings?.some((item) => item.command === "mindflow.saveFlowAs" && item.mac === "cmd+s") ?? false,
+    false
+  );
   assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), ["mindflow.storage.flowDirectory"]);
   assert.equal(manifest.bin, undefined);
   const removedScriptPrefix = ["m", "c", "p"].join("") + ":";

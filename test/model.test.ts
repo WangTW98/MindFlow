@@ -11,7 +11,7 @@ import { createManualEdge, createManualNode, removeManualEdge, removeManualNode,
 import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/core/projectOverview";
 import { applyTaxonomyRequest } from "../src/core/taxonomy";
 import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/core/taxonomyEditing";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/core/untitledMindFlowDocument";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName, createUntitledMindFlowTargetPath } from "../src/core/untitledMindFlowDocument";
 import { EDGE_TYPES, validateProductFlow } from "../src/models/productFlow";
 import { parseProductFlowText, serializeProductFlow } from "../src/models/productFlowCodec";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
@@ -144,16 +144,22 @@ test("Project overview details update local project metadata", () => {
   assert.equal(validateProductFlow(flow).valid, true);
 });
 
-test("Blank MindFlow opens as an untitled document without a target file path", () => {
+test("Blank MindFlow creates valid untitled document content and a .mindflow file name", () => {
   const flow = createEmptyProductFlow();
   const options = createUntitledMindFlowDocumentOptions(flow);
   const suggestedFileName = createUntitledMindFlowFileName(flow);
+  const workspaceRoot = path.join(os.tmpdir(), "mindflow-workspace");
   const validation = validateProductFlow(JSON.parse(options.content) as unknown);
 
   assert.equal(options.language, MINDFLOW_LANGUAGE_ID);
   assert.equal("uri" in options, false);
   assert.equal(suggestedFileName.startsWith("Untitled-MindFlow-"), true);
   assert.equal(suggestedFileName.endsWith(MINDFLOW_FILE_EXTENSION), true);
+  assert.equal(createUntitledMindFlowTargetPath(flow, undefined, ".mindflow/flows"), undefined);
+  assert.equal(
+    createUntitledMindFlowTargetPath(flow, workspaceRoot, ".mindflow/flows"),
+    path.join(workspaceRoot, ".mindflow/flows", suggestedFileName)
+  );
   assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
 

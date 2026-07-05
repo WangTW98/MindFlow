@@ -4,10 +4,10 @@ import type { ProductFlow } from "../models/productFlow";
 import { parseProductFlowText, serializeProductFlow } from "../models/productFlowCodec";
 import { assertValidProductFlowForSave } from "../models/productFlowSaveGuard";
 import { pruneMissingAppSurfaceReferences } from "../core/taxonomyEditing";
-import { createUntitledMindFlowFileName } from "../core/untitledMindFlowDocument";
+import { createMindFlowFileName, createUntitledMindFlowTargetPath } from "../core/untitledMindFlowDocument";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../storage/flowRepository";
 import { RecentFlowStore } from "../storage/recentFlows";
-import { nowIso, slugify } from "../utils/id";
+import { nowIso } from "../utils/id";
 
 export type FlowUriArgument = vscode.Uri | string | undefined;
 
@@ -87,6 +87,12 @@ export function getDefaultSaveUri(flow: ProductFlow, flowUri: vscode.Uri): vscod
   }
   const flowDirectory = vscode.workspace.getConfiguration("mindflow.storage").get<string>("flowDirectory", ".mindflow/flows");
   return vscode.Uri.file(path.join(workspaceRoot, flowDirectory, createMindFlowFileName(flow)));
+}
+
+export function createUntitledMindFlowUri(flow: ProductFlow): vscode.Uri | undefined {
+  const flowDirectory = vscode.workspace.getConfiguration("mindflow.storage").get<string>("flowDirectory", ".mindflow/flows");
+  const targetPath = createUntitledMindFlowTargetPath(flow, getWorkspaceRootIfAvailable(), flowDirectory);
+  return targetPath ? vscode.Uri.file(targetPath).with({ scheme: "untitled" }) : undefined;
 }
 
 export function ensureMindFlowExtension(filePath: string): string {
@@ -176,13 +182,6 @@ function getWorkspaceMindFlowDirectoryUri(): vscode.Uri | undefined {
   }
   const flowDirectory = vscode.workspace.getConfiguration("mindflow.storage").get<string>("flowDirectory", ".mindflow/flows");
   return vscode.Uri.file(path.join(workspaceRoot, flowDirectory));
-}
-
-function createMindFlowFileName(flow: ProductFlow): string {
-  if (flow.title === "Untitled MindFlow") {
-    return createUntitledMindFlowFileName(flow);
-  }
-  return `${slugify(flow.title, "flow")}-${flow.flowId}${FLOW_FILE_EXTENSION}`;
 }
 
 function getActiveMindFlowUri(): vscode.Uri | undefined {

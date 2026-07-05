@@ -6,12 +6,24 @@ import { validateProductFlow } from "../../models/productFlow";
 import { FlowRepository } from "../../storage/flowRepository";
 import { FlowPanel } from "../../webview/FlowPanel";
 import type { SidebarView } from "../../webview/SidebarView";
-import { ensureMindFlowExtension, flowDisplayName, getDefaultSaveUri, loadCurrentFlow, loadMindFlowFile, pickMindFlowFile, rememberRecentFlow, rememberUntitledFlow, resolveInputFlowPath, showError, type FlowUriArgument } from "../flowContext";
+import { createUntitledMindFlowUri, ensureMindFlowExtension, flowDisplayName, getDefaultSaveUri, loadCurrentFlow, loadMindFlowFile, pickMindFlowFile, rememberRecentFlow, rememberUntitledFlow, resolveInputFlowPath, showError, type FlowUriArgument } from "../flowContext";
 
 export async function newFlow(): Promise<void> {
   try {
     const flow = createEmptyProductFlow();
-    const document = await vscode.workspace.openTextDocument(createUntitledMindFlowDocumentOptions(flow));
+    const options = createUntitledMindFlowDocumentOptions(flow);
+    const untitledUri = createUntitledMindFlowUri(flow);
+    const document = untitledUri
+      ? await vscode.workspace.openTextDocument(untitledUri)
+      : await vscode.workspace.openTextDocument(options);
+    if (untitledUri && !document.getText()) {
+      const edit = new vscode.WorkspaceEdit();
+      edit.insert(document.uri, new vscode.Position(0, 0), options.content);
+      const applied = await vscode.workspace.applyEdit(edit);
+      if (!applied) {
+        throw new Error("VSCode refused to initialize the MindFlow document.");
+      }
+    }
     rememberUntitledFlow(document.uri);
     await vscode.commands.executeCommand("vscode.openWith", document.uri, FlowPanel.viewType);
   } catch (error) {
@@ -26,6 +38,11 @@ export async function saveFlowAs(
 ): Promise<void> {
   try {
     const { flow, flowUri } = await loadCurrentFlow(sourceUri);
+    if (flowUri.scheme === "untitled") {
+      FlowPanel.createOrShow(context.extensionUri, flow, flowUri);
+      await vscode.commands.executeCommand("workbench.action.files.saveAs");
+      return;
+    }
     const targetUri = await vscode.window.showSaveDialog({
       title: "Save MindFlow",
       defaultUri: getDefaultSaveUri(flow, flowUri),

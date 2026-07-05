@@ -98,14 +98,6 @@
         "title": "MindFlow: Validate Flow JSON"
       }
     ],
-    "keybindings": [
-      {
-        "command": "mindflow.saveFlowAs",
-        "key": "ctrl+s",
-        "mac": "cmd+s",
-        "when": "resourceScheme == untitled && resourceLangId == mindflow"
-      }
-    ],
     "configuration": {
       "title": "MindFlow",
       "properties": {
