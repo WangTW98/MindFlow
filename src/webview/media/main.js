@@ -1583,7 +1583,7 @@
       if (event.target.closest(".inline-title-editor")) {
         return;
       }
-      commitProjectOverviewDetailsChange();
+      commitProjectOverviewDetailsChange({ localOnly: true });
     });
     projectOverviewForm.addEventListener("change", (event) => {
       if (event.target.closest(".inline-title-editor")) {
@@ -1603,7 +1603,7 @@
       if (event.target.closest(".drag-handle, .inline-title-editor")) {
         return;
       }
-      commitNodeDetailsChange();
+      commitNodeDetailsChange({ localOnly: true });
     });
     nodeForm.addEventListener("change", (event) => {
       if (event.target.closest(".inline-title-editor")) {
@@ -1656,7 +1656,7 @@
       if (event.target.closest(".inline-title-editor")) {
         return;
       }
-      commitAppSurfaceDetailsChange();
+      commitAppSurfaceDetailsChange({ localOnly: true });
     });
     appSurfaceForm.addEventListener("change", (event) => {
       if (event.target.closest(".inline-title-editor")) {
@@ -1692,7 +1692,7 @@
       if (event.target.closest(".inline-title-editor")) {
         return;
       }
-      commitDomainDetailsChange();
+      commitDomainDetailsChange({ localOnly: true });
     });
     domainForm.addEventListener("change", (event) => {
       if (event.target.closest(".inline-title-editor")) {
@@ -1712,7 +1712,7 @@
       if (event.target.closest(".inline-title-editor")) {
         return;
       }
-      commitRoleDetailsChange();
+      commitRoleDetailsChange({ localOnly: true });
     });
     roleForm.addEventListener("change", (event) => {
       if (event.target.closest(".inline-title-editor")) {
@@ -1732,7 +1732,7 @@
       if (event.target.closest(".inline-title-editor")) {
         return;
       }
-      commitStatusGroupDetailsChange();
+      commitStatusGroupDetailsChange({ localOnly: true });
     });
     statusGroupForm.addEventListener("change", (event) => {
       if (event.target.closest(".inline-title-editor")) {
@@ -1815,6 +1815,7 @@
     bindInlineTitleEditor("edgePanelTitle", "edgeTriggerRule", () => submitEdgeDetails({ immediate: true }));
     edgeForm.addEventListener("submit", (event) => {
       event.preventDefault();
+      submitEdgeDetails({ immediate: true });
     });
     edgeForm.addEventListener("change", (event) => {
       if (event.target.closest(".inline-title-editor")) {
@@ -1823,7 +1824,7 @@
       if (event.target.closest(".endpoint-combobox")) {
         return;
       }
-      submitEdgeDetails();
+      submitEdgeDetails({ immediate: true });
     });
     edgeForm.addEventListener("input", (event) => {
       if (event.target.closest(".inline-title-editor")) {
@@ -1833,7 +1834,7 @@
         filterEndpointOptions(event.target);
         return;
       }
-      submitEdgeDetails();
+      submitEdgeDetails({ localOnly: true });
     });
     edgeForm.querySelectorAll(".endpoint-combobox-input").forEach((input) => {
       input.addEventListener("focus", () => {
@@ -2946,6 +2947,11 @@
     const patch = collectProjectOverviewDetailsPatch();
     applyProjectOverviewDetailsLocally(patch);
     refreshProjectOverviewViews();
+    if (options.localOnly) {
+      clearTimeout(projectOverviewDetailsSaveTimer);
+      projectOverviewDetailsSaveTimer = null;
+      return;
+    }
     if (options.immediate) {
       postProjectOverviewDetails(patch);
       return;
@@ -2980,6 +2986,11 @@
     const patch = collectNodeDetailsPatch();
     applyNodeDetailsLocally(nodeId, patch);
     refreshCanvasAndNodeList();
+    if (options.localOnly) {
+      clearTimeout(nodeDetailsSaveTimer);
+      nodeDetailsSaveTimer = null;
+      return;
+    }
     if (options.immediate) {
       postNodeDetails(nodeId, patch);
       return;
@@ -3020,6 +3031,11 @@
     const item = collectAppSurfaceDetailsPatch();
     applyAppSurfaceDetailsLocally(appId, item);
     refreshAppSurfaceViews();
+    if (options.localOnly) {
+      clearTimeout(appSurfaceDetailsSaveTimer);
+      appSurfaceDetailsSaveTimer = null;
+      return;
+    }
     if (options.immediate) {
       postAppSurfaceDetails(appId, item);
       return;
@@ -3061,6 +3077,11 @@
     const item = collectDomainDetailsPatch();
     applyDomainDetailsLocally(domainId, item);
     refreshDomainViews();
+    if (options.localOnly) {
+      clearTimeout(domainDetailsSaveTimer);
+      domainDetailsSaveTimer = null;
+      return;
+    }
     if (options.immediate) {
       postDomainDetails(domainId, item);
       return;
@@ -3122,6 +3143,11 @@
     const item = collectRoleDetailsPatch();
     applyRoleDetailsLocally(roleId, item);
     refreshRoleViews();
+    if (options.localOnly) {
+      clearTimeout(roleDetailsSaveTimer);
+      roleDetailsSaveTimer = null;
+      return;
+    }
     if (options.immediate) {
       postRoleDetails(roleId, item);
       return;
@@ -3185,6 +3211,11 @@
     const item = collectStatusGroupDetailsPatch();
     applyStatusGroupDetailsLocally(statusGroupId, item);
     refreshStatusGroupViews();
+    if (options.localOnly) {
+      clearTimeout(statusGroupDetailsSaveTimer);
+      statusGroupDetailsSaveTimer = null;
+      return;
+    }
     if (options.immediate) {
       postStatusGroupDetails(statusGroupId, item);
       return;
@@ -3309,6 +3340,11 @@
     const saveRevision = ++edgeDetailsSaveRevision;
     applyEdgeDetailsLocally(edgeId, patch);
     scheduleDrawEdges();
+    if (options.localOnly) {
+      clearTimeout(edgeDetailsSaveTimer);
+      edgeDetailsSaveTimer = null;
+      return;
+    }
     if (options.immediate) {
       postEdgeDetails(edgeId, patch, saveRevision);
       return;
