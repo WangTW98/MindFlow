@@ -625,7 +625,7 @@ small,
   display: grid;
   gap: 8px;
   padding: 12px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--card);
   border: 1px solid color-mix(in srgb, var(--outlet), var(--border) 62%);
   border-left: 4px solid var(--outlet);
@@ -705,6 +705,58 @@ small,
 
 .outlet-dot {
   border-color: var(--outlet);
+}
+
+.node-head > .inlet-dot,
+.app-surface-card-head > .inlet-dot {
+  left: -20px;
+}
+
+.app-surface-card-head > .inlet-dot {
+  left: -23px;
+}
+
+.node-head > .card-outlet,
+.app-surface-card-head > .card-outlet {
+  left: 20px;
+}
+
+.feature-group-head > .outlet-dot {
+  left: 28px;
+}
+
+.feature-item > .outlet-dot {
+  left: 27px;
+}
+
+.node-head > .inlet-dot::after,
+.node-head > .card-outlet::after,
+.app-surface-card-head > .inlet-dot::after,
+.app-surface-card-head > .card-outlet::after,
+.feature-group-head > .outlet-dot::after,
+.feature-item > .outlet-dot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 2px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.node-head > .inlet-dot::after,
+.app-surface-card-head > .inlet-dot::after {
+  left: calc(100% + 2px);
+  background: var(--inlet);
+}
+
+.node-head > .card-outlet::after,
+.app-surface-card-head > .card-outlet::after,
+.feature-group-head > .outlet-dot::after,
+.feature-item > .outlet-dot::after {
+  right: calc(100% + 2px);
+  background: var(--outlet);
 }
 
 .origin-dot:hover,

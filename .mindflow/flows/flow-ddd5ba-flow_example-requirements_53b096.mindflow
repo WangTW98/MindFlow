@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.0.0",
-  "flowId": "flow_example-requirements-md_f04201",
-  "revision": 30,
+  "flowId": "flow_example-requirements_53b096",
+  "revision": 14,
   "title": "多应用端采购协同平台需求示例",
   "sourceDocumentId": "/Users/wang/Documents/MindFlow/samples/example-requirements.md",
   "sourceSummary": "基于示例需求生成的多应用端采购协同平台产品流程。",
-  "createdAt": "2026-07-04T18:03:20.124Z",
-  "updatedAt": "2026-07-05T00:20:16.976Z",
+  "createdAt": "2026-07-05T00:29:51.232Z",
+  "updatedAt": "2026-07-05T00:36:26.024Z",
   "domains": [
     {
       "domainId": "domain_plan",
@@ -117,7 +117,7 @@
   "appSurfaces": [
     {
       "appId": "app_admin",
-      "name": "管理后台1",
+      "name": "管理后台",
       "type": "admin",
       "description": "采购专员、采购经理、财务和系统管理员使用的运营后台。",
       "domainIds": [
@@ -134,8 +134,8 @@
       ],
       "view": {
         "position": {
-          "x": -484,
-          "y": -9
+          "x": -550,
+          "y": 0
         }
       }
     },
@@ -151,13 +151,7 @@
       "roleIds": [
         "role_supplier_sales",
         "role_supplier_admin"
-      ],
-      "view": {
-        "position": {
-          "x": -412,
-          "y": 262
-        }
-      }
+      ]
     },
     {
       "appId": "app_mobile_approval",
@@ -171,13 +165,7 @@
         "role_purchase_manager",
         "role_finance",
         "role_general_manager"
-      ],
-      "view": {
-        "position": {
-          "x": -467,
-          "y": 481
-        }
-      }
+      ]
     },
     {
       "appId": "app_public_site",
@@ -189,13 +177,7 @@
       ],
       "roleIds": [
         "role_guest_supplier"
-      ],
-      "view": {
-        "position": {
-          "x": -437,
-          "y": 778
-        }
-      }
+      ]
     }
   ],
   "nodes": [
@@ -203,11 +185,11 @@
       "nodeId": "page_page-2d4715_2d4715",
       "stableKey": "fc54e42883f4",
       "status": "active",
-      "version": 2,
+      "version": 1,
       "title": "采购工作台",
       "pageType": "workspace",
       "appSurfaceIds": [
-        "app_supplier_portal"
+        "app_admin"
       ],
       "domainIds": [
         "domain_plan",
@@ -250,21 +232,21 @@
       ],
       "elements": [
         {
-          "elementId": "el_element-bc9fc7_30d382",
+          "elementId": "el_element-bc9fc7_a9811e",
           "name": "需求池列表",
           "type": "table",
           "description": "展示待采购需求。",
           "required": true
         },
         {
-          "elementId": "el_element-4114e4_a83836",
+          "elementId": "el_element-4114e4_d00f0a",
           "name": "新建计划按钮",
           "type": "button",
           "description": "进入采购计划新建页。",
           "required": false
         },
         {
-          "elementId": "el_element-7bb9b1_fe9f93",
+          "elementId": "el_element-7bb9b1_650236",
           "name": "待处理任务",
           "type": "list",
           "description": "展示待发布询价和待发起审批事项。",
@@ -273,7 +255,7 @@
       ],
       "actions": [
         {
-          "actionId": "act_action-4114e4_a83836",
+          "actionId": "act_action-4114e4_d00f0a",
           "label": "新建计划按钮",
           "type": "user",
           "result": "进入采购计划新建页。"
@@ -312,11 +294,10 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 247,
-          "y": -361
+          "x": -71,
+          "y": -286
         }
-      },
-      "updatedByChangeSetId": "manual"
+      }
     },
     {
       "nodeId": "page_page-3f602d_3f602d",
@@ -458,8 +439,8 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 829,
-          "y": -858
+          "x": 420,
+          "y": 60
         }
       }
     },
@@ -467,7 +448,7 @@
       "nodeId": "page_page-b6d354_b6d354",
       "stableKey": "c805e3b56c24",
       "status": "active",
-      "version": 1,
+      "version": 2,
       "title": "询价方案编辑页",
       "pageType": "form",
       "appSurfaceIds": [
@@ -479,13 +460,13 @@
       "roleIds": [
         "role_buyer"
       ],
-      "purpose": "维护供应商筛选条件、询价明细并发布询价。",
+      "purpose": "维护供应商筛选条件、询价明细并发布询价；审批退回后承接退回意见并保存修改，触发重新报价对比。",
       "featureGroups": [
         {
           "groupId": "group_group-e7a572_d817cb",
           "name": "页面功能",
           "type": "section",
-          "description": "页面中的主要功能分组。",
+          "description": "询价方案编辑与退回修改承接。",
           "items": [
             {
               "itemId": "item_item-eb7b0a_ea3b89",
@@ -509,6 +490,20 @@
               "required": true
             },
             {
+              "itemId": "item_return_revision_note",
+              "name": "退回意见提示",
+              "type": "alert",
+              "description": "展示当前审批退回原因和需要修改的字段。",
+              "required": false
+            },
+            {
+              "itemId": "item_save_return_revision",
+              "name": "保存退回修改按钮",
+              "type": "button",
+              "description": "保存按退回意见修改后的询价方案，并触发报价对比刷新。",
+              "required": false
+            },
+            {
               "itemId": "item_item-c1ca6d_4a93e7",
               "name": "发布询价按钮",
               "type": "button",
@@ -520,28 +515,42 @@
       ],
       "elements": [
         {
-          "elementId": "el_element-eb7b0a_850e04",
+          "elementId": "el_element-eb7b0a_0cb578",
           "name": "供应商等级",
           "type": "select",
           "description": "筛选供应商等级。",
           "required": true
         },
         {
-          "elementId": "el_element-eba814_f02149",
+          "elementId": "el_element-eba814_9c071a",
           "name": "历史履约评分",
           "type": "number",
           "description": "筛选历史评分。",
           "required": true
         },
         {
-          "elementId": "el_element-524013_cc3a43",
+          "elementId": "el_element-524013_062c4a",
           "name": "物料明细表",
           "type": "table",
           "description": "维护物料名称、规格、数量和目标价格。",
           "required": true
         },
         {
-          "elementId": "el_element-c1ca6d_e2d44f",
+          "elementId": "el_element-3f6837_b30f03",
+          "name": "退回意见提示",
+          "type": "alert",
+          "description": "展示当前审批退回原因和需要修改的字段。",
+          "required": false
+        },
+        {
+          "elementId": "el_element-3470ae_416ad4",
+          "name": "保存退回修改按钮",
+          "type": "button",
+          "description": "保存按退回意见修改后的询价方案，并触发报价对比刷新。",
+          "required": false
+        },
+        {
+          "elementId": "el_element-c1ca6d_014b7c",
           "name": "发布询价按钮",
           "type": "button",
           "description": "发布询价并通知供应商门户。",
@@ -550,7 +559,13 @@
       ],
       "actions": [
         {
-          "actionId": "act_action-c1ca6d_e2d44f",
+          "actionId": "act_action-3470ae_416ad4",
+          "label": "保存退回修改按钮",
+          "type": "user",
+          "result": "保存按退回意见修改后的询价方案，并触发报价对比刷新。"
+        },
+        {
+          "actionId": "act_action-c1ca6d_014b7c",
           "label": "发布询价按钮",
           "type": "user",
           "result": "发布询价并通知供应商门户。"
@@ -589,10 +604,11 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 1364,
-          "y": -821
+          "x": 780,
+          "y": 60
         }
-      }
+      },
+      "updatedByChangeSetId": "manual"
     },
     {
       "nodeId": "page_page-4975e3_4975e3",
@@ -717,7 +733,7 @@
       "nodeId": "page_page-14ec50_14ec50",
       "stableKey": "a83f6f734458",
       "status": "active",
-      "version": 3,
+      "version": 1,
       "title": "报价填写页",
       "pageType": "form",
       "appSurfaceIds": [
@@ -766,63 +782,41 @@
               "required": false
             }
           ]
-        },
-        {
-          "groupId": "group_mr6wba5s_lg1mg",
-          "name": "新功能分组",
-          "type": "section",
-          "description": "",
-          "items": [
-            {
-              "itemId": "item_mr6wbcdw_tw9ob",
-              "name": "新功能项",
-              "type": "text",
-              "description": "",
-              "required": false
-            }
-          ]
         }
       ],
       "elements": [
         {
-          "elementId": "el_element-ac89c1_0ca436",
+          "elementId": "el_element-ac89c1_d25f0e",
           "name": "报价金额",
           "type": "currency",
           "description": "填写报价金额。",
           "required": true
         },
         {
-          "elementId": "el_element-dc961a_b50336",
+          "elementId": "el_element-dc961a_c28bbd",
           "name": "交付周期",
           "type": "input",
           "description": "填写承诺交付周期。",
           "required": true
         },
         {
-          "elementId": "el_element-76a3cb_b6ea70",
+          "elementId": "el_element-76a3cb_36830a",
           "name": "资质文件",
           "type": "upload",
           "description": "上传资质材料。",
           "required": true
         },
         {
-          "elementId": "el_element-b92635_481029",
+          "elementId": "el_element-b92635_4f7aa7",
           "name": "提交报价按钮",
           "type": "button",
           "description": "提交报价到管理后台。",
-          "required": false
-        },
-        {
-          "elementId": "el_element-97fb34_5b7500",
-          "name": "新功能项",
-          "type": "text",
-          "description": "",
           "required": false
         }
       ],
       "actions": [
         {
-          "actionId": "act_action-b92635_481029",
+          "actionId": "act_action-b92635_4f7aa7",
           "label": "提交报价按钮",
           "type": "user",
           "result": "提交报价到管理后台。"
@@ -861,17 +855,16 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 2392,
-          "y": -510
+          "x": 1500,
+          "y": 60
         }
-      },
-      "updatedByChangeSetId": "manual"
+      }
     },
     {
       "nodeId": "page_page-5c8a02_5c8a02",
       "stableKey": "2b336832949b",
       "status": "active",
-      "version": 2,
+      "version": 1,
       "title": "报价对比页",
       "pageType": "workspace",
       "appSurfaceIds": [
@@ -924,28 +917,28 @@
       ],
       "elements": [
         {
-          "elementId": "el_element-cbb2ff_60bcdc",
+          "elementId": "el_element-cbb2ff_97c83a",
           "name": "供应商名称",
           "type": "input",
           "description": "按供应商名称筛选。",
           "required": true
         },
         {
-          "elementId": "el_element-1bc481_236000",
+          "elementId": "el_element-1bc481_d9719b",
           "name": "报价结果列表",
           "type": "table",
           "description": "展示供应商、报价、税率、交期、评分和风险标签。",
           "required": true
         },
         {
-          "elementId": "el_element-e96dc5_584ec4",
+          "elementId": "el_element-e96dc5_53a1fd",
           "name": "查询按钮",
           "type": "button",
           "description": "查询报价列表。",
           "required": false
         },
         {
-          "elementId": "el_element-11c09d_94be50",
+          "elementId": "el_element-11c09d_763c6f",
           "name": "生成比价报告按钮",
           "type": "button",
           "description": "生成比价报告。",
@@ -954,13 +947,13 @@
       ],
       "actions": [
         {
-          "actionId": "act_action-e96dc5_584ec4",
+          "actionId": "act_action-e96dc5_53a1fd",
           "label": "查询按钮",
           "type": "user",
           "result": "查询报价列表。"
         },
         {
-          "actionId": "act_action-11c09d_94be50",
+          "actionId": "act_action-11c09d_763c6f",
           "label": "生成比价报告按钮",
           "type": "user",
           "result": "生成比价报告。"
@@ -1002,15 +995,13 @@
           "x": 60,
           "y": 380
         }
-      },
-      "statusGroupId": "status_mr70lqe1_jty0n",
-      "updatedByChangeSetId": "manual"
+      }
     },
     {
       "nodeId": "page_page-d501c4_d501c4",
       "stableKey": "147a4d50f15f",
       "status": "active",
-      "version": 2,
+      "version": 1,
       "title": "审批发起页",
       "pageType": "form",
       "appSurfaceIds": [
@@ -1064,28 +1055,28 @@
       ],
       "elements": [
         {
-          "elementId": "el_element-638af4_743b72",
+          "elementId": "el_element-638af4_a33bd6",
           "name": "推荐供应商",
           "type": "select",
           "description": "选择推荐中标供应商。",
           "required": true
         },
         {
-          "elementId": "el_element-ae9d4a_a57c34",
+          "elementId": "el_element-ae9d4a_67b160",
           "name": "预算差异",
           "type": "currency",
           "description": "展示预算差异。",
           "required": true
         },
         {
-          "elementId": "el_element-459a6f_92268e",
+          "elementId": "el_element-459a6f_f2b010",
           "name": "审批流选择",
           "type": "select",
           "description": "选择采购经理、财务审核员和总经理。",
           "required": true
         },
         {
-          "elementId": "el_element-71e3e4_6e1666",
+          "elementId": "el_element-71e3e4_fcea09",
           "name": "发起审批按钮",
           "type": "button",
           "description": "发送审批待办到移动审批 App。",
@@ -1094,7 +1085,7 @@
       ],
       "actions": [
         {
-          "actionId": "act_action-71e3e4_6e1666",
+          "actionId": "act_action-71e3e4_fcea09",
           "label": "发起审批按钮",
           "type": "user",
           "result": "发送审批待办到移动审批 App。"
@@ -1136,9 +1127,7 @@
           "x": 420,
           "y": 380
         }
-      },
-      "statusGroupId": "status_mr70lqrg_hkxro",
-      "updatedByChangeSetId": "manual"
+      }
     },
     {
       "nodeId": "page_page-4eb4bd_4eb4bd",
@@ -1660,8 +1649,8 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": -24,
-          "y": 927
+          "x": 60,
+          "y": 700
         }
       }
     },
@@ -2181,70 +2170,101 @@
       "confidence": 0.78,
       "view": {
         "position": {
-          "x": 1502,
-          "y": 938
+          "x": 1500,
+          "y": 700
         }
       }
     },
     {
-      "nodeId": "page_mcp_eca811",
-      "stableKey": "0e28dd05724d",
+      "nodeId": "page_page-47508f_603156",
+      "stableKey": "fe7490be27e4",
       "status": "active",
-      "version": 1,
-      "title": "MCP 验证页",
-      "pageType": "debug",
+      "version": 2,
+      "title": "采购退回待办",
+      "pageType": "task_list",
       "appSurfaceIds": [
         "app_admin"
       ],
       "domainIds": [
-        "domain_sourcing"
+        "domain_sourcing",
+        "domain_mobile_approval"
       ],
       "roleIds": [
         "role_buyer"
       ],
-      "purpose": "用于验证 MCP 创建节点和画布渲染。",
+      "purpose": "采购专员接收审批退回事项，识别退回原因、退回审批人、原审批单和需要重新处理的询价方案。",
       "featureGroups": [
         {
-          "groupId": "group_mcp_verify",
-          "name": "验证功能",
+          "groupId": "group_return_task_list",
+          "name": "退回任务列表",
           "type": "section",
-          "description": "MCP 自动化验证分组。",
+          "description": "承接审批退回后生成的采购专员待办。",
           "items": [
             {
-              "itemId": "item_mcp_verify_submit",
-              "name": "验证按钮",
+              "itemId": "item_return_task_table",
+              "name": "退回任务列表",
+              "type": "table",
+              "description": "展示采购计划、退回节点、退回人、退回时间、退回原因摘要和处理状态。",
+              "required": true
+            },
+            {
+              "itemId": "item_return_task_filter",
+              "name": "退回任务筛选",
+              "type": "filter",
+              "description": "按采购计划、退回时间、审批人和处理状态筛选退回待办。",
+              "required": false
+            },
+            {
+              "itemId": "item_view_return_opinion",
+              "name": "查看退回意见按钮",
               "type": "button",
-              "description": "触发验证动作。"
+              "description": "打开退回意见查看页，查看审批人退回原因和修改要求。",
+              "required": false
             }
           ]
         }
       ],
       "elements": [
         {
-          "elementId": "el_element-fb5de2_3debd4",
-          "name": "验证按钮",
+          "elementId": "el_element-db3387_5a8fb0",
+          "name": "退回任务列表",
+          "type": "table",
+          "description": "展示采购计划、退回节点、退回人、退回时间、退回原因摘要和处理状态。",
+          "required": true
+        },
+        {
+          "elementId": "el_element-886302_9c7886",
+          "name": "退回任务筛选",
+          "type": "filter",
+          "description": "按采购计划、退回时间、审批人和处理状态筛选退回待办。",
+          "required": false
+        },
+        {
+          "elementId": "el_element-850c71_d9f422",
+          "name": "查看退回意见按钮",
           "type": "button",
-          "description": "触发验证动作。"
+          "description": "打开退回意见查看页，查看审批人退回原因和修改要求。",
+          "required": false
         }
       ],
       "actions": [
         {
-          "actionId": "act_action-fb5de2_3debd4",
-          "label": "验证按钮",
+          "actionId": "act_action-850c71_d9f422",
+          "label": "查看退回意见按钮",
           "type": "user",
-          "result": "触发验证动作。"
+          "result": "打开退回意见查看页，查看审批人退回原因和修改要求。"
         }
       ],
       "states": [
         {
-          "stateId": "state_48bfa63f7bbe",
+          "stateId": "state_0cb7fefcc4db",
           "name": "默认态",
           "description": "页面加载并可正常操作。"
         }
       ],
       "exceptions": [
         {
-          "exceptionId": "ex_904fadeb7b5e",
+          "exceptionId": "ex_7b61bde59523",
           "name": "异常处理",
           "handling": "按业务规则提示用户并支持重试。"
         }
@@ -2258,102 +2278,7 @@
         {
           "sourceId": "manual",
           "label": "MindFlow manual edit",
-          "excerpt": "用于验证 MCP 创建节点和画布渲染。"
-        }
-      ],
-      "artifacts": {
-        "prdIds": [
-          "prd_3fa306fe42"
-        ],
-        "pencilIds": [
-          "pencil_5e0308c215"
-        ]
-      },
-      "view": {
-        "position": {
-          "x": 784,
-          "y": 1984
-        }
-      },
-      "confidence": 1
-    },
-    {
-      "nodeId": "page_page-64451e_5bb52b",
-      "stableKey": "18f938b039ef",
-      "status": "active",
-      "version": 1,
-      "title": "新建页面",
-      "pageType": "page",
-      "appSurfaceIds": [],
-      "domainIds": [],
-      "roleIds": [],
-      "purpose": "手动创建的产品页面节点。",
-      "featureGroups": [
-        {
-          "groupId": "group_group-6b9957_ed7cff",
-          "name": "基础功能",
-          "type": "section",
-          "description": "页面默认功能分组，可在右侧详情栏编辑。",
-          "items": [
-            {
-              "itemId": "item_item-da1a76_813538",
-              "name": "主要内容",
-              "type": "content",
-              "description": "承载此页面的核心业务内容。"
-            },
-            {
-              "itemId": "item_item-16de57_0740e0",
-              "name": "确认按钮",
-              "type": "button",
-              "description": "触发页面主要业务操作。"
-            }
-          ]
-        }
-      ],
-      "elements": [
-        {
-          "elementId": "el_element-da1a76_01a1db",
-          "name": "主要内容",
-          "type": "content",
-          "description": "承载此页面的核心业务内容。"
-        },
-        {
-          "elementId": "el_element-16de57_1c885c",
-          "name": "确认按钮",
-          "type": "button",
-          "description": "触发页面主要业务操作。"
-        }
-      ],
-      "actions": [
-        {
-          "actionId": "act_action-16de57_1c885c",
-          "label": "确认按钮",
-          "type": "user",
-          "result": "触发页面主要业务操作。"
-        }
-      ],
-      "states": [
-        {
-          "stateId": "state_7283121826c3",
-          "name": "默认态",
-          "description": "页面加载并可正常操作。"
-        }
-      ],
-      "exceptions": [
-        {
-          "exceptionId": "ex_e9b3cac59b72",
-          "name": "异常处理",
-          "handling": "按业务规则提示用户并支持重试。"
-        }
-      ],
-      "inputs": [],
-      "outputs": [],
-      "permissions": [],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edit",
-          "excerpt": "手动创建的产品页面节点。"
+          "excerpt": "采购专员接收审批退回事项，识别退回原因、退回审批人、原审批单和需要重新处理的询价方案。"
         }
       ],
       "artifacts": {
@@ -2362,11 +2287,181 @@
       },
       "view": {
         "position": {
-          "x": 3941,
-          "y": -832
+          "x": 248,
+          "y": 1715
         }
       },
-      "confidence": 1
+      "confidence": 1,
+      "updatedByChangeSetId": "manual"
+    },
+    {
+      "nodeId": "page_page-acb7d9_791369",
+      "stableKey": "7eff339e1f00",
+      "status": "active",
+      "version": 2,
+      "title": "退回意见查看页",
+      "pageType": "detail",
+      "appSurfaceIds": [
+        "app_admin"
+      ],
+      "domainIds": [
+        "domain_sourcing",
+        "domain_mobile_approval"
+      ],
+      "roleIds": [
+        "role_buyer"
+      ],
+      "purpose": "采购专员查看审批退回意见、风险提示、需修改字段和原审批上下文，并决定进入询价方案修改。",
+      "featureGroups": [
+        {
+          "groupId": "group_return_opinion_summary",
+          "name": "退回意见摘要",
+          "type": "section",
+          "description": "展示审批退回原因和采购侧需要处理的修改要求。",
+          "items": [
+            {
+              "itemId": "item_return_reviewer",
+              "name": "退回审批人",
+              "type": "text",
+              "description": "展示执行退回的审批角色和人员。",
+              "required": true
+            },
+            {
+              "itemId": "item_return_reason",
+              "name": "退回原因",
+              "type": "textarea",
+              "description": "展示审批人填写的退回原因和风险提示。",
+              "required": true
+            },
+            {
+              "itemId": "item_revision_requirements",
+              "name": "修改要求",
+              "type": "list",
+              "description": "列出需要调整的供应商筛选、询价明细、推荐理由或预算说明。",
+              "required": true
+            }
+          ]
+        },
+        {
+          "groupId": "group_return_context",
+          "name": "原审批上下文",
+          "type": "section",
+          "description": "提供重新修改前需要回看的业务上下文。",
+          "items": [
+            {
+              "itemId": "item_original_approval_summary",
+              "name": "原审批摘要",
+              "type": "summary",
+              "description": "展示原推荐供应商、推荐理由、预算差异和审批流。",
+              "required": true
+            },
+            {
+              "itemId": "item_quote_compare_snapshot",
+              "name": "报价对比快照",
+              "type": "table",
+              "description": "展示退回时的报价对比结果和风险标签。",
+              "required": true
+            },
+            {
+              "itemId": "item_enter_sourcing_revision",
+              "name": "进入修改询价方案按钮",
+              "type": "button",
+              "description": "进入询价方案编辑页，按退回意见修改方案。",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "elements": [
+        {
+          "elementId": "el_element-b68a6c_7ffb65",
+          "name": "退回审批人",
+          "type": "text",
+          "description": "展示执行退回的审批角色和人员。",
+          "required": true
+        },
+        {
+          "elementId": "el_element-405dd1_784816",
+          "name": "退回原因",
+          "type": "textarea",
+          "description": "展示审批人填写的退回原因和风险提示。",
+          "required": true
+        },
+        {
+          "elementId": "el_element-28c290_351b51",
+          "name": "修改要求",
+          "type": "list",
+          "description": "列出需要调整的供应商筛选、询价明细、推荐理由或预算说明。",
+          "required": true
+        },
+        {
+          "elementId": "el_element-312e50_7cdac8",
+          "name": "原审批摘要",
+          "type": "summary",
+          "description": "展示原推荐供应商、推荐理由、预算差异和审批流。",
+          "required": true
+        },
+        {
+          "elementId": "el_element-e0d834_f775f6",
+          "name": "报价对比快照",
+          "type": "table",
+          "description": "展示退回时的报价对比结果和风险标签。",
+          "required": true
+        },
+        {
+          "elementId": "el_element-66b1f4_acfd1f",
+          "name": "进入修改询价方案按钮",
+          "type": "button",
+          "description": "进入询价方案编辑页，按退回意见修改方案。",
+          "required": false
+        }
+      ],
+      "actions": [
+        {
+          "actionId": "act_action-66b1f4_acfd1f",
+          "label": "进入修改询价方案按钮",
+          "type": "user",
+          "result": "进入询价方案编辑页，按退回意见修改方案。"
+        }
+      ],
+      "states": [
+        {
+          "stateId": "state_3071c650f123",
+          "name": "默认态",
+          "description": "页面加载并可正常操作。"
+        }
+      ],
+      "exceptions": [
+        {
+          "exceptionId": "ex_2305febb3cd3",
+          "name": "异常处理",
+          "handling": "按业务规则提示用户并支持重试。"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "permissions": [
+        "role_buyer"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edit",
+          "excerpt": "采购专员查看审批退回意见、风险提示、需修改字段和原审批上下文，并决定进入询价方案修改。"
+        }
+      ],
+      "artifacts": {
+        "prdIds": [],
+        "pencilIds": []
+      },
+      "view": {
+        "position": {
+          "x": 780,
+          "y": 430
+        }
+      },
+      "confidence": 1,
+      "updatedByChangeSetId": "manual"
     }
   ],
   "edges": [
@@ -2525,19 +2620,18 @@
       },
       "action": "提交报价",
       "trigger": "提交报价",
-      "type": "interaction",
+      "type": "submit",
       "appSurfaceIds": [
-        "app_admin",
         "app_supplier_portal",
-        "app_mobile_approval"
+        "app_admin"
       ],
       "domainIds": [
-        "domain_sourcing",
-        "domain_supplier"
+        "domain_supplier",
+        "domain_sourcing"
       ],
       "roleIds": [
-        "role_buyer",
-        "role_supplier_sales"
+        "role_supplier_sales",
+        "role_buyer"
       ],
       "sourceRefs": [
         {
@@ -2546,8 +2640,7 @@
           "excerpt": "报价填写页 -> 报价对比页"
         }
       ],
-      "confidence": 0.76,
-      "updatedByChangeSetId": "manual"
+      "confidence": 0.76
     },
     {
       "edgeId": "edge_580df8e4da",
@@ -2734,7 +2827,7 @@
     },
     {
       "edgeId": "edge_19381d003c",
-      "status": "active",
+      "status": "removed",
       "fromNodeId": "page_page-41a912_41a912",
       "toNodeId": "page_page-b6d354_b6d354",
       "from": {
@@ -2768,7 +2861,10 @@
           "excerpt": "移动审批详情页 -> 询价方案编辑页"
         }
       ],
-      "confidence": 0.76
+      "confidence": 0.76,
+      "removedAt": "2026-07-05T00:35:30.492Z",
+      "removedByChangeSetId": "manual",
+      "updatedByChangeSetId": "manual"
     },
     {
       "edgeId": "edge_491c889461",
@@ -2952,23 +3048,102 @@
       "confidence": 0.76
     },
     {
-      "edgeId": "edge_32b8c7604e",
+      "edgeId": "edge_11b51e2788",
       "status": "active",
-      "fromNodeId": "page_page-5c8a02_5c8a02",
-      "toNodeId": "page_page-d501c4_d501c4",
+      "fromNodeId": "page_page-41a912_41a912",
+      "toNodeId": "page_page-47508f_603156",
       "from": {
         "kind": "featureItem",
-        "nodeId": "page_page-5c8a02_5c8a02",
-        "groupId": "group_group-e7a572_dd2fa9",
-        "itemId": "item_item-11c09d_8eddb4"
+        "nodeId": "page_page-41a912_41a912",
+        "groupId": "group_group-e7a572_44b8d3",
+        "itemId": "item_item-0a3ede_c52010"
       },
       "to": {
         "kind": "node",
-        "nodeId": "page_page-d501c4_d501c4"
+        "nodeId": "page_page-47508f_603156"
       },
-      "action": "同一功能项出口进入审批",
-      "trigger": "同一功能项出口进入审批",
-      "type": "submit",
+      "action": "审批人点击退回按钮并填写退回原因后，系统生成采购专员退回待办",
+      "trigger": "审批人点击退回按钮并填写退回原因后，系统生成采购专员退回待办",
+      "type": "reject",
+      "appSurfaceIds": [
+        "app_mobile_approval",
+        "app_admin"
+      ],
+      "domainIds": [
+        "domain_mobile_approval",
+        "domain_sourcing"
+      ],
+      "roleIds": [
+        "role_purchase_manager",
+        "role_finance",
+        "role_general_manager",
+        "role_buyer"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "page_page-41a912_41a912/group_group-e7a572_44b8d3/item_item-0a3ede_c52010 -> page_page-47508f_603156"
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "edgeId": "edge_3e0cc7775d",
+      "status": "active",
+      "fromNodeId": "page_page-2d4715_2d4715",
+      "toNodeId": "page_page-47508f_603156",
+      "from": {
+        "kind": "featureItem",
+        "nodeId": "page_page-2d4715_2d4715",
+        "groupId": "group_group-e7a572_6d9679",
+        "itemId": "item_item-7bb9b1_373788"
+      },
+      "to": {
+        "kind": "node",
+        "nodeId": "page_page-47508f_603156"
+      },
+      "action": "采购专员在采购工作台的待处理任务中点击审批退回待办",
+      "trigger": "采购专员在采购工作台的待处理任务中点击审批退回待办",
+      "type": "navigate",
+      "appSurfaceIds": [
+        "app_admin"
+      ],
+      "domainIds": [
+        "domain_plan",
+        "domain_sourcing",
+        "domain_mobile_approval"
+      ],
+      "roleIds": [
+        "role_buyer"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "page_page-2d4715_2d4715/group_group-e7a572_6d9679/item_item-7bb9b1_373788 -> page_page-47508f_603156"
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "edgeId": "edge_084eebce4d",
+      "status": "active",
+      "fromNodeId": "page_page-47508f_603156",
+      "toNodeId": "page_page-acb7d9_791369",
+      "from": {
+        "kind": "featureItem",
+        "nodeId": "page_page-47508f_603156",
+        "groupId": "group_return_task_list",
+        "itemId": "item_view_return_opinion"
+      },
+      "to": {
+        "kind": "node",
+        "nodeId": "page_page-acb7d9_791369"
+      },
+      "action": "采购专员在退回待办中点击查看退回意见，进入退回意见查看页",
+      "trigger": "采购专员在退回待办中点击查看退回意见，进入退回意见查看页",
+      "type": "navigate",
       "appSurfaceIds": [
         "app_admin"
       ],
@@ -2983,16 +3158,89 @@
         {
           "sourceId": "manual",
           "label": "MindFlow manual edge",
-          "excerpt": "page_page-5c8a02_5c8a02/group_group-e7a572_dd2fa9/item_item-11c09d_8eddb4 -> 审批发起页"
+          "excerpt": "page_page-47508f_603156/group_return_task_list/item_view_return_opinion -> page_page-acb7d9_791369"
         }
       ],
       "confidence": 1
     },
     {
-      "edgeId": "edge_712cdc37b9",
+      "edgeId": "edge_ea3b2ddc1f",
+      "status": "active",
+      "fromNodeId": "page_page-acb7d9_791369",
+      "toNodeId": "page_page-b6d354_b6d354",
+      "from": {
+        "kind": "featureItem",
+        "nodeId": "page_page-acb7d9_791369",
+        "groupId": "group_return_context",
+        "itemId": "item_enter_sourcing_revision"
+      },
+      "to": {
+        "kind": "node",
+        "nodeId": "page_page-b6d354_b6d354"
+      },
+      "action": "采购专员确认退回原因和修改要求后，点击进入修改询价方案按钮",
+      "trigger": "采购专员确认退回原因和修改要求后，点击进入修改询价方案按钮",
+      "type": "navigate",
+      "appSurfaceIds": [
+        "app_admin"
+      ],
+      "domainIds": [
+        "domain_sourcing",
+        "domain_mobile_approval"
+      ],
+      "roleIds": [
+        "role_buyer"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "page_page-acb7d9_791369/group_return_context/item_enter_sourcing_revision -> page_page-b6d354_b6d354"
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "edgeId": "edge_9e86b78797",
+      "status": "active",
+      "fromNodeId": "page_page-b6d354_b6d354",
+      "toNodeId": "page_page-5c8a02_5c8a02",
+      "from": {
+        "kind": "featureItem",
+        "nodeId": "page_page-b6d354_b6d354",
+        "groupId": "group_group-e7a572_d817cb",
+        "itemId": "item_save_return_revision"
+      },
+      "to": {
+        "kind": "node",
+        "nodeId": "page_page-5c8a02_5c8a02"
+      },
+      "action": "采购专员按退回意见修改供应商筛选或询价明细并保存退回修改后，系统刷新报价对比",
+      "trigger": "采购专员按退回意见修改供应商筛选或询价明细并保存退回修改后，系统刷新报价对比",
+      "type": "update",
+      "appSurfaceIds": [
+        "app_admin"
+      ],
+      "domainIds": [
+        "domain_sourcing"
+      ],
+      "roleIds": [
+        "role_buyer"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "page_page-b6d354_b6d354/group_group-e7a572_d817cb/item_save_return_revision -> page_page-5c8a02_5c8a02"
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "edgeId": "edge_dc9ec6a36c",
       "status": "active",
       "fromNodeId": "page_page-5c8a02_5c8a02",
-      "toNodeId": "page_page-3f602d_3f602d",
+      "toNodeId": "page_page-d501c4_d501c4",
       "from": {
         "kind": "featureItem",
         "nodeId": "page_page-5c8a02_5c8a02",
@@ -3001,17 +3249,17 @@
       },
       "to": {
         "kind": "node",
-        "nodeId": "page_page-3f602d_3f602d"
+        "nodeId": "page_page-d501c4_d501c4"
       },
-      "action": "同一功能项出口回看计划",
-      "trigger": "同一功能项出口回看计划",
-      "type": "navigate",
+      "action": "退回修改后的报价对比刷新完成后，采购专员点击生成比价报告按钮重新生成比价报告",
+      "trigger": "退回修改后的报价对比刷新完成后，采购专员点击生成比价报告按钮重新生成比价报告",
+      "type": "create",
       "appSurfaceIds": [
         "app_admin"
       ],
       "domainIds": [
         "domain_sourcing",
-        "domain_plan"
+        "domain_mobile_approval"
       ],
       "roleIds": [
         "role_buyer"
@@ -3020,337 +3268,29 @@
         {
           "sourceId": "manual",
           "label": "MindFlow manual edge",
-          "excerpt": "page_page-5c8a02_5c8a02/group_group-e7a572_dd2fa9/item_item-11c09d_8eddb4 -> 采购计划新建页"
+          "excerpt": "page_page-5c8a02_5c8a02/group_group-e7a572_dd2fa9/item_item-11c09d_8eddb4 -> page_page-d501c4_d501c4"
         }
       ],
       "confidence": 1
     },
     {
-      "edgeId": "edge_cbbae88ba6",
+      "edgeId": "edge_2d6255f328",
       "status": "active",
-      "fromNodeId": "page_mcp_eca811",
-      "toNodeId": "page_page-5c8a02_5c8a02",
-      "from": {
-        "kind": "node",
-        "nodeId": "page_mcp_eca811"
-      },
-      "to": {
-        "kind": "node",
-        "nodeId": "page_page-5c8a02_5c8a02"
-      },
-      "action": "MCP 验证回到报价对比",
-      "trigger": "MCP 验证回到报价对比",
-      "type": "navigate",
-      "appSurfaceIds": [
-        "app_admin"
-      ],
-      "domainIds": [
-        "domain_sourcing"
-      ],
-      "roleIds": [
-        "role_buyer"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "page_mcp_eca811 -> 报价对比页"
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "edgeId": "edge_c30ffeba96",
-      "status": "active",
-      "fromNodeId": "page_page-dd6d12_dd6d12",
-      "toNodeId": "page_page-c73633_c73633",
-      "from": {
-        "kind": "node",
-        "nodeId": "page_page-dd6d12_dd6d12"
-      },
-      "to": {
-        "kind": "node",
-        "nodeId": "page_page-c73633_c73633"
-      },
-      "action": "手动连接",
-      "trigger": "手动连接",
-      "type": "dataFlow",
-      "appSurfaceIds": [
-        "app_admin",
-        "app_supplier_portal",
-        "app_public_site"
-      ],
-      "domainIds": [
-        "domain_contract_archive",
-        "domain_public"
-      ],
-      "roleIds": [
-        "role_buyer",
-        "role_finance",
-        "role_supplier_admin",
-        "role_guest_supplier"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "page_page-dd6d12_dd6d12 -> 采购公告列表"
-        }
-      ],
-      "confidence": 1,
-      "updatedByChangeSetId": "manual"
-    },
-    {
-      "edgeId": "edge_dba52d020b",
-      "status": "active",
-      "fromNodeId": "app_admin",
-      "toNodeId": "page_page-2d4715_2d4715",
-      "from": {
-        "kind": "appSurface",
-        "nodeId": "app_admin",
-        "appId": "app_admin"
-      },
-      "to": {
-        "kind": "node",
-        "nodeId": "page_page-2d4715_2d4715"
-      },
-      "action": "手动连接",
-      "trigger": "手动连接",
-      "type": "navigate",
-      "appSurfaceIds": [
-        "app_admin"
-      ],
-      "domainIds": [
-        "domain_plan",
-        "domain_sourcing",
-        "domain_contract_archive",
-        "domain_admin"
-      ],
-      "roleIds": [
-        "role_buyer",
-        "role_purchase_manager",
-        "role_finance",
-        "role_system_admin"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "管理后台 -> page_page-2d4715_2d4715"
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "edgeId": "edge_32a1e75519",
-      "status": "active",
-      "fromNodeId": "page_page-2d4715_2d4715",
-      "toNodeId": "page_page-b6d354_b6d354",
-      "from": {
-        "kind": "node",
-        "nodeId": "page_page-2d4715_2d4715"
-      },
-      "to": {
-        "kind": "node",
-        "nodeId": "page_page-b6d354_b6d354"
-      },
-      "action": "手动连接",
-      "trigger": "手动连接",
-      "type": "interaction",
-      "appSurfaceIds": [
-        "app_admin"
-      ],
-      "domainIds": [
-        "domain_plan",
-        "domain_sourcing"
-      ],
-      "roleIds": [
-        "role_buyer"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "page_page-2d4715_2d4715 -> page_page-b6d354_b6d354"
-        }
-      ],
-      "confidence": 1,
-      "updatedByChangeSetId": "manual"
-    },
-    {
-      "edgeId": "edge_4ed25a19cd",
-      "status": "active",
-      "fromNodeId": "page_page-3f602d_3f602d",
-      "toNodeId": "page_page-4975e3_4975e3",
-      "from": {
-        "kind": "node",
-        "nodeId": "page_page-3f602d_3f602d"
-      },
-      "to": {
-        "kind": "node",
-        "nodeId": "page_page-4975e3_4975e3"
-      },
-      "action": "手动连接",
-      "trigger": "手动连接",
-      "type": "interaction",
-      "appSurfaceIds": [
-        "app_admin",
-        "app_supplier_portal"
-      ],
-      "domainIds": [
-        "domain_plan",
-        "domain_supplier"
-      ],
-      "roleIds": [
-        "role_buyer",
-        "role_supplier_sales",
-        "role_supplier_admin"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "page_page-3f602d_3f602d -> page_page-4975e3_4975e3"
-        }
-      ],
-      "confidence": 1,
-      "updatedByChangeSetId": "manual"
-    },
-    {
-      "edgeId": "edge_6d88d3fd55",
-      "status": "active",
-      "fromNodeId": "app_supplier_portal",
-      "toNodeId": "page_page-2d4715_2d4715",
-      "from": {
-        "kind": "appSurface",
-        "nodeId": "app_supplier_portal",
-        "appId": "app_supplier_portal"
-      },
-      "to": {
-        "kind": "node",
-        "nodeId": "page_page-2d4715_2d4715"
-      },
-      "action": "手动连接",
-      "trigger": "手动连接",
-      "type": "navigate",
-      "appSurfaceIds": [
-        "app_supplier_portal"
-      ],
-      "domainIds": [
-        "domain_supplier",
-        "domain_contract_archive",
-        "domain_plan",
-        "domain_sourcing"
-      ],
-      "roleIds": [
-        "role_supplier_sales",
-        "role_supplier_admin",
-        "role_buyer"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "供应商门户 -> page_page-2d4715_2d4715"
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "edgeId": "edge_8c523c59a2",
-      "status": "active",
-      "fromNodeId": "page_page-2d4715_2d4715",
-      "toNodeId": "page_page-b6d354_b6d354",
-      "from": {
-        "kind": "featureGroup",
-        "nodeId": "page_page-2d4715_2d4715",
-        "groupId": "group_group-e7a572_6d9679"
-      },
-      "to": {
-        "kind": "node",
-        "nodeId": "page_page-b6d354_b6d354"
-      },
-      "action": "手动连接",
-      "trigger": "手动连接",
-      "type": "navigate",
-      "appSurfaceIds": [
-        "app_supplier_portal",
-        "app_admin"
-      ],
-      "domainIds": [
-        "domain_plan",
-        "domain_sourcing"
-      ],
-      "roleIds": [
-        "role_buyer"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "page_page-2d4715_2d4715/group_group-e7a572_6d9679 -> page_page-b6d354_b6d354"
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "edgeId": "edge_2a8a7fa72f",
-      "status": "active",
-      "fromNodeId": "page_page-2d4715_2d4715",
-      "toNodeId": "page_page-4975e3_4975e3",
-      "from": {
-        "kind": "featureItem",
-        "nodeId": "page_page-2d4715_2d4715",
-        "groupId": "group_group-e7a572_6d9679",
-        "itemId": "item_item-bc9fc7_0e9b06"
-      },
-      "to": {
-        "kind": "node",
-        "nodeId": "page_page-4975e3_4975e3"
-      },
-      "action": "手动连接",
-      "trigger": "手动连接",
-      "type": "navigate",
-      "appSurfaceIds": [
-        "app_supplier_portal"
-      ],
-      "domainIds": [
-        "domain_plan",
-        "domain_sourcing",
-        "domain_supplier"
-      ],
-      "roleIds": [
-        "role_buyer",
-        "role_supplier_sales",
-        "role_supplier_admin"
-      ],
-      "sourceRefs": [
-        {
-          "sourceId": "manual",
-          "label": "MindFlow manual edge",
-          "excerpt": "page_page-2d4715_2d4715/group_group-e7a572_6d9679/item_item-bc9fc7_0e9b06 -> page_page-4975e3_4975e3"
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "edgeId": "edge_26fa0115bb",
-      "status": "active",
-      "fromNodeId": "page_page-5c8a02_5c8a02",
+      "fromNodeId": "page_page-d501c4_d501c4",
       "toNodeId": "page_page-4eb4bd_4eb4bd",
       "from": {
         "kind": "featureItem",
-        "nodeId": "page_page-5c8a02_5c8a02",
-        "groupId": "group_group-e7a572_dd2fa9",
-        "itemId": "item_item-e96dc5_cf03e5"
+        "nodeId": "page_page-d501c4_d501c4",
+        "groupId": "group_group-e7a572_7dc2b4",
+        "itemId": "item_item-71e3e4_fdcee2"
       },
       "to": {
         "kind": "node",
         "nodeId": "page_page-4eb4bd_4eb4bd"
       },
-      "action": "手动连接",
-      "trigger": "手动连接",
-      "type": "interaction",
+      "action": "重新生成比价报告并更新审批摘要后，采购专员点击发起审批按钮再次提交审批",
+      "trigger": "重新生成比价报告并更新审批摘要后，采购专员点击发起审批按钮再次提交审批",
+      "type": "resubmit",
       "appSurfaceIds": [
         "app_admin",
         "app_mobile_approval"
@@ -3369,66 +3309,78 @@
         {
           "sourceId": "manual",
           "label": "MindFlow manual edge",
-          "excerpt": "page_page-5c8a02_5c8a02/group_group-e7a572_dd2fa9/item_item-e96dc5_cf03e5 -> page_page-4eb4bd_4eb4bd"
+          "excerpt": "page_page-d501c4_d501c4/group_group-e7a572_7dc2b4/item_item-71e3e4_fdcee2 -> page_page-4eb4bd_4eb4bd"
         }
       ],
       "confidence": 1
     }
   ],
   "artifacts": {
-    "prds": [
-      {
-        "prdId": "prd_3fa306fe42",
-        "scope": "node",
-        "nodeId": "page_mcp_eca811",
-        "path": "docs/prd/flow_example-requirements-md_f04201/node-page_mcp_eca811-prd_3fa306fe42.md",
-        "status": "active",
-        "createdAt": "2026-07-04T18:03:20.141Z",
-        "updatedAt": "2026-07-04T18:03:20.141Z"
-      }
-    ],
-    "pencils": [
-      {
-        "pencilId": "pencil_5e0308c215",
-        "scope": "node",
-        "nodeId": "page_mcp_eca811",
-        "path": "designs/pencil/flow_example-requirements-md_f04201/node-page_mcp_eca811-pencil_5e0308c215.pencil.json",
-        "status": "active",
-        "createdAt": "2026-07-04T18:03:20.144Z",
-        "updatedAt": "2026-07-04T18:03:20.144Z"
-      }
-    ]
+    "prds": [],
+    "pencils": []
   },
   "changeHistory": [],
   "syncState": {
     "issues": []
   },
-  "openQuestions": [],
-  "statusGroups": [
+  "productDesignIssues": [
     {
-      "statusGroupId": "status_mr70lqe1_jty0n",
-      "title": "新状态组 1",
-      "color": "#c89a69"
+      "issueId": "pdi_critical_e51bf159",
+      "severity": "critical",
+      "title": "报价撤回缺少闭环路径",
+      "description": "供应商门户描述了报价撤回场景，但当前流程只表现提交报价到报价对比，缺少撤回后的状态回滚、重新报价入口和采购侧通知。",
+      "prompt": "请基于当前 MindFlow 完善“报价撤回缺少闭环路径”：在供应商门户首页、报价填写页、报价对比页之间补充撤回报价后的状态、通知、重新报价入口和采购侧处理路径，并保持节点与边的 domainIds、roleIds、appSurfaceIds 一致。",
+      "relatedNodeIds": [
+        "page_page-4975e3_4975e3",
+        "page_page-14ec50_14ec50",
+        "page_page-5c8a02_5c8a02"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "mock",
+          "label": "MockProvider",
+          "excerpt": "供应商查看询价、提交报价和撤回报价。"
+        }
+      ]
     },
     {
-      "statusGroupId": "status_mr70lqrg_hkxro",
-      "title": "新状态组 2",
-      "color": "#4c5adb"
+      "issueId": "pdi_warning_45f44ea7",
+      "severity": "warning",
+      "title": "退回审批后的采购待办承接不清晰",
+      "description": "移动审批详情页可以退回修改并连到询价方案编辑页，但缺少采购专员收到退回待办、查看退回意见、修改后再次发起审批的明确闭环。",
+      "prompt": "请基于当前 MindFlow 完善“退回审批后的采购待办承接不清晰”：补充采购专员退回待办、退回意见查看、修改询价方案、重新生成比价报告并再次发起审批的节点或连线，明确每一步触发条件。",
+      "relatedNodeIds": [
+        "page_page-41a912_41a912",
+        "page_page-b6d354_b6d354",
+        "page_page-5c8a02_5c8a02"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "mock",
+          "label": "MockProvider",
+          "excerpt": "审批人查看采购摘要、报价对比、预算占用和风险提示并处理审批。"
+        }
+      ]
     },
     {
-      "statusGroupId": "status_mr70lr7n_e2vsh",
-      "title": "新状态组 3",
-      "color": "#06a99a"
-    },
-    {
-      "statusGroupId": "status_mr70lrcq_gw4sp",
-      "title": "新状态组 4",
-      "color": "#ba8dc3"
-    },
-    {
-      "statusGroupId": "status_mr70lrhu_mqxas",
-      "title": "新状态组 5",
-      "color": "#fa6a32"
+      "issueId": "pdi_optional_596be201",
+      "severity": "optional",
+      "title": "供应商注册后缺少进度反馈体验",
+      "description": "访客供应商提交注册后直接进入后台审核链路，当前流程未体现供应商侧的提交成功、审核进度查询和驳回后补充材料体验。",
+      "prompt": "请基于当前 MindFlow 优化“供应商注册后缺少进度反馈体验”：为公开采购网站或供应商门户补充注册提交成功、审核进度查询、驳回原因查看和补充材料路径，并标注对应角色与应用端。",
+      "relatedNodeIds": [
+        "page_page-fca2b3_fca2b3",
+        "page_page-d3ac5d_d3ac5d",
+        "page_page-4975e3_4975e3"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "mock",
+          "label": "MockProvider",
+          "excerpt": "潜在供应商提交企业信息、联系人和资质文件。"
+        }
+      ]
     }
-  ]
+  ],
+  "openQuestions": []
 }
