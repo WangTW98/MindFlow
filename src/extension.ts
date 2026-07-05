@@ -19,6 +19,12 @@ import {
   type UpdateNodeDetailsInput
 } from "./core/flowEditing";
 import { createEmptyProductFlow } from "./core/emptyFlow";
+import {
+  ensureProjectOverview,
+  updateProjectOverview,
+  updateProjectOverviewPosition,
+  type UpdateProjectOverviewInput
+} from "./core/projectOverview";
 import { applyTaxonomyRequest, type TaxonomyRequest } from "./core/taxonomy";
 import { pruneMissingAppSurfaceReferences } from "./core/taxonomyEditing";
 import { createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "./core/untitledMindFlowDocument";
@@ -60,6 +66,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("mindflow.updateAppSurfacePosition", (appId?: string, x?: number, y?: number, flowUri?: FlowUriArgument) =>
       updateAppSurfacePosition(appId, x, y, flowUri)
     ),
+    vscode.commands.registerCommand("mindflow.updateProjectOverviewPosition", (x?: number, y?: number, flowUri?: FlowUriArgument) =>
+      saveProjectOverviewPosition(x, y, flowUri)
+    ),
     vscode.commands.registerCommand(
       "mindflow.createNodeAt",
       (x?: number, y?: number, appSurfaceIds?: string[], domainIds?: string[], roleIds?: string[], flowUri?: FlowUriArgument) =>
@@ -67,6 +76,9 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand("mindflow.updateNodeDetails", (nodeId?: string, patch?: UpdateNodeDetailsInput, flowUri?: FlowUriArgument) =>
       updateNodeDetails(context, nodeId, patch, flowUri)
+    ),
+    vscode.commands.registerCommand("mindflow.updateProjectOverview", (patch?: UpdateProjectOverviewInput, flowUri?: FlowUriArgument) =>
+      updateProjectOverviewDetails(context, patch, flowUri)
     ),
     vscode.commands.registerCommand("mindflow.createEdge", (from?: FlowEndpoint, to?: FlowEndpoint, trigger?: string, type?: EdgeType, flowUri?: FlowUriArgument) =>
       createEdge(context, from, to, trigger, type, flowUri)
@@ -185,6 +197,19 @@ async function updateAppSurfacePosition(appId?: string, x?: number, y?: number, 
   }
 }
 
+async function saveProjectOverviewPosition(x?: number, y?: number, sourceUri?: FlowUriArgument): Promise<void> {
+  try {
+    if (typeof x !== "number" || typeof y !== "number") {
+      return;
+    }
+    const { flow, flowUri } = await loadCurrentFlow(sourceUri);
+    updateProjectOverviewPosition(flow, x, y);
+    await applyFlowDocumentEdit(flowUri, flow);
+  } catch (error) {
+    showError("Update project overview position failed", error);
+  }
+}
+
 async function createNodeAt(
   context: vscode.ExtensionContext,
   x?: number,
@@ -204,6 +229,7 @@ async function createNodeAt(
       roleIds: Array.isArray(roleIds) ? roleIds : undefined
     });
     await applyFlowDocumentEdit(flowUri, flow);
+    FlowPanel.selectedProjectOverview = false;
     FlowPanel.selectedNodeId = node.nodeId;
     FlowPanel.selectedEdgeId = undefined;
     FlowPanel.selectedAppSurfaceId = undefined;
@@ -224,6 +250,7 @@ async function updateNodeDetails(context: vscode.ExtensionContext, nodeId?: stri
     const { flow, flowUri } = await loadCurrentFlow(sourceUri);
     updateManualNodeDetails(flow, nodeId, patch);
     await applyFlowDocumentEdit(flowUri, flow);
+    FlowPanel.selectedProjectOverview = false;
     FlowPanel.selectedNodeId = nodeId;
     FlowPanel.selectedEdgeId = undefined;
     FlowPanel.selectedAppSurfaceId = undefined;
@@ -233,6 +260,27 @@ async function updateNodeDetails(context: vscode.ExtensionContext, nodeId?: stri
     FlowPanel.createOrShow(context.extensionUri, flow, flowUri);
   } catch (error) {
     showError("Update node details failed", error);
+  }
+}
+
+async function updateProjectOverviewDetails(context: vscode.ExtensionContext, patch?: UpdateProjectOverviewInput, sourceUri?: FlowUriArgument): Promise<void> {
+  try {
+    if (!patch) {
+      return;
+    }
+    const { flow, flowUri } = await loadCurrentFlow(sourceUri);
+    updateProjectOverview(flow, patch);
+    await applyFlowDocumentEdit(flowUri, flow);
+    FlowPanel.selectedProjectOverview = true;
+    FlowPanel.selectedNodeId = undefined;
+    FlowPanel.selectedEdgeId = undefined;
+    FlowPanel.selectedAppSurfaceId = undefined;
+    FlowPanel.selectedDomainId = undefined;
+    FlowPanel.selectedRoleId = undefined;
+    FlowPanel.selectedStatusGroupId = undefined;
+    FlowPanel.createOrShow(context.extensionUri, flow, flowUri);
+  } catch (error) {
+    showError("Update project overview failed", error);
   }
 }
 
@@ -251,6 +299,7 @@ async function createEdge(
     const { flow, flowUri } = await loadCurrentFlow(sourceUri);
     const edge = createManualEdge(flow, { from, to, trigger, type });
     await applyFlowDocumentEdit(flowUri, flow);
+    FlowPanel.selectedProjectOverview = false;
     FlowPanel.selectedNodeId = undefined;
     FlowPanel.selectedEdgeId = edge.edgeId;
     FlowPanel.selectedAppSurfaceId = undefined;
@@ -312,6 +361,7 @@ async function createConnectedNodeAt(context: vscode.ExtensionContext, request?:
       });
     }
     await applyFlowDocumentEdit(flowUri, flow);
+    FlowPanel.selectedProjectOverview = false;
     FlowPanel.selectedNodeId = node.nodeId;
     FlowPanel.selectedEdgeId = undefined;
     FlowPanel.selectedAppSurfaceId = undefined;
@@ -336,6 +386,7 @@ async function deleteNode(context: vscode.ExtensionContext, nodeId?: string, sou
     const { flow, flowUri } = await loadCurrentFlow(sourceUri);
     removeManualNode(flow, nodeId);
     await applyFlowDocumentEdit(flowUri, flow);
+    FlowPanel.selectedProjectOverview = false;
     FlowPanel.selectedNodeId = undefined;
     FlowPanel.selectedEdgeId = undefined;
     FlowPanel.selectedAppSurfaceId = undefined;
@@ -356,6 +407,7 @@ async function updateEdgeDetails(context: vscode.ExtensionContext, edgeId?: stri
     const { flow, flowUri } = await loadCurrentFlow(sourceUri);
     updateManualEdgeDetails(flow, edgeId, patch);
     await applyFlowDocumentEdit(flowUri, flow);
+    FlowPanel.selectedProjectOverview = false;
     FlowPanel.selectedNodeId = undefined;
     FlowPanel.selectedEdgeId = edgeId;
     FlowPanel.selectedAppSurfaceId = undefined;
@@ -376,6 +428,7 @@ async function disconnectEdge(context: vscode.ExtensionContext, edgeId?: string,
     const { flow, flowUri } = await loadCurrentFlow(sourceUri);
     removeManualEdge(flow, edgeId);
     await applyFlowDocumentEdit(flowUri, flow);
+    FlowPanel.selectedProjectOverview = false;
     FlowPanel.selectedEdgeId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowUri);
   } catch (error) {
@@ -416,6 +469,7 @@ async function loadCurrentFlow(sourceUri?: FlowUriArgument): Promise<{ flow: Pro
   }
   const document = await vscode.workspace.openTextDocument(flowUri);
   const parsed = JSON.parse(document.getText()) as unknown;
+  ensureProjectOverview(parsed as ProductFlow);
   const validation = validateProductFlow(parsed);
   if (!validation.valid) {
     throw new Error(`Invalid ProductFlow document ${flowDisplayName(flowUri)}:\n${validation.errors.join("\n")}`);
@@ -427,6 +481,7 @@ async function loadCurrentFlow(sourceUri?: FlowUriArgument): Promise<{ flow: Pro
 
 async function applyFlowDocumentEdit(flowUri: vscode.Uri, flow: ProductFlow): Promise<void> {
   flow.updatedAt = nowIso();
+  ensureProjectOverview(flow);
   pruneMissingAppSurfaceReferences(flow);
   const validation = validateProductFlow(flow);
   if (!validation.valid) {

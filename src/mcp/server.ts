@@ -19,6 +19,7 @@ import {
   updateManualNodeDetails,
   updateManualNodePosition
 } from "../core/flowEditing";
+import { ensureProjectOverview } from "../core/projectOverview";
 import { applyTaxonomyRequest, type TaxonomyRequest } from "../core/taxonomy";
 import type { FlowChangePlan } from "../models/flowChange";
 import type { EdgeType, FeatureGroup, FlowEndpoint, PageNode, ProductFlow } from "../models/productFlow";
@@ -552,6 +553,7 @@ async function validateFlow(args: Record<string, unknown>): Promise<unknown> {
   const raw = await fs.readFile(flowPath, "utf8");
   try {
     const parsed = JSON.parse(raw) as unknown;
+    ensureProjectOverview(parsed as ProductFlow);
     const validation = validateProductFlow(parsed);
     return {
       flowPath: repository.relativePath(flowPath),

@@ -12,6 +12,7 @@
     "sourceSummary",
     "createdAt",
     "updatedAt",
+    "projectOverview",
     "domains",
     "roles",
     "nodes",
@@ -29,6 +30,27 @@
     "sourceSummary": { "type": "string" },
     "createdAt": { "type": "string" },
     "updatedAt": { "type": "string" },
+    "projectOverview": {
+      "type": "object",
+      "required": ["summary", "goal"],
+      "properties": {
+        "summary": { "type": "string" },
+        "goal": { "type": "string" },
+        "view": {
+          "type": "object",
+          "properties": {
+            "position": {
+              "type": "object",
+              "required": ["x", "y"],
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
     "domains": { "type": "array" },
     "roles": { "type": "array" },
     "appSurfaces": { "type": "array" },

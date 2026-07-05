@@ -50,6 +50,17 @@ export interface AppSurface {
   };
 }
 
+export interface ProjectOverview {
+  summary: string;
+  goal: string;
+  view?: {
+    position?: {
+      x: number;
+      y: number;
+    };
+  };
+}
+
 export interface ProductStatusGroup {
   statusGroupId: string;
   title: string;
@@ -144,7 +155,7 @@ export interface PageNode {
   confidence: number;
 }
 
-export type FlowEndpointKind = "appSurface" | "node" | "featureGroup" | "featureItem";
+export type FlowEndpointKind = "appSurface" | "projectOverview" | "node" | "featureGroup" | "featureItem";
 
 export interface FlowEndpoint {
   kind: FlowEndpointKind;
@@ -247,6 +258,7 @@ export interface ProductFlow {
   sourceSummary: string;
   createdAt: string;
   updatedAt: string;
+  projectOverview: ProjectOverview;
   domains: BusinessDomain[];
   roles: UserRole[];
   appSurfaces?: AppSurface[];
@@ -288,6 +300,7 @@ export function validateProductFlow(flow: unknown): ValidationResult {
   requireString(flow, "sourceSummary", errors);
   requireString(flow, "createdAt", errors);
   requireString(flow, "updatedAt", errors);
+  requireObject(flow, "projectOverview", errors);
   requireArray(flow, "domains", errors);
   requireArray(flow, "roles", errors);
   if ("appSurfaces" in flow) {
@@ -307,6 +320,12 @@ export function validateProductFlow(flow: unknown): ValidationResult {
 
   if (!Array.isArray(flow.nodes) || !Array.isArray(flow.edges)) {
     return { valid: errors.length === 0, errors, warnings };
+  }
+
+  if (isRecord(flow.projectOverview)) {
+    requireString(flow.projectOverview, "summary", errors, "projectOverview");
+    requireString(flow.projectOverview, "goal", errors, "projectOverview");
+    validateOptionalViewPosition(flow.projectOverview.view, "projectOverview.view", errors);
   }
 
   const nodeIds = new Set<string>();
@@ -427,10 +446,10 @@ export function validateProductFlow(flow: unknown): ValidationResult {
       }
       edgeIds.add(edge.edgeId);
     }
-    if (typeof edge.fromNodeId === "string" && !isAppSurfaceEndpoint(edge.from, edge.fromNodeId) && !nodeIds.has(edge.fromNodeId)) {
+    if (typeof edge.fromNodeId === "string" && !isProjectOverviewEndpoint(edge.from, edge.fromNodeId) && !isAppSurfaceEndpoint(edge.from, edge.fromNodeId) && !nodeIds.has(edge.fromNodeId)) {
       errors.push(`Edge ${edge.edgeId ?? index} references missing fromNodeId ${edge.fromNodeId}`);
     }
-    if (typeof edge.toNodeId === "string" && !isAppSurfaceEndpoint(edge.to, edge.toNodeId) && !nodeIds.has(edge.toNodeId)) {
+    if (typeof edge.toNodeId === "string" && !isProjectOverviewEndpoint(edge.to, edge.toNodeId) && !isAppSurfaceEndpoint(edge.to, edge.toNodeId) && !nodeIds.has(edge.toNodeId)) {
       errors.push(`Edge ${edge.edgeId ?? index} references missing toNodeId ${edge.toNodeId}`);
     }
     checkEndpoint(edge.from, `edges[${index}].from`, nodeIds, appSurfaceIds, errors);
@@ -569,6 +588,13 @@ function checkEndpoint(
     return;
   }
   requireString(value, "kind", errors, path);
+  if (value.kind === "projectOverview") {
+    requireString(value, "nodeId", errors, path);
+    if (typeof value.nodeId === "string" && value.nodeId !== "projectOverview") {
+      errors.push(`${path}.nodeId must be projectOverview for project overview endpoints.`);
+    }
+    return;
+  }
   if (value.kind === "appSurface") {
     const appId = typeof value.appId === "string" ? value.appId : typeof value.nodeId === "string" ? value.nodeId : "";
     if (!appId) {
@@ -583,8 +609,31 @@ function checkEndpoint(
     errors.push(`${path}.nodeId references missing node ${value.nodeId}`);
   }
   if (value.kind !== "node" && value.kind !== "featureGroup" && value.kind !== "featureItem") {
-    errors.push(`${path}.kind must be appSurface, node, featureGroup, or featureItem.`);
+    errors.push(`${path}.kind must be appSurface, projectOverview, node, featureGroup, or featureItem.`);
   }
+}
+
+function validateOptionalViewPosition(value: unknown, path: string, errors: string[]): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!isRecord(value)) {
+    errors.push(`${path} must be an object.`);
+    return;
+  }
+  if (value.position === undefined) {
+    return;
+  }
+  if (!isRecord(value.position)) {
+    errors.push(`${path}.position must be an object.`);
+    return;
+  }
+  requireNumber(value.position, "x", errors, `${path}.position`);
+  requireNumber(value.position, "y", errors, `${path}.position`);
+}
+
+function isProjectOverviewEndpoint(value: unknown, legacyId: string): boolean {
+  return legacyId === "projectOverview" && isRecord(value) && value.kind === "projectOverview";
 }
 
 function isAppSurfaceEndpoint(value: unknown, legacyId: string): boolean {

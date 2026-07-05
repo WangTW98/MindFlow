@@ -1,4 +1,5 @@
 import type { ProductFlow } from "../models/productFlow";
+import { createDefaultProjectOverview } from "./projectOverview";
 import { makeFlowId, nowIso } from "../utils/id";
 
 export function createEmptyProductFlow(title = "Untitled MindFlow"): ProductFlow {
@@ -12,6 +13,7 @@ export function createEmptyProductFlow(title = "Untitled MindFlow"): ProductFlow
     sourceSummary: "Manually created blank MindFlow.",
     createdAt: now,
     updatedAt: now,
+    projectOverview: createDefaultProjectOverview("Manually created blank MindFlow."),
     domains: [],
     roles: [],
     appSurfaces: [],

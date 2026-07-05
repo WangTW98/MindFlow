@@ -6,6 +6,10 @@
 
   const CARD_WIDTH = 300;
   const CARD_MIN_HEIGHT = 230;
+  const PROJECT_OVERVIEW_NODE_ID = "projectOverview";
+  const PROJECT_OVERVIEW_WIDTH = 340;
+  const PROJECT_OVERVIEW_DEFAULT_X = -760;
+  const PROJECT_OVERVIEW_DEFAULT_Y = 0;
   const CARD_DRAG_THRESHOLD_PX = 4;
   const CARD_CLICK_SUPPRESS_MS = 100;
   const MIN_ZOOM = 0.2;
@@ -83,6 +87,7 @@
   } else if (selectedNodeId && !selectedNodeIds.includes(selectedNodeId)) {
     selectedNodeId = selectedNodeIds[0] || "";
   }
+  let selectedProjectOverview = Boolean(state.selectedProjectOverview || persisted.selectedProjectOverview);
   let selectedEdgeId = state.selectedEdgeId || "";
   let selectedAppSurfaceId = state.selectedAppSurfaceId || persisted.selectedAppSurfaceId || "";
   let selectedDomainId = state.selectedDomainId || persisted.selectedDomainId || "";
@@ -96,6 +101,9 @@
   selectedDomainId ||= taxonomySelection.domain;
   selectedRoleId ||= taxonomySelection.role;
   selectedStatusGroupId ||= taxonomySelection.statusGroup;
+  if (selectedNodeId || selectedEdgeId || selectedAppSurfaceId || selectedDomainId || selectedRoleId || selectedStatusGroupId) {
+    selectedProjectOverview = false;
+  }
   let taxonomyPanelsOpen = readTaxonomyPanelsOpen();
   let nodeSearch = persisted.nodeSearch || "";
   let nodeSearchComposing = false;
@@ -105,7 +113,7 @@
   let zoom = clamp(Number(persisted.zoom || 1), MIN_ZOOM, MAX_ZOOM);
   let camera = persisted.camera && Number.isFinite(persisted.camera.x) && Number.isFinite(persisted.camera.y)
     ? { x: persisted.camera.x, y: persisted.camera.y }
-    : { x: 340, y: 120 };
+    : { x: 800, y: 120 };
   let connectingFrom = persisted.connectingFrom || null;
   let connectionDrag = null;
   let connectionDropTarget = null;
@@ -114,6 +122,7 @@
   let suppressNextCanvasClick = false;
   let suppressNextNodeCardClick = false;
   let featureDrag = null;
+  let projectOverviewDetailsSaveTimer = null;
   let nodeDetailsSaveTimer = null;
   let appSurfaceDetailsSaveTimer = null;
   let domainDetailsSaveTimer = null;
@@ -127,9 +136,11 @@
   let toastTimer = null;
   const nodePositions = new Map();
   const appSurfacePositions = new Map();
+  let projectOverviewPosition = null;
 
   function render() {
     const flow = state.flow;
+    seedProjectOverviewPosition(flow);
     seedNodePositions(flow);
     seedAppSurfacePositions(flow);
     normalizeFilters();
@@ -148,7 +159,7 @@
     const productIssueCounts = countProductIssues(productIssues);
 
     app.innerHTML = `
-      <main class="app-shell ${leftPanelCollapsed ? "left-collapsed" : ""} ${selectedNode || selectedEdge || selectedAppSurface || selectedDomain || selectedRole || selectedStatusGroup ? "" : "inspector-collapsed"} ${productIssuesPanelOpen ? "product-issues-open" : ""}">
+      <main class="app-shell ${leftPanelCollapsed ? "left-collapsed" : ""} ${selectedProjectOverview || selectedNode || selectedEdge || selectedAppSurface || selectedDomain || selectedRole || selectedStatusGroup ? "" : "inspector-collapsed"} ${productIssuesPanelOpen ? "product-issues-open" : ""}">
         <aside class="left-panel">
           <section class="node-sidebar">
             <header class="nodes-toolbar">
@@ -171,6 +182,7 @@
           ${renderTaxonomyPanels(flow)}
           <svg class="edge-layer" id="edgeLayer"></svg>
           <div class="world" id="world">
+            ${renderProjectOverviewCard(flow)}
             ${renderAppSurfaceSourceCards(flow)}
             ${activeNodes.map((node) => renderNodeCard(flow, node)).join("")}
           </div>
@@ -178,7 +190,7 @@
         </section>
 
         <aside class="inspector">
-          ${selectedAppSurface ? renderAppSurfaceInspector(flow, selectedAppSurface) : selectedDomain ? renderDomainInspector(selectedDomain) : selectedRole ? renderRoleInspector(flow, selectedRole) : selectedStatusGroup ? renderStatusGroupInspector(selectedStatusGroup) : selectedEdge ? renderEdgeInspector(flow, selectedEdge) : selectedNode ? renderNodeInspector(flow, selectedNode) : ""}
+          ${selectedProjectOverview ? renderProjectOverviewInspector(flow) : selectedAppSurface ? renderAppSurfaceInspector(flow, selectedAppSurface) : selectedDomain ? renderDomainInspector(selectedDomain) : selectedRole ? renderRoleInspector(flow, selectedRole) : selectedStatusGroup ? renderStatusGroupInspector(selectedStatusGroup) : selectedEdge ? renderEdgeInspector(flow, selectedEdge) : selectedNode ? renderNodeInspector(flow, selectedNode) : ""}
         </aside>
 
         ${renderProductIssueFab(productIssueCounts)}
@@ -192,6 +204,86 @@
     applyCamera();
     persistUiState();
     scheduleDrawEdges();
+  }
+
+  function renderProjectOverviewCard(flow) {
+    const overview = getProjectOverview(flow);
+    const summary = overview.summary || flow.sourceSummary || "暂无项目综述";
+    const goal = overview.goal || "暂无项目目标";
+    return `
+      <article class="project-overview-card ${selectedProjectOverview ? "selected" : ""}"
+        data-project-overview-id="${escapeAttr(PROJECT_OVERVIEW_NODE_ID)}">
+        <header class="project-overview-head">
+          <div class="project-overview-title">
+            <span class="project-overview-icon" aria-hidden="true">${renderLucideIcon("file-text")}</span>
+            <div>
+              <h3>${escapeHtml(flow.title || "项目概述")}</h3>
+              <small>项目概述</small>
+            </div>
+          </div>
+        </header>
+        <section class="project-overview-copy">
+          <div>
+            <strong>项目综述</strong>
+            <p>${escapeHtml(summary)}</p>
+          </div>
+          <div>
+            <strong>项目目标</strong>
+            <p>${escapeHtml(goal)}</p>
+          </div>
+        </section>
+        <div class="project-overview-taxonomy">
+          ${renderProjectOverviewCardSection("appSurface", "应用端", "monitor-smartphone", flow.appSurfaces || [], "appId", "name", "description")}
+          ${renderProjectOverviewCardSection("domain", "业务域", "network", flow.domains || [], "domainId", "name", "description")}
+          ${renderProjectOverviewCardSection("role", "角色", "users", flow.roles || [], "roleId", "name", "description")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderProjectOverviewCardSection(kind, label, iconName, items, idKey, labelKey, descriptionKey) {
+    return `
+      <section class="project-overview-section" data-overview-kind="${escapeAttr(kind)}">
+        <header>
+          ${renderLucideIcon(iconName)}
+          <strong>${escapeHtml(label)}</strong>
+          <span>${items.length}</span>
+        </header>
+        <ul>
+          ${items.map((item) => renderProjectOverviewCardListItem(kind, item, idKey, labelKey, descriptionKey)).join("") || "<li class=\"empty compact\">暂无数据</li>"}
+        </ul>
+      </section>
+    `;
+  }
+
+  function renderProjectOverviewCardListItem(kind, item, idKey, labelKey, descriptionKey) {
+    const itemId = item[idKey];
+    const icon = kind === "appSurface"
+      ? getAppSurfaceTypeOption(item.type).icon
+      : kind === "domain"
+        ? "network"
+        : "user";
+    return `
+      <li class="project-overview-list-item" data-overview-kind="${escapeAttr(kind)}" data-overview-item-id="${escapeAttr(itemId)}">
+        <span class="project-overview-list-icon" aria-hidden="true">${renderLucideIcon(icon)}</span>
+        <span class="project-overview-list-text">
+          <strong>${escapeHtml(item[labelKey])}</strong>
+          <small>${escapeHtml(item[descriptionKey] || getTaxonomySecondaryText(kind, item) || "无说明")}</small>
+        </span>
+        ${kind === "appSurface" ? `<span class="project-overview-system-dot" data-project-overview-app-id="${escapeAttr(itemId)}" title="应用端系统连接点" aria-hidden="true"></span>` : ""}
+      </li>
+    `;
+  }
+
+  function getProjectOverview(flow) {
+    flow.projectOverview = flow.projectOverview || { summary: flow.sourceSummary || "", goal: "" };
+    if (typeof flow.projectOverview.summary !== "string" || !flow.projectOverview.summary.trim()) {
+      flow.projectOverview.summary = flow.sourceSummary || "";
+    }
+    if (typeof flow.projectOverview.goal !== "string") {
+      flow.projectOverview.goal = "";
+    }
+    return flow.projectOverview;
   }
 
   function renderNodeListItem(flow, node) {
@@ -449,11 +541,13 @@
     return `<svg class="lucide-icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.x}</svg>`;
   }
 
-  function renderManagedList(kind, label, items, idKey, labelKey, descriptionKey, selectedIds) {
+  function renderManagedList(kind, label, items, idKey, labelKey, descriptionKey, selectedIds, options = {}) {
     const selectedSet = new Set(selectedIds || []);
     const currentId = getSelectedTaxonomyId(kind);
+    const showFilters = options.showFilters !== false;
+    const panelClass = options.panelClass || "";
     return `
-      <section class="managed-list taxonomy-panel" data-kind="${kind}" data-taxonomy-panel="${kind}">
+      <section class="managed-list taxonomy-panel ${escapeAttr(panelClass)}" data-kind="${kind}" data-taxonomy-panel="${kind}">
         <header class="managed-list-head">
           <h4>${label}</h4>
           <div class="tiny-actions">
@@ -466,8 +560,10 @@
             const selected = selectedSet.has(itemId);
             const active = itemId === currentId;
             return `
-              <div class="managed-list-item ${active ? "active" : ""}" data-kind="${kind}" data-taxonomy-id="${escapeAttr(itemId)}" role="option" tabindex="0" aria-selected="${active ? "true" : "false"}">
-                <input type="checkbox" class="taxonomy-filter-checkbox" data-kind="${kind}" value="${escapeAttr(itemId)}" ${selected ? "checked" : ""} aria-label="筛选 ${escapeAttr(item[labelKey])}">
+              <div class="managed-list-item ${showFilters ? "" : "without-filter"} ${active ? "active" : ""}" data-kind="${kind}" data-taxonomy-id="${escapeAttr(itemId)}" role="option" tabindex="0" aria-selected="${active ? "true" : "false"}">
+                ${showFilters
+                  ? `<input type="checkbox" class="taxonomy-filter-checkbox" data-kind="${kind}" value="${escapeAttr(itemId)}" ${selected ? "checked" : ""} aria-label="筛选 ${escapeAttr(item[labelKey])}">`
+                  : `<span class="managed-list-kind-icon" aria-hidden="true">${renderLucideIcon(getManagedListItemIcon(kind, item))}</span>`}
                 <span class="managed-list-text">
                   <strong>${escapeHtml(item[labelKey])}</strong>
                   <small>${escapeHtml(item[descriptionKey] || getTaxonomySecondaryText(kind, item) || "无说明")}</small>
@@ -548,6 +644,19 @@
       return namesByIds(state.flow.domains || [], "domainId", item.domainIds || []);
     }
     return "";
+  }
+
+  function getManagedListItemIcon(kind, item) {
+    if (kind === "appSurface") {
+      return getAppSurfaceTypeOption(item.type).icon;
+    }
+    if (kind === "domain") {
+      return "network";
+    }
+    if (kind === "statusGroup") {
+      return "palette";
+    }
+    return "user";
   }
 
   function renderNodeCard(flow, node) {
@@ -821,6 +930,43 @@
     `;
   }
 
+  function renderProjectOverviewInspector(flow) {
+    const overview = getProjectOverview(flow);
+    return `
+      <form class="details-form" id="projectOverviewDetailsForm" data-inspector-key="${escapeAttr(inspectorScrollKey("projectOverview", PROJECT_OVERVIEW_NODE_ID))}">
+        <header class="inspector-head">
+          <div>
+            <h2 id="projectOverviewPanelTitle" class="inline-title-editor" tabindex="0" title="双击编辑标题">${escapeHtml(flow.title || "项目概述")}</h2>
+            <code>${escapeHtml(PROJECT_OVERVIEW_NODE_ID)}</code>
+          </div>
+          ${renderIconButton("closeInspector", "关闭详情", "x")}
+        </header>
+        <input id="projectOverviewTitle" type="hidden" value="${escapeAttr(flow.title || "项目概述")}">
+        <label>项目综述
+          <textarea id="projectOverviewSummary" rows="5">${escapeHtml(overview.summary || flow.sourceSummary || "")}</textarea>
+        </label>
+        <label>项目目标
+          <textarea id="projectOverviewGoal" rows="5">${escapeHtml(overview.goal || "")}</textarea>
+        </label>
+        <section class="project-overview-inspector-taxonomy">
+          <div class="section-title">
+            <h3>应用端</h3>
+          </div>
+          ${renderManagedList("appSurface", "应用端", flow.appSurfaces || [], "appId", "name", "description", [], { showFilters: false, panelClass: "embedded-taxonomy-panel" })}
+          <div class="section-title">
+            <h3>业务域</h3>
+          </div>
+          ${renderManagedList("domain", "业务域", flow.domains || [], "domainId", "name", "description", [], { showFilters: false, panelClass: "embedded-taxonomy-panel" })}
+          <div class="section-title">
+            <h3>角色</h3>
+          </div>
+          ${renderManagedList("role", "角色", flow.roles || [], "roleId", "name", "description", [], { showFilters: false, panelClass: "embedded-taxonomy-panel" })}
+        </section>
+        <p class="form-error" id="projectOverviewFormError"></p>
+      </form>
+    `;
+  }
+
   function renderAppSurfaceInspector(flow, surface) {
     return `
       <form class="details-form" id="appSurfaceDetailsForm">
@@ -1009,6 +1155,7 @@
               aria-expanded="false"
               aria-controls="${escapeAttr(id)}Menu">
             <div id="${escapeAttr(id)}Menu" class="endpoint-menu" role="listbox">
+            ${renderEndpointProjectOverviewOption(flow, selectedValue)}
             ${appSurfaces.map((surface) => renderEndpointAppSurfaceOption(surface, selectedValue)).join("")}
             ${nodes.map((node) => renderEndpointNodeOptions(node, selectedValue, includeFeatureEndpoints)).join("")}
             </div>
@@ -1016,6 +1163,12 @@
         </label>
       </div>
     `;
+  }
+
+  function renderEndpointProjectOverviewOption(flow, selectedValue) {
+    const endpoint = { kind: "projectOverview", nodeId: PROJECT_OVERVIEW_NODE_ID };
+    const search = endpointSearchText([flow.title, flow.sourceSummary, flow.projectOverview?.goal]);
+    return renderEndpointOption(endpoint, `项目概述 · ${flow.title || "项目概述"}`, search, selectedValue, "standalone-option");
   }
 
   function renderEndpointAppSurfaceOption(surface, selectedValue) {
@@ -1058,7 +1211,7 @@
 
   function renderEndpointOption(endpoint, label, searchText, selectedValue, extraClass = "") {
     const value = encodeEndpoint(endpoint);
-    const kindClass = endpoint.kind === "appSurface" ? "app-surface-option" : endpoint.kind === "node" ? "node-option" : endpoint.kind === "featureGroup" ? "group-option" : "item-option";
+    const kindClass = endpoint.kind === "appSurface" ? "app-surface-option" : endpoint.kind === "projectOverview" ? "project-overview-option" : endpoint.kind === "node" ? "node-option" : endpoint.kind === "featureGroup" ? "group-option" : "item-option";
     return `
       <button type="button"
         class="endpoint-option ${kindClass} ${escapeAttr(extraClass)} ${value === selectedValue ? "selected" : ""}"
@@ -1219,6 +1372,10 @@
     const nodeForm = document.getElementById("nodeDetailsForm");
     if (nodeForm) {
       bindNodeInspector(nodeForm);
+    }
+    const projectOverviewForm = document.getElementById("projectOverviewDetailsForm");
+    if (projectOverviewForm) {
+      bindProjectOverviewInspector(projectOverviewForm);
     }
     const appSurfaceForm = document.getElementById("appSurfaceDetailsForm");
     if (appSurfaceForm) {
@@ -1400,6 +1557,21 @@
   }
 
   function bindCanvasElements(root = document) {
+    const projectOverviewCards = root.matches?.(".project-overview-card")
+      ? [root]
+      : Array.from(root.querySelectorAll(".project-overview-card"));
+    projectOverviewCards.forEach((card) => {
+      card.addEventListener("pointerdown", startProjectOverviewDrag);
+      card.addEventListener("click", (event) => {
+        if (event.target.closest("button, input, textarea, select")) {
+          return;
+        }
+        if (!dragState) {
+          selectProjectOverview();
+        }
+      });
+    });
+
     root.querySelectorAll(".node-list-item").forEach((button) => {
       button.addEventListener("click", (event) => {
         const nodeId = button.dataset.listNodeId;
@@ -1513,6 +1685,26 @@
         event.stopPropagation();
         manageTaxonomy(button.dataset.kind, button.dataset.action, button.dataset.taxonomyId);
       });
+    });
+  }
+
+  function bindProjectOverviewInspector(projectOverviewForm) {
+    bindInlineTitleEditor("projectOverviewPanelTitle", "projectOverviewTitle", () => commitProjectOverviewDetailsChange({ immediate: true }));
+    projectOverviewForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      commitProjectOverviewDetailsChange({ immediate: true });
+    });
+    projectOverviewForm.addEventListener("input", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
+      commitProjectOverviewDetailsChange();
+    });
+    projectOverviewForm.addEventListener("change", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
+      commitProjectOverviewDetailsChange({ immediate: true });
     });
   }
 
@@ -1695,6 +1887,7 @@
     if (!kind || !id) {
       return;
     }
+    selectedProjectOverview = false;
     if (kind === "statusGroup") {
       selectStatusGroup(id);
       return;
@@ -2133,6 +2326,21 @@
     persistUiState();
   }
 
+  function seedProjectOverviewPosition(flow) {
+    if (projectOverviewPosition) {
+      return;
+    }
+    const saved = flow.projectOverview && flow.projectOverview.view && flow.projectOverview.view.position;
+    if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+      projectOverviewPosition = { x: saved.x, y: saved.y };
+      return;
+    }
+    projectOverviewPosition = {
+      x: PROJECT_OVERVIEW_DEFAULT_X,
+      y: PROJECT_OVERVIEW_DEFAULT_Y
+    };
+  }
+
   function seedNodePositions(flow) {
     flow.nodes.forEach((node, index) => {
       if (nodePositions.has(node.nodeId)) {
@@ -2165,6 +2373,11 @@
   }
 
   function positionCards() {
+    const projectOverviewCard = document.querySelector(".project-overview-card");
+    if (projectOverviewCard && projectOverviewPosition) {
+      projectOverviewCard.style.left = `${projectOverviewPosition.x}px`;
+      projectOverviewCard.style.top = `${projectOverviewPosition.y}px`;
+    }
     document.querySelectorAll(".node-card").forEach((card) => {
       const nodeId = card.dataset.nodeId;
       const pos = nodePositions.get(nodeId);
@@ -2442,6 +2655,7 @@
     return Boolean(
       element &&
       canvas?.contains(element) &&
+      !element.closest(".project-overview-card") &&
       !element.closest(".node-card") &&
       !element.closest(".app-surface-card") &&
       !element.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") &&
@@ -2454,6 +2668,7 @@
     if (
       connectionDrag ||
       (event.button !== 0 && event.button !== 1) ||
+      event.target.closest(".project-overview-card") ||
       event.target.closest(".node-card") ||
       event.target.closest(".app-surface-card") ||
       event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") ||
@@ -2507,8 +2722,28 @@
     startCardDrag(event, "node");
   }
 
+  function startProjectOverviewDrag(event) {
+    startCardDrag(event, "projectOverview");
+  }
+
   function startAppSurfaceDrag(event) {
     startCardDrag(event, "appSurface");
+  }
+
+  function getCardPosition(kind, id) {
+    if (kind === "projectOverview") {
+      return projectOverviewPosition;
+    }
+    return kind === "appSurface" ? appSurfacePositions.get(id) : nodePositions.get(id);
+  }
+
+  function setCardPosition(kind, id, position) {
+    if (kind === "projectOverview") {
+      projectOverviewPosition = position;
+      return;
+    }
+    const positions = kind === "appSurface" ? appSurfacePositions : nodePositions;
+    positions.set(id, position);
   }
 
   function startCardDrag(event, kind) {
@@ -2517,9 +2752,12 @@
     }
     event.stopPropagation();
     const card = event.currentTarget;
-    const id = kind === "appSurface" ? card.dataset.appSurfaceId : card.dataset.nodeId;
-    const positions = kind === "appSurface" ? appSurfacePositions : nodePositions;
-    const pos = positions.get(id);
+    const id = kind === "appSurface"
+      ? card.dataset.appSurfaceId
+      : kind === "projectOverview"
+        ? PROJECT_OVERVIEW_NODE_ID
+        : card.dataset.nodeId;
+    const pos = getCardPosition(kind, id);
     if (!id || !pos) {
       return;
     }
@@ -2528,6 +2766,7 @@
     selectedRoleId = "";
     selectedStatusGroupId = "";
     if (kind === "appSurface") {
+      selectedProjectOverview = false;
       clearNodeSelectionState();
       taxonomySelection = {
         appSurface: id,
@@ -2535,7 +2774,13 @@
         role: "",
         statusGroup: ""
       };
+    } else if (kind === "projectOverview") {
+      selectedProjectOverview = true;
+      clearNodeSelectionState();
+      selectedAppSurfaceId = "";
+      taxonomySelection = clearAllTaxonomySelections();
     } else {
+      selectedProjectOverview = false;
       selectedAppSurfaceId = "";
       taxonomySelection = clearAllTaxonomySelections();
     }
@@ -2576,8 +2821,7 @@
       x: Math.round(dragState.originX + dx),
       y: Math.round(dragState.originY + dy)
     };
-    const positions = dragState.kind === "appSurface" ? appSurfacePositions : nodePositions;
-    positions.set(dragState.id, next);
+    setCardPosition(dragState.kind, dragState.id, next);
     dragState.card.style.left = `${next.x}px`;
     dragState.card.style.top = `${next.y}px`;
     scheduleDrawEdges();
@@ -2588,8 +2832,7 @@
       return;
     }
     const { kind, id, card, moved, multiSelect } = dragState;
-    const positions = kind === "appSurface" ? appSurfacePositions : nodePositions;
-    const pos = positions.get(id);
+    const pos = getCardPosition(kind, id);
     card.classList.remove("dragging");
     card.removeEventListener("pointermove", moveCardDrag);
     card.removeEventListener("pointerup", endCardDrag);
@@ -2603,6 +2846,7 @@
     if (moved && pos) {
       selectedEdgeId = "";
       if (kind === "appSurface") {
+        selectedProjectOverview = false;
         selectedAppSurfaceId = id;
         clearNodeSelectionState();
         selectedDomainId = "";
@@ -2617,6 +2861,17 @@
         persistUiState();
         vscode.postMessage({ type: "saveAppSurfacePosition", appId: id, x: pos.x, y: pos.y });
         vscode.postMessage({ type: "selectAppSurface", appId: id });
+      } else if (kind === "projectOverview") {
+        selectedProjectOverview = true;
+        clearNodeSelectionState();
+        selectedAppSurfaceId = "";
+        selectedDomainId = "";
+        selectedRoleId = "";
+        selectedStatusGroupId = "";
+        taxonomySelection = clearAllTaxonomySelections();
+        persistUiState();
+        vscode.postMessage({ type: "saveProjectOverviewPosition", x: pos.x, y: pos.y });
+        vscode.postMessage({ type: "selectProjectOverview" });
       } else {
         const multi = Boolean(multiSelect || isNodeMultiSelectEvent(event));
         if (multi) {
@@ -2632,6 +2887,10 @@
       selectAppSurface(id);
       return;
     }
+    if (kind === "projectOverview") {
+      selectProjectOverview();
+      return;
+    }
     const multi = Boolean(multiSelect || isNodeMultiSelectEvent(event));
     if (multi) {
       event.preventDefault();
@@ -2645,7 +2904,7 @@
     if (!canvas || !canvas.contains(event.target)) {
       return;
     }
-    if (event.target.closest(".node-card") || event.target.closest(".app-surface-card") || event.target.closest("[data-edge-id]")) {
+    if (event.target.closest(".project-overview-card") || event.target.closest(".node-card") || event.target.closest(".app-surface-card") || event.target.closest("[data-edge-id]")) {
       return;
     }
     event.preventDefault();
@@ -2668,6 +2927,7 @@
     }
     if (
       event.target.closest(".node-card") ||
+      event.target.closest(".project-overview-card") ||
       event.target.closest(".app-surface-card") ||
       event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") ||
       event.target.closest("[data-edge-id]") ||
@@ -2680,6 +2940,7 @@
   }
 
   function clearSelection() {
+    selectedProjectOverview = false;
     clearNodeSelectionState();
     selectedEdgeId = "";
     selectedAppSurfaceId = "";
@@ -2725,6 +2986,10 @@
       vscode.postMessage({ type: "removeEdge", edgeId });
       return;
     }
+    if (selectedProjectOverview) {
+      event.preventDefault();
+      return;
+    }
     if (selectedAppSurfaceId) {
       event.preventDefault();
       deleteSelectedTaxonomy("appSurface", selectedAppSurfaceId);
@@ -2751,6 +3016,7 @@
       return;
     }
     cancelPendingTaxonomyDetailsSave(kind);
+    selectedProjectOverview = false;
     clearTaxonomySelection(kind, id);
     clearNodeSelectionState();
     selectedEdgeId = "";
@@ -2786,6 +3052,39 @@
   function submitNodeDetails(event) {
     event?.preventDefault();
     commitNodeDetailsChange({ immediate: true });
+  }
+
+  function commitProjectOverviewDetailsChange(options = {}) {
+    if (!selectedProjectOverview) {
+      return;
+    }
+    const patch = collectProjectOverviewDetailsPatch();
+    applyProjectOverviewDetailsLocally(patch);
+    refreshProjectOverviewViews();
+    if (options.immediate) {
+      postProjectOverviewDetails(patch);
+      return;
+    }
+    clearTimeout(projectOverviewDetailsSaveTimer);
+    projectOverviewDetailsSaveTimer = setTimeout(() => postProjectOverviewDetails(patch), 250);
+  }
+
+  function collectProjectOverviewDetailsPatch() {
+    return {
+      title: document.getElementById("projectOverviewTitle").value,
+      summary: document.getElementById("projectOverviewSummary").value,
+      goal: document.getElementById("projectOverviewGoal").value
+    };
+  }
+
+  function postProjectOverviewDetails(patch) {
+    persistCurrentInspectorScroll();
+    clearTimeout(projectOverviewDetailsSaveTimer);
+    projectOverviewDetailsSaveTimer = null;
+    vscode.postMessage({
+      type: "updateProjectOverview",
+      patch
+    });
   }
 
   function commitNodeDetailsChange(options = {}) {
@@ -3090,9 +3389,10 @@
     refreshTaxonomyPanels();
     const world = document.getElementById("world");
     if (world) {
+      seedProjectOverviewPosition(state.flow);
       seedAppSurfacePositions(state.flow);
       const activeNodes = state.flow.nodes.filter((node) => node.status !== "removed");
-      world.innerHTML = `${renderAppSurfaceSourceCards(state.flow)}${activeNodes.map((node) => renderNodeCard(state.flow, node)).join("")}`;
+      world.innerHTML = `${renderProjectOverviewCard(state.flow)}${renderAppSurfaceSourceCards(state.flow)}${activeNodes.map((node) => renderNodeCard(state.flow, node)).join("")}`;
       applyStatusGroupColorSwatches(world);
       bindCanvasElements(world);
       positionCards();
@@ -3147,6 +3447,37 @@
       domainIds: collectTagMultiSelect("edgeDomainIds"),
       roleIds: collectTagMultiSelect("edgeRoleIds")
     };
+  }
+
+  function applyProjectOverviewDetailsLocally(patch) {
+    const overview = getProjectOverview(state.flow);
+    state.flow.title = patch.title.trim() || state.flow.title || "项目概述";
+    overview.summary = patch.summary.trim() || overview.summary;
+    overview.goal = patch.goal.trim();
+    state.flow.sourceSummary = overview.summary;
+    const title = document.getElementById("projectOverviewPanelTitle");
+    const titleInput = document.getElementById("projectOverviewTitle");
+    if (title && title.dataset.inlineEditing !== "true") {
+      title.textContent = state.flow.title;
+    }
+    if (titleInput) {
+      titleInput.value = state.flow.title;
+    }
+  }
+
+  function refreshProjectOverviewViews() {
+    const card = document.querySelector(".project-overview-card");
+    if (card) {
+      const replacement = document.createElement("div");
+      replacement.innerHTML = renderProjectOverviewCard(state.flow);
+      const nextCard = replacement.firstElementChild;
+      if (nextCard) {
+        card.replaceWith(nextCard);
+        bindCanvasElements(nextCard);
+        positionCards();
+        scheduleDrawEdges();
+      }
+    }
   }
 
   function postEdgeDetails(edgeId, patch, revision) {
@@ -3299,6 +3630,7 @@
 
   function refreshCanvasAndNodeList() {
     const flow = state.flow;
+    seedProjectOverviewPosition(flow);
     seedNodePositions(flow);
     seedAppSurfacePositions(flow);
     normalizeFilters();
@@ -3307,7 +3639,7 @@
     const world = document.getElementById("world");
     const nodeList = document.querySelector(".node-list");
     if (world) {
-      world.innerHTML = `${renderAppSurfaceSourceCards(flow)}${activeNodes.map((node) => renderNodeCard(flow, node)).join("")}`;
+      world.innerHTML = `${renderProjectOverviewCard(flow)}${renderAppSurfaceSourceCards(flow)}${activeNodes.map((node) => renderNodeCard(flow, node)).join("")}`;
       applyStatusGroupColorSwatches(world);
     }
     if (nodeList) {
@@ -3324,6 +3656,7 @@
   }
 
   function selectNode(nodeId, center, options = {}) {
+    selectedProjectOverview = false;
     if (options.multi) {
       toggleNodeSelection(nodeId);
     } else {
@@ -3390,6 +3723,7 @@
   }
 
   function selectEdge(edgeId) {
+    selectedProjectOverview = false;
     selectedEdgeId = edgeId;
     clearNodeSelectionState();
     selectedAppSurfaceId = "";
@@ -3403,6 +3737,7 @@
   }
 
   function selectAppSurface(appId) {
+    selectedProjectOverview = false;
     selectedAppSurfaceId = appId;
     clearNodeSelectionState();
     selectedEdgeId = "";
@@ -3422,6 +3757,7 @@
   }
 
   function selectStatusGroup(statusGroupId) {
+    selectedProjectOverview = false;
     selectedStatusGroupId = statusGroupId;
     clearNodeSelectionState();
     selectedEdgeId = "";
@@ -3436,6 +3772,21 @@
     };
     persistUiState();
     vscode.postMessage({ type: "selectStatusGroup", statusGroupId });
+    render();
+    requestAnimationFrame(() => focusCanvas());
+  }
+
+  function selectProjectOverview() {
+    selectedProjectOverview = true;
+    clearNodeSelectionState();
+    selectedEdgeId = "";
+    selectedAppSurfaceId = "";
+    selectedDomainId = "";
+    selectedRoleId = "";
+    selectedStatusGroupId = "";
+    taxonomySelection = clearAllTaxonomySelections();
+    persistUiState();
+    vscode.postMessage({ type: "selectProjectOverview" });
     render();
     requestAnimationFrame(() => focusCanvas());
   }
@@ -3480,7 +3831,41 @@
       .filter((edge) => edge.status === "active")
       .map((edge) => renderEdge(edge))
       .join("");
-    svg.innerHTML = `${edgesHtml}${renderConnectionPreview()}`;
+    svg.innerHTML = `${renderProjectOverviewSystemEdges(state.flow)}${edgesHtml}${renderConnectionPreview()}`;
+  }
+
+  function renderProjectOverviewSystemEdges(flow) {
+    return (flow.appSurfaces || []).map((surface) => renderProjectOverviewSystemEdge(surface)).join("");
+  }
+
+  function renderProjectOverviewSystemEdge(surface) {
+    const from = getProjectOverviewAppSystemPoint(surface.appId);
+    const to = getEndpointScreenPoint({ kind: "appSurface", nodeId: surface.appId, appId: surface.appId }, "to");
+    if (!from || !to) {
+      return "";
+    }
+    const curve = Math.max(70, Math.abs(to.x - from.x) * 0.42);
+    const d = `M ${from.x} ${from.y} C ${from.x + curve} ${from.y}, ${to.x - curve} ${to.y}, ${to.x} ${to.y}`;
+    return `
+      <g class="project-overview-system-edge">
+        <path class="edge-path" d="${d}"></path>
+      </g>
+    `;
+  }
+
+  function getProjectOverviewAppSystemPoint(appId) {
+    const dot = document.querySelector(`.project-overview-system-dot[data-project-overview-app-id="${cssEscape(appId)}"]`);
+    const canvas = document.getElementById("canvas");
+    if (!dot || !canvas) {
+      return null;
+    }
+    const rect = dot.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2 - canvasRect.left,
+      y: rect.top + rect.height / 2 - canvasRect.top,
+      related: true
+    };
   }
 
   function getAppSurfaceEntryNodes(flow, appId) {
@@ -3555,7 +3940,7 @@
     }
     if (element) {
       const rect = element.getBoundingClientRect();
-      const card = element.closest(".node-card, .app-surface-card");
+      const card = element.closest(".node-card, .app-surface-card, .project-overview-card");
       const cardRect = card?.getBoundingClientRect();
       const canvasRect = document.getElementById("canvas").getBoundingClientRect();
       const x = cardRect
@@ -3565,6 +3950,17 @@
         x: x - canvasRect.left,
         y: rect.top + rect.height / 2 - canvasRect.top,
         related: !card?.classList.contains("dimmed")
+      };
+    }
+    if (endpoint.kind === "projectOverview") {
+      const pos = projectOverviewPosition;
+      if (!pos) {
+        return null;
+      }
+      const x = direction === "to" ? pos.x : pos.x + PROJECT_OVERVIEW_WIDTH;
+      return {
+        ...worldToScreen({ x, y: pos.y + 46 }),
+        related: true
       };
     }
     if (endpoint.kind === "appSurface") {
@@ -3606,6 +4002,9 @@
   }
 
   function endpointFromButton(button) {
+    if (button.dataset.originKind === "projectOverview") {
+      return { kind: "projectOverview", nodeId: PROJECT_OVERVIEW_NODE_ID };
+    }
     if (button.dataset.originKind === "appSurface") {
       const appId = button.dataset.originAppId || button.dataset.originNodeId;
       return { kind: "appSurface", nodeId: appId, appId };
@@ -3624,6 +4023,9 @@
   }
 
   function endpointFromTargetButton(button) {
+    if (button.dataset.targetKind === "projectOverview") {
+      return { kind: "projectOverview", nodeId: PROJECT_OVERVIEW_NODE_ID };
+    }
     if (button.dataset.targetKind === "appSurface") {
       const appId = button.dataset.targetAppId || button.dataset.targetNodeId;
       return appId ? { kind: "appSurface", nodeId: appId, appId } : null;
@@ -3648,6 +4050,8 @@
       .map((part) => decodeURIComponent(part || ""));
     const endpoint = kind === "appSurface"
       ? { kind, nodeId: entityId, appId: entityId }
+      : kind === "projectOverview"
+        ? { kind, nodeId: PROJECT_OVERVIEW_NODE_ID }
       : { kind, nodeId: entityId };
     if (groupId) {
       endpoint.groupId = groupId;
@@ -3659,6 +4063,9 @@
   }
 
   function endpointDisplayLabel(flow, endpoint) {
+    if (endpoint.kind === "projectOverview") {
+      return `项目概述 · ${flow.title || "项目概述"}`;
+    }
     if (endpoint.kind === "appSurface") {
       const appId = endpointEntityId(endpoint);
       const surface = (flow.appSurfaces || []).find((item) => item.appId === appId);
@@ -3680,6 +4087,9 @@
   }
 
   function endpointEntityId(endpoint) {
+    if (endpoint.kind === "projectOverview") {
+      return PROJECT_OVERVIEW_NODE_ID;
+    }
     return endpoint.kind === "appSurface" ? endpoint.appId || endpoint.nodeId || "" : endpoint.nodeId || "";
   }
 
@@ -4141,7 +4551,9 @@
   }
 
   function endpointNode(endpoint) {
-    return endpoint.kind === "appSurface" ? null : state.flow.nodes.find((node) => node.nodeId === endpoint.nodeId);
+    return endpoint.kind === "appSurface" || endpoint.kind === "projectOverview"
+      ? null
+      : state.flow.nodes.find((node) => node.nodeId === endpoint.nodeId);
   }
 
   function endpointAppSurface(endpoint) {
@@ -4471,6 +4883,7 @@
       roleFilters,
       taxonomyPanelsOpen,
       taxonomySelection,
+      selectedProjectOverview,
       selectedNodeId,
       selectedNodeIds,
       selectedAppSurfaceId,

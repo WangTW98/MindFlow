@@ -114,7 +114,7 @@ function edgeToNodeConstraint(edge: FlowEdge, nodeIds: Set<string>): { fromNodeI
 }
 
 function endpointNodeId(endpoint: FlowEndpoint | undefined, nodeIds: Set<string>): string | undefined {
-  if (!endpoint || endpoint.kind === "appSurface") {
+  if (!endpoint || endpoint.kind === "appSurface" || endpoint.kind === "projectOverview") {
     return undefined;
   }
   return endpoint.nodeId && nodeIds.has(endpoint.nodeId) ? endpoint.nodeId : undefined;

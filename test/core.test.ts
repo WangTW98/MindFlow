@@ -12,6 +12,11 @@ import { ensureAppSurfaceEntryEdges } from "../src/core/appSurfaceEntryEdges";
 import { ensureReasonableNodeLayout } from "../src/core/canvasLayout";
 import { createEmptyProductFlow } from "../src/core/emptyFlow";
 import {
+  PROJECT_OVERVIEW_NODE_ID,
+  ensureProjectOverview,
+  updateProjectOverview
+} from "../src/core/projectOverview";
+import {
   createManualEdge,
   createManualNode,
   removeManualEdge,
@@ -58,11 +63,77 @@ test("Empty ProductFlow starts as a valid blank canvas", () => {
   assert.equal(validation.valid, true, validation.errors.join("\n"));
   assert.equal(flow.nodes.length, 0);
   assert.equal(flow.edges.length, 0);
+  assert.equal(flow.projectOverview.summary, flow.sourceSummary);
+  assert.equal(flow.projectOverview.goal, "");
   assert.equal(flow.domains.length, 0);
   assert.equal(flow.roles.length, 0);
   assert.equal(flow.appSurfaces?.length, 0);
   assert.equal(flow.statusGroups?.length, 0);
   assert.equal(flow.productDesignIssues?.length, 0);
+});
+
+test("Legacy ProductFlow missing projectOverview can be backfilled", () => {
+  const flow = createEmptyProductFlow();
+  delete (flow as unknown as { projectOverview?: unknown }).projectOverview;
+
+  const result = ensureProjectOverview(flow);
+  const validation = validateProductFlow(flow);
+
+  assert.equal(result.changed, true);
+  assert.equal(flow.projectOverview.summary, flow.sourceSummary);
+  assert.equal(flow.projectOverview.goal, "");
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+});
+
+test("Project overview details sync flow title and source summary", () => {
+  const flow = createEmptyProductFlow();
+
+  updateProjectOverview(flow, {
+    title: "供应链协同平台",
+    summary: "覆盖采购、供应商和审批协同。",
+    goal: "提升跨端采购协作效率。"
+  });
+
+  assert.equal(flow.title, "供应链协同平台");
+  assert.equal(flow.sourceSummary, "覆盖采购、供应商和审批协同。");
+  assert.equal(flow.projectOverview.summary, "覆盖采购、供应商和审批协同。");
+  assert.equal(flow.projectOverview.goal, "提升跨端采购协作效率。");
+  assert.equal(validateProductFlow(flow).valid, true);
+});
+
+test("Project overview endpoint can create a normal persisted edge", () => {
+  const flow = createEmptyProductFlow();
+  const target = createManualNode(flow, { title: "采购工作台" });
+
+  const edge = createManualEdge(flow, {
+    from: { kind: "projectOverview", nodeId: PROJECT_OVERVIEW_NODE_ID },
+    to: { kind: "node", nodeId: target.nodeId },
+    trigger: "进入项目主流程",
+    type: "navigate"
+  });
+
+  assert.equal(edge.fromNodeId, PROJECT_OVERVIEW_NODE_ID);
+  assert.equal(edge.from?.kind, "projectOverview");
+  assert.equal(edge.toNodeId, target.nodeId);
+  assert.equal(validateProductFlow(flow).valid, true);
+});
+
+test("Project overview app-surface system links are not persisted", () => {
+  const flow = createEmptyProductFlow();
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "运营后台。",
+    domainIds: [],
+    roleIds: []
+  }];
+
+  deleteAppSurface(flow, "app_admin");
+
+  assert.equal(flow.appSurfaces?.length, 0);
+  assert.equal(flow.edges.some((edge) => edge.from?.kind === "projectOverview" || edge.to?.kind === "projectOverview"), false);
+  assert.equal(validateProductFlow(flow).valid, true);
 });
 
 test("Generated nodes without coordinates receive a structural canvas layout", () => {

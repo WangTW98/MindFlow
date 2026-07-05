@@ -323,6 +323,43 @@ small,
   color: var(--danger);
 }
 
+.managed-list-item.without-filter {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.managed-list-kind-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.managed-list-kind-icon .lucide-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.embedded-taxonomy-panel {
+  width: auto;
+  max-height: none;
+  border-radius: 6px;
+  padding: 9px;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--card), var(--bg) 28%);
+}
+
+.embedded-taxonomy-panel .managed-list-body {
+  max-height: none;
+  overflow: visible;
+}
+
+.project-overview-inspector-taxonomy {
+  display: grid;
+  gap: 9px;
+}
+
 .status-group-list {
   gap: 6px;
 }
@@ -435,6 +472,20 @@ small,
 
 .edge.edge-type-nesting {
   --edge-color: var(--vscode-charts-yellow, #facc15);
+}
+
+.project-overview-system-edge {
+  --edge-color: color-mix(in srgb, var(--fg), var(--bg) 58%);
+  pointer-events: none;
+}
+
+.project-overview-system-edge .edge-path {
+  stroke: var(--edge-color);
+  stroke-width: 1.7;
+  stroke-dasharray: 5 5;
+  opacity: 0.72;
+  pointer-events: none;
+  cursor: default;
 }
 
 .edge-hitarea,
@@ -596,11 +647,28 @@ small,
   box-shadow: var(--card-shadow);
 }
 
+.taxonomy-panel.embedded-taxonomy-panel {
+  width: 100%;
+  max-width: 100%;
+  max-height: none;
+  overflow: visible;
+  justify-self: stretch;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--card), var(--bg) 28%);
+}
+
 .taxonomy-panel .managed-list-body {
   max-height: min(34vh, 300px);
   overflow: auto;
   overscroll-behavior: contain;
   padding-right: 2px;
+}
+
+.taxonomy-panel.embedded-taxonomy-panel .managed-list-body {
+  max-height: none;
+  overflow: visible;
+  overscroll-behavior: auto;
+  padding-right: 0;
 }
 
 .node-card {
@@ -620,6 +688,28 @@ small,
   user-select: none;
   touch-action: none;
   transition: border-color 0.12s, opacity 0.12s, box-shadow 0.12s;
+}
+
+.project-overview-card {
+  --overview-system-line-width: 48px;
+  --overview-system-port-offset: 29px;
+  position: absolute;
+  width: 340px;
+  min-height: 260px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 13px;
+  overflow: visible;
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--accent), var(--border) 62%);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
 
 .app-surface-card {
@@ -655,13 +745,15 @@ small,
 }
 
 .node-card.dragging,
+.project-overview-card.dragging,
 .app-surface-card.dragging {
   z-index: 5;
   cursor: grabbing;
   box-shadow: var(--card-shadow-strong);
 }
 
-.node-card.selected {
+.node-card.selected,
+.project-overview-card.selected {
   border-color: var(--accent);
   outline: 2px solid color-mix(in srgb, var(--accent), transparent 62%);
   box-shadow: var(--card-shadow-strong);
@@ -801,6 +893,166 @@ small,
   grid-template-columns: auto 1fr auto auto;
   align-items: flex-start;
   gap: 8px;
+}
+
+.project-overview-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.project-overview-title {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.project-overview-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--accent), var(--border) 48%);
+  border-radius: 6px;
+  color: var(--accent-fg);
+  background: var(--accent);
+}
+
+.project-overview-title h3,
+.project-overview-title small {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-overview-title h3 {
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.project-overview-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.project-overview-copy > div {
+  display: grid;
+  gap: 3px;
+}
+
+.project-overview-copy strong {
+  font-size: 12px;
+}
+
+.project-overview-copy p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  line-height: 1.42;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.project-overview-taxonomy {
+  display: grid;
+  gap: 9px;
+}
+
+.project-overview-section {
+  display: grid;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--border), transparent 14%);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--group-bg);
+}
+
+.project-overview-section header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.project-overview-section header .lucide-icon,
+.project-overview-list-icon .lucide-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.project-overview-section header span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.project-overview-section ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-overview-list-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--border), transparent 24%);
+  border-radius: 5px;
+  padding: 5px 7px;
+  background: color-mix(in srgb, var(--input), transparent 42%);
+}
+
+.project-overview-section[data-overview-kind="appSurface"] .project-overview-list-item {
+  padding-right: 32px;
+}
+
+.project-overview-list-text {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.project-overview-list-text strong,
+.project-overview-list-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-overview-system-dot {
+  position: absolute;
+  top: 50%;
+  right: calc(var(--overview-system-port-offset) * -1);
+  z-index: 2;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--outlet);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--outlet), var(--bg) 64%);
+  transform: translateY(-50%);
+}
+
+.project-overview-system-dot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 2px);
+  width: var(--overview-system-line-width);
+  height: 2px;
+  border-radius: 999px;
+  background: var(--outlet);
+  transform: translateY(-50%);
 }
 
 .node-title {

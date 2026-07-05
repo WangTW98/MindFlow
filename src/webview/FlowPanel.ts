@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { MINDFLOW_FILE_EXTENSION, createUntitledMindFlowDocumentOptions } from "../core/untitledMindFlowDocument";
+import { ensureProjectOverview } from "../core/projectOverview";
 import type { ProductFlow } from "../models/productFlow";
 import { validateProductFlow } from "../models/productFlow";
 
@@ -9,6 +10,7 @@ type OpenFlowCallback = (flowUri: vscode.Uri) => void;
 
 export class FlowPanel implements vscode.CustomTextEditorProvider {
   public static readonly viewType = "mindflow.productFlow";
+  public static selectedProjectOverview: boolean | undefined;
   public static selectedNodeId: string | undefined;
   public static selectedEdgeId: string | undefined;
   public static selectedAppSurfaceId: string | undefined;
@@ -150,12 +152,16 @@ class FlowEditorSession {
         return;
       }
       const parsed = JSON.parse(text) as unknown;
+      const migration = ensureProjectOverview(parsed as ProductFlow);
       const validation = validateProductFlow(parsed);
       if (!validation.valid) {
         this.renderError(`Invalid ProductFlow:\n${validation.errors.join("\n")}`);
         return;
       }
       this.flow = parsed as ProductFlow;
+      if (migration.changed) {
+        void this.replaceDocumentText(document, serializeFlow(this.flow));
+      }
       this.renderFlow(this.flow);
     } catch (error) {
       this.renderError(error instanceof Error ? error.message : String(error));
@@ -165,6 +171,7 @@ class FlowEditorSession {
   public renderWithFallback(fallbackFlow: ProductFlow): void {
     try {
       const parsed = JSON.parse(this.getRenderableDocumentText(this.document, fallbackFlow)) as unknown;
+      ensureProjectOverview(parsed as ProductFlow);
       const validation = validateProductFlow(parsed);
       const documentFlow = validation.valid ? parsed as ProductFlow : undefined;
       this.flow = documentFlow ? chooseFresherFlow(documentFlow, fallbackFlow) : fallbackFlow;
@@ -230,6 +237,7 @@ class FlowEditorSession {
   private async handleMessage(message: WebviewMessage): Promise<void> {
     switch (message.type) {
       case "selectNode":
+        FlowPanel.selectedProjectOverview = false;
         FlowPanel.selectedNodeId = message.nodeId;
         FlowPanel.selectedEdgeId = undefined;
         FlowPanel.selectedAppSurfaceId = undefined;
@@ -238,6 +246,7 @@ class FlowEditorSession {
         FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "selectEdge":
+        FlowPanel.selectedProjectOverview = false;
         FlowPanel.selectedEdgeId = message.edgeId;
         FlowPanel.selectedNodeId = undefined;
         FlowPanel.selectedAppSurfaceId = undefined;
@@ -246,6 +255,7 @@ class FlowEditorSession {
         FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "selectAppSurface":
+        FlowPanel.selectedProjectOverview = false;
         FlowPanel.selectedAppSurfaceId = message.appId;
         FlowPanel.selectedNodeId = undefined;
         FlowPanel.selectedEdgeId = undefined;
@@ -254,6 +264,7 @@ class FlowEditorSession {
         FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "selectDomain":
+        FlowPanel.selectedProjectOverview = false;
         FlowPanel.selectedDomainId = message.domainId;
         FlowPanel.selectedNodeId = undefined;
         FlowPanel.selectedEdgeId = undefined;
@@ -262,6 +273,7 @@ class FlowEditorSession {
         FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "selectRole":
+        FlowPanel.selectedProjectOverview = false;
         FlowPanel.selectedRoleId = message.roleId;
         FlowPanel.selectedNodeId = undefined;
         FlowPanel.selectedEdgeId = undefined;
@@ -270,6 +282,7 @@ class FlowEditorSession {
         FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "selectStatusGroup":
+        FlowPanel.selectedProjectOverview = false;
         FlowPanel.selectedStatusGroupId = message.statusGroupId;
         FlowPanel.selectedNodeId = undefined;
         FlowPanel.selectedEdgeId = undefined;
@@ -278,6 +291,16 @@ class FlowEditorSession {
         FlowPanel.selectedRoleId = undefined;
         break;
       case "clearSelection":
+        FlowPanel.selectedProjectOverview = false;
+        FlowPanel.selectedNodeId = undefined;
+        FlowPanel.selectedEdgeId = undefined;
+        FlowPanel.selectedAppSurfaceId = undefined;
+        FlowPanel.selectedDomainId = undefined;
+        FlowPanel.selectedRoleId = undefined;
+        FlowPanel.selectedStatusGroupId = undefined;
+        break;
+      case "selectProjectOverview":
+        FlowPanel.selectedProjectOverview = true;
         FlowPanel.selectedNodeId = undefined;
         FlowPanel.selectedEdgeId = undefined;
         FlowPanel.selectedAppSurfaceId = undefined;
@@ -286,6 +309,7 @@ class FlowEditorSession {
         FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "deleteNode":
+        FlowPanel.selectedProjectOverview = false;
         FlowPanel.selectedNodeId = message.nodeId;
         FlowPanel.selectedEdgeId = undefined;
         FlowPanel.selectedAppSurfaceId = undefined;
@@ -300,6 +324,9 @@ class FlowEditorSession {
       case "saveAppSurfacePosition":
         await vscode.commands.executeCommand("mindflow.updateAppSurfacePosition", message.appId, message.x, message.y, this.document.uri);
         break;
+      case "saveProjectOverviewPosition":
+        await vscode.commands.executeCommand("mindflow.updateProjectOverviewPosition", message.x, message.y, this.document.uri);
+        break;
       case "createNodeAt":
         await vscode.commands.executeCommand(
           "mindflow.createNodeAt",
@@ -313,6 +340,9 @@ class FlowEditorSession {
         break;
       case "updateNodeDetails":
         await vscode.commands.executeCommand("mindflow.updateNodeDetails", message.nodeId, message.patch, this.document.uri);
+        break;
+      case "updateProjectOverview":
+        await vscode.commands.executeCommand("mindflow.updateProjectOverview", message.patch, this.document.uri);
         break;
       case "createEdge":
         await vscode.commands.executeCommand("mindflow.createEdge", message.from, message.to, message.trigger, message.edgeType, this.document.uri);
@@ -373,6 +403,7 @@ class FlowEditorSession {
       flow,
       flowPath: vscode.workspace.asRelativePath(this.document.uri, false),
       flowFileName: path.basename(this.document.uri.fsPath),
+      selectedProjectOverview: FlowPanel.selectedProjectOverview ?? false,
       selectedNodeId: FlowPanel.selectedNodeId ?? null,
       selectedEdgeId: FlowPanel.selectedEdgeId ?? null,
       selectedAppSurfaceId: FlowPanel.selectedAppSurfaceId ?? null,
@@ -430,12 +461,15 @@ type WebviewMessage =
   | { type: "selectDomain"; domainId: string }
   | { type: "selectRole"; roleId: string }
   | { type: "selectStatusGroup"; statusGroupId: string }
+  | { type: "selectProjectOverview" }
   | { type: "clearSelection" }
   | { type: "deleteNode"; nodeId: string; nodeTitle?: string }
   | { type: "saveNodePosition"; nodeId: string; x: number; y: number }
   | { type: "saveAppSurfacePosition"; appId: string; x: number; y: number }
+  | { type: "saveProjectOverviewPosition"; x: number; y: number }
   | { type: "createNodeAt"; x: number; y: number; appSurfaceIds?: string[]; domainIds?: string[]; roleIds?: string[] }
   | { type: "updateNodeDetails"; nodeId: string; patch: Record<string, unknown> }
+  | { type: "updateProjectOverview"; patch: Record<string, unknown> }
   | { type: "createEdge"; from: Record<string, unknown>; to: Record<string, unknown>; trigger?: string; edgeType?: string }
   | { type: "createConnectedNodeAt"; request: Record<string, unknown> }
   | { type: "updateEdgeDetails"; edgeId: string; revision?: number; patch: Record<string, unknown> }
@@ -486,6 +520,7 @@ function isAssociatedMindFlowUntitled(document: vscode.TextDocument): boolean {
 function parseValidFlow(text: string): ProductFlow | undefined {
   try {
     const parsed = JSON.parse(text) as unknown;
+    ensureProjectOverview(parsed as ProductFlow);
     const validation = validateProductFlow(parsed);
     return validation.valid ? parsed as ProductFlow : undefined;
   } catch {

@@ -8,12 +8,13 @@ import { validateFlowChangePlan } from "../models/flowChange";
 import type { PageNode, ProductFlow } from "../models/productFlow";
 import { validateProductFlow } from "../models/productFlow";
 import { ensureAppSurfaceEntryEdges } from "../core/appSurfaceEntryEdges";
+import { ensureProjectOverview } from "../core/projectOverview";
 import { buildAnalyzeDocumentPrompt } from "../prompts/analyzeDocument";
 import { buildGeneratePencilPrompt } from "../prompts/generatePencil";
 import { buildGeneratePrdPrompt } from "../prompts/generatePrd";
 import { buildModifyFlowPrompt } from "../prompts/modifyFlow";
 
-const PRODUCT_FLOW_SCHEMA_SUMMARY = "ProductFlow fields: schemaVersion, flowId, revision, title, sourceDocumentId, sourceSummary, createdAt, updatedAt, domains, roles, appSurfaces, nodes, edges, artifacts, changeHistory, syncState, productDesignIssues, openQuestions. productDesignIssues is an array of { issueId, severity: critical|warning|optional, title, description, prompt, relatedNodeIds?, relatedEdgeIds?, sourceRefs? } for product logic/design closure and requirement improvement issues.";
+const PRODUCT_FLOW_SCHEMA_SUMMARY = "ProductFlow fields: schemaVersion, flowId, revision, title, sourceDocumentId, sourceSummary, createdAt, updatedAt, projectOverview { summary, goal, view? }, domains, roles, appSurfaces, nodes, edges, artifacts, changeHistory, syncState, productDesignIssues, openQuestions. productDesignIssues is an array of { issueId, severity: critical|warning|optional, title, description, prompt, relatedNodeIds?, relatedEdgeIds?, sourceRefs? } for product logic/design closure and requirement improvement issues.";
 const FLOW_CHANGE_SCHEMA_SUMMARY = "FlowChangePlan fields: changeSetId, flowId, baseRevision, instruction, intent, requiresClarification, operations, affectedNodeIds, affectedEdgeIds, artifactImpact, openQuestions, confidence.";
 
 export abstract class HttpJsonAgentProvider implements AgentProvider {
@@ -24,6 +25,7 @@ export abstract class HttpJsonAgentProvider implements AgentProvider {
   public async analyzeDocument(input: AnalyzeDocumentInput): Promise<ProductFlow> {
     const prompt = buildAnalyzeDocumentPrompt(input.documentText, PRODUCT_FLOW_SCHEMA_SUMMARY);
     const parsed = await this.invokeJson(prompt);
+    ensureProjectOverview(parsed as ProductFlow);
     const validation = validateProductFlow(parsed);
     if (!validation.valid) {
       throw new Error(`Provider returned invalid ProductFlow:\n${validation.errors.join("\n")}`);

@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { ProductFlow } from "../models/productFlow";
 import { validateProductFlow } from "../models/productFlow";
+import { ensureProjectOverview } from "../core/projectOverview";
 import { nowIso, slugify } from "../utils/id";
 
 export const FLOW_FILE_EXTENSION = ".mindflow";
@@ -22,6 +23,7 @@ export class FlowRepository {
 
   public async save(flow: ProductFlow): Promise<string> {
     await this.ensureDirectories();
+    ensureProjectOverview(flow);
     const validation = validateProductFlow(flow);
     if (!validation.valid) {
       throw new Error(`Cannot save invalid ProductFlow:\n${validation.errors.join("\n")}`);
@@ -34,6 +36,7 @@ export class FlowRepository {
   }
 
   public async saveToPath(absolutePath: string, flow: ProductFlow): Promise<void> {
+    ensureProjectOverview(flow);
     const validation = validateProductFlow(flow);
     if (!validation.valid) {
       throw new Error(`Cannot save invalid ProductFlow:\n${validation.errors.join("\n")}`);
@@ -45,6 +48,7 @@ export class FlowRepository {
   public async load(absolutePath: string): Promise<ProductFlow> {
     const raw = await fs.readFile(absolutePath, "utf8");
     const parsed = JSON.parse(raw) as unknown;
+    ensureProjectOverview(parsed as ProductFlow);
     const validation = validateProductFlow(parsed);
     if (!validation.valid) {
       throw new Error(`Invalid ProductFlow file ${absolutePath}:\n${validation.errors.join("\n")}`);
