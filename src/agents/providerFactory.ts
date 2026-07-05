@@ -1,15 +1,10 @@
 import * as vscode from "vscode";
 import type { AgentProvider, HttpAgentConfig } from "./AgentProvider";
-import { CodexProvider } from "./CodexProvider";
-import { GeminiProvider } from "./GeminiProvider";
-import { MockProvider } from "./MockProvider";
+import { createConfiguredAgentProvider, parseAgentProviderId } from "./providerRuntime";
 
 export async function createAgentProvider(context: vscode.ExtensionContext): Promise<AgentProvider> {
   const config = vscode.workspace.getConfiguration("mindflow.agent");
-  const provider = config.get<"mock" | "codex" | "gemini">("provider", "mock");
-  if (provider === "mock") {
-    return new MockProvider();
-  }
+  const provider = parseAgentProviderId(config.get<string>("provider", "codex"));
 
   const httpConfig: HttpAgentConfig = {
     endpoint: config.get<string>("endpoint", ""),
@@ -22,24 +17,17 @@ export async function createAgentProvider(context: vscode.ExtensionContext): Pro
       : undefined
   };
 
-  if (provider === "codex") {
-    return new CodexProvider(httpConfig);
-  }
-  return new GeminiProvider(httpConfig);
+  return createConfiguredAgentProvider(provider, httpConfig);
 }
 
 export async function configureAgent(context: vscode.ExtensionContext): Promise<void> {
-  const selected = await vscode.window.showQuickPick(["mock", "codex", "gemini"], {
+  const selected = await vscode.window.showQuickPick(["codex", "gemini"], {
     title: "MindFlow AI Agent Provider"
   });
   if (!selected) {
     return;
   }
   await vscode.workspace.getConfiguration("mindflow.agent").update("provider", selected, vscode.ConfigurationTarget.Workspace);
-  if (selected === "mock") {
-    vscode.window.showInformationMessage("MindFlow provider set to mock.");
-    return;
-  }
 
   const endpoint = await vscode.window.showInputBox({
     title: `${selected} endpoint`,

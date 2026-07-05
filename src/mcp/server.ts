@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { MockProvider } from "../agents/MockProvider";
 import type { PencilArtifact, PrdArtifact } from "../agents/AgentProvider";
+import { createConfiguredAgentProvider, parseAgentProviderId } from "../agents/providerRuntime";
 import {
   createManualEdge,
   createManualNode,
@@ -50,7 +50,12 @@ const tools: ToolDefinition[] = [
       flowDirectory: stringSchema("Workspace-relative flow directory. Defaults to .mindflow/flows."),
       documentPath: stringSchema("Absolute or workspace-relative Markdown/TXT document path."),
       documentText: stringSchema("Document text. Used when documentPath is omitted."),
-      documentName: stringSchema("Document name used for flow title and source ids.")
+      documentName: stringSchema("Document name used for flow title and source ids."),
+      provider: stringSchema("AI provider. Defaults to MINDFLOW_AGENT_PROVIDER or codex. Supported values: codex, gemini."),
+      endpoint: stringSchema("Provider HTTP endpoint. Optional for codex when using Codex CLI."),
+      model: stringSchema("Provider model name."),
+      apiKey: stringSchema("Provider API key. Defaults to MINDFLOW_AGENT_API_KEY or provider-specific env vars."),
+      codexCliPath: stringSchema("Codex CLI path. Defaults to MINDFLOW_CODEX_CLI_PATH or codex.")
     })
   },
   {
@@ -136,7 +141,12 @@ const tools: ToolDefinition[] = [
       flowPath: stringSchema("MindFlow ProductFlow file path."),
       scope: stringSchema("node or full."),
       nodeId: stringSchema("Required for node PRD."),
-      markdown: stringSchema("PRD Markdown body. If omitted, the mock generator creates a draft."),
+      markdown: stringSchema("PRD Markdown body. If omitted, the configured real provider generates a draft."),
+      provider: stringSchema("AI provider used when markdown is omitted. Defaults to MINDFLOW_AGENT_PROVIDER or codex."),
+      endpoint: stringSchema("Provider HTTP endpoint. Optional for codex when using Codex CLI."),
+      model: stringSchema("Provider model name."),
+      apiKey: stringSchema("Provider API key. Defaults to MINDFLOW_AGENT_API_KEY or provider-specific env vars."),
+      codexCliPath: stringSchema("Codex CLI path. Defaults to MINDFLOW_CODEX_CLI_PATH or codex."),
       prdId: stringSchema("Optional stable PRD id.")
     })
   },
@@ -148,7 +158,12 @@ const tools: ToolDefinition[] = [
       flowPath: stringSchema("MindFlow ProductFlow file path."),
       scope: stringSchema("node or full."),
       nodeId: stringSchema("Required for node Pencil spec."),
-      spec: objectSchema({}, "Pencil spec object. If omitted, the mock generator creates a draft."),
+      spec: objectSchema({}, "Pencil spec object. If omitted, the configured real provider generates a draft."),
+      provider: stringSchema("AI provider used when spec is omitted. Defaults to MINDFLOW_AGENT_PROVIDER or codex."),
+      endpoint: stringSchema("Provider HTTP endpoint. Optional for codex when using Codex CLI."),
+      model: stringSchema("Provider model name."),
+      apiKey: stringSchema("Provider API key. Defaults to MINDFLOW_AGENT_API_KEY or provider-specific env vars."),
+      codexCliPath: stringSchema("Codex CLI path. Defaults to MINDFLOW_CODEX_CLI_PATH or codex."),
       pencilId: stringSchema("Optional stable Pencil id.")
     })
   }
@@ -293,7 +308,7 @@ async function analyzeDocument(args: Record<string, unknown>): Promise<unknown> 
     : undefined;
   const documentText = documentPath ? await fs.readFile(documentPath, "utf8") : requireString(args, "documentText");
   const documentName = optionalString(args.documentName) || (documentPath ? path.basename(documentPath) : "requirements.md");
-  const provider = new MockProvider();
+  const provider = createMcpAgentProvider(args, workspaceRoot);
   const flow = await provider.analyzeDocument({
     documentText,
     documentName,
@@ -368,7 +383,7 @@ async function writePrd(args: Record<string, unknown>): Promise<unknown> {
       markdown: args.markdown
     };
   } else {
-    const provider = new MockProvider();
+    const provider = createMcpAgentProvider(args, workspaceRoot);
     artifact = node ? await provider.generateNodePrd(flow, node) : await provider.generateFullPrd(flow);
     artifact.metadata.generatedBy = "mcp";
     artifact.metadata.linkedJsonPath = repository.relativePath(flowPath);
@@ -404,7 +419,7 @@ async function writePencil(args: Record<string, unknown>): Promise<unknown> {
       spec: args.spec
     };
   } else {
-    const provider = new MockProvider();
+    const provider = createMcpAgentProvider(args, workspaceRoot);
     artifact = node ? await provider.generateNodePencil(flow, node) : await provider.generateFullPencil(flow);
     artifact.metadata.generatedBy = "mcp";
     artifact.metadata.linkedJsonPath = repository.relativePath(flowPath);
@@ -451,6 +466,34 @@ function getWorkspaceRoot(args: Record<string, unknown>): string {
     return path.isAbsolute(fromEnv) ? fromEnv : path.join(process.cwd(), fromEnv);
   }
   return process.cwd();
+}
+
+function createMcpAgentProvider(args: Record<string, unknown>, workspaceRoot: string) {
+  const provider = parseAgentProviderId(
+    optionalString(args.provider) ||
+      process.env.MINDFLOW_AGENT_PROVIDER ||
+      process.env.MINDFLOW_PROVIDER ||
+      "codex"
+  );
+  return createConfiguredAgentProvider(provider, {
+    endpoint:
+      optionalString(args.endpoint) ||
+      process.env.MINDFLOW_AGENT_ENDPOINT ||
+      process.env[`MINDFLOW_${provider.toUpperCase()}_ENDPOINT`] ||
+      "",
+    model:
+      optionalString(args.model) ||
+      process.env.MINDFLOW_AGENT_MODEL ||
+      process.env[`MINDFLOW_${provider.toUpperCase()}_MODEL`] ||
+      "",
+    apiKey:
+      optionalString(args.apiKey) ||
+      process.env.MINDFLOW_AGENT_API_KEY ||
+      process.env[`MINDFLOW_${provider.toUpperCase()}_API_KEY`],
+    codexCliPath: optionalString(args.codexCliPath) || process.env.MINDFLOW_CODEX_CLI_PATH || "codex",
+    workspaceRoot,
+    debugDirectory: path.join(workspaceRoot, ".mindflow", "debug")
+  });
 }
 
 function requireNode(flow: ProductFlow, nodeId: string | undefined): PageNode {

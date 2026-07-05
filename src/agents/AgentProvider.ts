@@ -44,7 +44,7 @@ export interface PencilArtifact {
 }
 
 export interface AgentProvider {
-  readonly id: "mock" | "codex" | "gemini";
+  readonly id: "codex" | "gemini";
   analyzeDocument(input: AnalyzeDocumentInput): Promise<ProductFlow>;
   proposeFlowChanges(input: FlowChangeInput): Promise<FlowChangePlan>;
   generateNodePrd(flow: ProductFlow, node: PageNode, changeSetId?: string): Promise<PrdArtifact>;

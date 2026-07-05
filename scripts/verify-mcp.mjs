@@ -45,7 +45,7 @@ try {
   const analyzed = await callTool("mindflow_analyze_document", {
     workspaceRoot,
     documentPath: "samples/example-requirements.md"
-  });
+  }, 180000);
   assert(analyzed.flowPath.endsWith(".mindflow"), "analyzed flow should use .mindflow extension.");
   assert(analyzed.nodeCount >= 12, "sample analysis should create multi-surface nodes.");
 
@@ -61,20 +61,12 @@ try {
   for (const surface of flow.appSurfaces || []) {
     assert((entryNodesByApp.get(surface.appId) || []).length >= 1, `app surface ${surface.appId} should have an entry node.`);
   }
+  assertAppSurfaceEntryEdges(flow);
 
-  const compare = flow.nodes.find((node) => node.title === "报价对比页");
-  const approval = flow.nodes.find((node) => node.title === "审批发起页");
-  const plan = flow.nodes.find((node) => node.title === "采购计划新建页");
-  assert(compare && approval && plan, "required verification nodes missing.");
-  const originGroup = compare.featureGroups?.[0];
-  const originItem = originGroup?.items.find((item) => item.name.includes("生成比价报告")) || originGroup?.items[0];
+  const { originNode, origin, targetA, targetB } = findVerificationEndpoints(flow);
+  const originGroup = originNode.featureGroups?.find((group) => group.groupId === origin.groupId);
+  const originItem = originGroup?.items.find((item) => item.itemId === origin.itemId);
   assert(originGroup && originItem, "feature item origin missing.");
-  const origin = {
-    kind: "featureItem",
-    nodeId: compare.nodeId,
-    groupId: originGroup.groupId,
-    itemId: originItem.itemId
-  };
 
   const createdNode = await callTool("mindflow_create_node", {
     workspaceRoot,
@@ -110,24 +102,24 @@ try {
     workspaceRoot,
     flowPath: analyzed.flowPath,
     from: origin,
-    toNodeId: approval.nodeId,
-    trigger: "同一功能项出口进入审批",
+    toNodeId: targetA.nodeId,
+    trigger: "同一功能项出口进入目标 A",
     type: "submit"
   });
   await callTool("mindflow_create_edge", {
     workspaceRoot,
     flowPath: analyzed.flowPath,
     from: origin,
-    toNodeId: plan.nodeId,
-    trigger: "同一功能项出口回看计划",
+    toNodeId: targetB.nodeId,
+    trigger: "同一功能项出口进入目标 B",
     type: "navigate"
   });
   await callTool("mindflow_create_edge", {
     workspaceRoot,
     flowPath: analyzed.flowPath,
     from: { kind: "node", nodeId: createdNodeId },
-    toNodeId: compare.nodeId,
-    trigger: "MCP 验证回到报价对比",
+    toNodeId: originNode.nodeId,
+    trigger: "MCP 验证回到原始页面",
     type: "navigate"
   });
   await callTool("mindflow_write_prd", {
@@ -181,14 +173,14 @@ try {
   await once(server, "close");
 }
 
-function request(method, params) {
+function request(method, params, timeoutMs = 20000) {
   const id = nextId++;
   const payload = { jsonrpc: "2.0", id, method, params };
   const response = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       waiters.delete(id);
       reject(new Error(`MCP request timed out: ${method}`));
-    }, 20000);
+    }, timeoutMs);
     waiters.set(id, (message) => {
       clearTimeout(timeout);
       if (message.error) {
@@ -202,11 +194,11 @@ function request(method, params) {
   return response;
 }
 
-async function callTool(name, args) {
+async function callTool(name, args, timeoutMs = 20000) {
   const result = await request("tools/call", {
     name,
     arguments: args
-  });
+  }, timeoutMs);
   return JSON.parse(result.content[0].text);
 }
 
@@ -238,4 +230,43 @@ function findEntryNodesByApp(flow) {
     }
   }
   return entries;
+}
+
+function assertAppSurfaceEntryEdges(flow) {
+  const activeNodes = flow.nodes.filter((node) => node.status === "active");
+  const nodesById = new Map(activeNodes.map((node) => [node.nodeId, node]));
+  const activeEdges = flow.edges.filter((edge) => edge.status === "active");
+  for (const surface of flow.appSurfaces || []) {
+    const edge = activeEdges.find((candidate) => {
+      const target = nodesById.get(candidate.toNodeId);
+      return candidate.from?.kind === "appSurface" &&
+        (candidate.from.appId || candidate.from.nodeId) === surface.appId &&
+        target &&
+        (target.appSurfaceIds || []).includes(surface.appId);
+    });
+    assert(edge, `app surface ${surface.appId} should connect to its own entry page.`);
+  }
+}
+
+function findVerificationEndpoints(flow) {
+  const activeNodes = flow.nodes.filter((node) => node.status === "active");
+  const originNode = activeNodes.find((node) =>
+    node.featureGroups?.some((group) => group.items?.length > 0)
+  );
+  assert(originNode, "verification origin node with feature items missing.");
+  const originGroup = originNode.featureGroups.find((group) => group.items?.length > 0);
+  const originItem = originGroup.items[0];
+  const targets = activeNodes.filter((node) => node.nodeId !== originNode.nodeId).slice(0, 2);
+  assert(targets.length >= 2, "verification needs at least two target nodes.");
+  return {
+    originNode,
+    origin: {
+      kind: "featureItem",
+      nodeId: originNode.nodeId,
+      groupId: originGroup.groupId,
+      itemId: originItem.itemId
+    },
+    targetA: targets[0],
+    targetB: targets[1]
+  };
 }

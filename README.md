@@ -37,9 +37,9 @@ MindFlow is a VSCode extension MVP that turns product or business documents into
 
 ## AI Providers
 
-Set `mindflow.agent.provider` to `mock`, `codex`, or `gemini`.
+Set `mindflow.agent.provider` to `codex` or `gemini`.
 
-The `mock` provider works without credentials and is the default. The `codex` and `gemini` providers use configurable HTTP endpoints and store API keys through VSCode `SecretStorage`; no API key is written to the repository.
+The `codex` provider is the default. Without an HTTP endpoint, it uses the configured Codex CLI path. `codex` and `gemini` can also use configurable HTTP endpoints and store API keys through VSCode `SecretStorage`; no API key is written to the repository.
 
 ## Development
 
@@ -95,6 +95,16 @@ npm run mcp:verify
 ```
 
 For manual MCP client configuration, use command `node`, args `["/Users/wang/Documents/MindFlow/scripts/mindflow-mcp.mjs"]`, and set `MINDFLOW_WORKSPACE=/Users/wang/Documents/MindFlow`.
+
+MCP document analysis and generated PRD/Pencil drafts use real providers only. Configure them with:
+
+- `MINDFLOW_AGENT_PROVIDER=codex|gemini` (defaults to `codex`)
+- `MINDFLOW_AGENT_ENDPOINT` for HTTP providers, or omit it for Codex CLI
+- `MINDFLOW_AGENT_MODEL`
+- `MINDFLOW_AGENT_API_KEY`
+- `MINDFLOW_CODEX_CLI_PATH`
+
+If `npm run mcp:verify` fails while spawning the local Codex CLI, reinstall or repair the Codex CLI, set `MINDFLOW_CODEX_CLI_PATH` to a working executable, or configure `MINDFLOW_AGENT_ENDPOINT`/`MINDFLOW_AGENT_PROVIDER=gemini`. The MCP server no longer falls back to generated sample data.
 
 Available MCP tools:
 

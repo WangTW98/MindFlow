@@ -337,7 +337,7 @@ class FlowEditorSession {
       flow,
       flowPath: vscode.workspace.asRelativePath(this.document.uri, false),
       flowFileName: path.basename(this.document.uri.fsPath),
-      provider: vscode.workspace.getConfiguration("mindflow.agent").get<string>("provider", "mock"),
+      provider: vscode.workspace.getConfiguration("mindflow.agent").get<string>("provider", "codex"),
       pendingChange: this.pendingChange ?? null,
       selectedNodeId: FlowPanel.selectedNodeId ?? null,
       selectedEdgeId: FlowPanel.selectedEdgeId ?? null,

@@ -7,6 +7,7 @@ import type { FlowChangePlan } from "../models/flowChange";
 import { validateFlowChangePlan } from "../models/flowChange";
 import type { PageNode, ProductFlow } from "../models/productFlow";
 import { validateProductFlow } from "../models/productFlow";
+import { ensureAppSurfaceEntryEdges } from "../core/appSurfaceEntryEdges";
 import { buildAnalyzeDocumentPrompt } from "../prompts/analyzeDocument";
 import { buildGeneratePencilPrompt } from "../prompts/generatePencil";
 import { buildGeneratePrdPrompt } from "../prompts/generatePrd";
@@ -27,7 +28,13 @@ export abstract class HttpJsonAgentProvider implements AgentProvider {
     if (!validation.valid) {
       throw new Error(`Provider returned invalid ProductFlow:\n${validation.errors.join("\n")}`);
     }
-    return parsed as ProductFlow;
+    const flow = parsed as ProductFlow;
+    ensureAppSurfaceEntryEdges(flow);
+    const repairedValidation = validateProductFlow(flow);
+    if (!repairedValidation.valid) {
+      throw new Error(`Provider returned ProductFlow that is invalid after app-surface entry repair:\n${repairedValidation.errors.join("\n")}`);
+    }
+    return flow;
   }
 
   public async proposeFlowChanges(input: FlowChangeInput): Promise<FlowChangePlan> {

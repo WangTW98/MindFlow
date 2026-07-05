@@ -182,9 +182,8 @@
       "properties": {
         "mindflow.agent.provider": {
           "type": "string",
-          "default": "mock",
+          "default": "codex",
           "enum": [
-            "mock",
             "codex",
             "gemini"
           ],
@@ -198,7 +197,7 @@
         "mindflow.agent.endpoint": {
           "type": "string",
           "default": "",
-          "description": "Provider-specific HTTP endpoint. Leave empty to use MockProvider or provider defaults."
+          "description": "Provider-specific HTTP endpoint. Leave empty to use Codex CLI when provider is codex."
         },
         "mindflow.agent.codexCliPath": {
           "type": "string",
