@@ -288,11 +288,13 @@
 
   function renderNodeListItem(flow, node) {
     const related = isNodeRelated(node);
+    const pageType = getPageTypeOption(node.pageType);
     return `
       <button class="node-list-item ${isNodeSelected(node.nodeId) ? "selected" : ""} ${related ? "" : "dimmed"}"
         data-list-node-id="${escapeAttr(node.nodeId)}"
         aria-pressed="${isNodeSelected(node.nodeId) ? "true" : "false"}">
-        <span>${escapeHtml(node.title)}</span>
+        <span class="node-list-icon" title="${escapeAttr(pageType.label)}" aria-hidden="true">${renderLucideIcon(pageType.icon)}</span>
+        <span class="node-list-title">${escapeHtml(node.title)}</span>
       </button>
     `;
   }
