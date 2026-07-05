@@ -25,10 +25,13 @@ function submitEdgeDetails(options = {}) {
 }
 
 function collectEdgeDetailsPatch() {
+  const edge = state.flow.edges.find((item) => item.edgeId === selectedEdgeId);
+  const fallbackFrom = edge?.from || (edge?.fromNodeId ? { kind: "node", nodeId: edge.fromNodeId } : undefined);
+  const fallbackTo = edge?.to || (edge?.toNodeId ? { kind: "node", nodeId: edge.toNodeId } : undefined);
   return {
     trigger: document.getElementById("edgeTriggerRule").value,
-    from: parseEndpointValue(document.getElementById("edgeFromEndpoint").dataset.endpointValue),
-    to: parseEndpointValue(document.getElementById("edgeToEndpoint").dataset.endpointValue),
+    from: parseEndpointValue(document.getElementById("edgeFromEndpoint").dataset.endpointValue, fallbackFrom),
+    to: parseEndpointValue(document.getElementById("edgeToEndpoint").dataset.endpointValue, fallbackTo),
     type: document.getElementById("edgeType").dataset.edgeTypeValue || "interaction",
     condition: document.getElementById("edgeCondition").value,
     appSurfaceIds: collectTagMultiSelect("edgeAppSurfaceIds"),

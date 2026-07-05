@@ -116,7 +116,7 @@ function renderCommandStatus() {
 
 function renderSaveHint() {
   if (!commandStatus) {
-    return "<p class=\"save-hint\">画布修改会写入 VS Code 文档缓冲区，使用文件保存落盘。</p>";
+    return "";
   }
   return `<p class="save-hint ${escapeAttr(commandStatus.kind)}" role="status">${escapeHtml(commandStatus.message)}</p>`;
 }

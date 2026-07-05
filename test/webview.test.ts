@@ -58,8 +58,15 @@ test("FlowPanel media scripts keep dependency order explicit", () => {
 
   assert.ok(indexOf("state/canvas-namespace.js") < indexOf("state/canvas-state.js"));
   assert.ok(indexOf("state/canvas-state.js") < indexOf("render/canvas-render.js"));
-  assert.ok(indexOf("render/canvas-render.js") < indexOf("events/canvas-bindings.js"));
-  assert.ok(indexOf("events/canvas-bindings.js") < indexOf("view/canvas-endpoint-pickers.js"));
+  assert.ok(indexOf("render/canvas-render.js") < indexOf("events/canvas-camera.js"));
+  assert.ok(indexOf("events/canvas-camera.js") < indexOf("events/canvas-pan.js"));
+  assert.ok(indexOf("events/canvas-pan.js") < indexOf("events/canvas-connections.js"));
+  assert.ok(indexOf("events/canvas-connections.js") < indexOf("events/canvas-card-drag.js"));
+  assert.ok(indexOf("events/canvas-card-drag.js") < indexOf("events/canvas-interactions.js"));
+  assert.ok(indexOf("events/canvas-interactions.js") < indexOf("events/canvas-bindings.js"));
+  assert.ok(indexOf("events/canvas-bindings.js") < indexOf("view/canvas-endpoint-codec.js"));
+  assert.ok(indexOf("view/canvas-endpoint-codec.js") < indexOf("view/canvas-picker-controls.js"));
+  assert.ok(indexOf("view/canvas-picker-controls.js") < indexOf("view/canvas-endpoint-pickers.js"));
   assert.ok(indexOf("view/canvas-endpoint-pickers.js") < indexOf("view/canvas-edge-view.js"));
   assert.ok(indexOf("view/canvas-edge-view.js") < indexOf("view/canvas-view.js"));
   assert.ok(indexOf("view/canvas-view.js") < indexOf("data/canvas-feature-data.js"));
@@ -68,6 +75,31 @@ test("FlowPanel media scripts keep dependency order explicit", () => {
   assert.ok(indexOf("data/canvas-color-data.js") < indexOf("data/canvas-ui-state.js"));
   assert.ok(indexOf("data/canvas-ui-state.js") < indexOf("data/canvas-data.js"));
   assert.equal(FLOW_WEBVIEW_SCRIPT_FILES[FLOW_WEBVIEW_SCRIPT_FILES.length - 1], "state/main.js");
+});
+
+test("Webview endpoint codec falls back when encoded values are malformed", async () => {
+  const { encodeEndpoint, endpointFromButton, parseEndpointValue } = await loadEndpointCodecHelpers();
+  const fallback = { kind: "node", nodeId: "node_a" };
+  const appSurfaceEndpoint = { kind: "appSurface", nodeId: "app_admin", appId: "app_admin" };
+
+  assert.deepEqual(parseEndpointValue(encodeEndpoint(appSurfaceEndpoint), fallback), appSurfaceEndpoint);
+  assert.deepEqual(endpointFromButton({ dataset: { originKind: "featureItem", originNodeId: "node_b", originGroupId: "group_a", originItemId: "item_a" } }), {
+    kind: "featureItem",
+    nodeId: "node_b",
+    groupId: "group_a",
+    itemId: "item_a"
+  });
+  assert.equal(endpointFromButton({ dataset: { originKind: "featureItem", originNodeId: "node_b", originGroupId: "group_a" } }), null);
+  assert.deepEqual(parseEndpointValue("featureItem|node_b|group_a|item_a", fallback), {
+    kind: "featureItem",
+    nodeId: "node_b",
+    groupId: "group_a",
+    itemId: "item_a"
+  });
+  assert.deepEqual(parseEndpointValue("featureItem|node_b|group_a", fallback), fallback);
+  assert.deepEqual(parseEndpointValue("unsupported|node_b||", fallback), fallback);
+  assert.deepEqual(parseEndpointValue("%E0%A4%A", fallback), fallback);
+  assert.deepEqual(parseEndpointValue("", undefined), { kind: "projectOverview", nodeId: "projectOverview" });
 });
 
 test("Webview message parser rejects malformed messages before command dispatch", () => {
@@ -247,4 +279,24 @@ function createDispatcherHarness(initialSelection: FlowSelectionPatch = emptyFlo
       }
     }
   };
+}
+
+interface EndpointCodecHelpers {
+  encodeEndpoint(endpoint: Record<string, unknown>): string;
+  endpointFromButton(button: { dataset: Record<string, string | undefined> }): unknown;
+  parseEndpointValue(value: unknown, fallbackEndpoint?: Record<string, unknown>): unknown;
+  endpointKey(endpoint: Record<string, unknown>): string;
+}
+
+async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
+  const source = await fs.readFile(
+    path.join(process.cwd(), "src", "webview", "media", "view", "canvas-endpoint-codec.js"),
+    "utf8"
+  );
+  const factory = new Function(
+    "PROJECT_OVERVIEW_NODE_ID",
+    "getFeatureGroups",
+    `${source}\nreturn { encodeEndpoint, endpointFromButton, parseEndpointValue, endpointKey };`
+  ) as (projectOverviewNodeId: string, getFeatureGroups: (node: unknown) => unknown[]) => EndpointCodecHelpers;
+  return factory("projectOverview", () => []);
 }

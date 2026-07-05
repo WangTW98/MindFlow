@@ -112,7 +112,6 @@ export class FlowEditorSession {
         this.postCommandResult(false, `${label}失败，文档未更新。`, true);
         return;
       }
-      this.postCommandResult(true, "修改已写入 VS Code 文档缓冲区。");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.postCommandResult(false, `${label}失败：${message}`, true);

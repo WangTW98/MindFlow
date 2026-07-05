@@ -1,5 +1,4 @@
 .project-overview-card {
-  --overview-system-line-width: 48px;
   --overview-system-port-offset: 29px;
   position: absolute;
   width: 340px;
@@ -142,6 +141,18 @@
   padding-right: 32px;
 }
 
+.project-overview-section[data-overview-kind="appSurface"] .project-overview-list-item::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: calc(var(--overview-system-port-offset) - 12px);
+  height: 2px;
+  border-radius: 999px;
+  background: var(--outlet);
+  transform: translateY(-50%);
+}
+
 .project-overview-list-text {
   display: grid;
   min-width: 0;
@@ -165,17 +176,5 @@
   border: 2px solid var(--outlet);
   border-radius: 999px;
   background: color-mix(in srgb, var(--outlet), var(--bg) 64%);
-  transform: translateY(-50%);
-}
-
-.project-overview-system-dot::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: calc(100% + 2px);
-  width: var(--overview-system-line-width);
-  height: 2px;
-  border-radius: 999px;
-  background: var(--outlet);
   transform: translateY(-50%);
 }

@@ -65,7 +65,12 @@ function bindCanvasElements(root = document) {
   });
 
   root.querySelectorAll(".origin-dot").forEach((button) => {
-    button.addEventListener("pointerdown", (event) => startConnectionDrag(event, "from", endpointFromButton(button), button));
+    button.addEventListener("pointerdown", (event) => {
+      const endpoint = endpointFromButton(button);
+      if (endpoint) {
+        startConnectionDrag(event, "from", endpoint, button);
+      }
+    });
   });
 
   root.querySelectorAll(".target-dot").forEach((button) => {

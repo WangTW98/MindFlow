@@ -68,7 +68,10 @@ function endConnectionDrag(event) {
   } else {
     const originDot = releaseElement?.closest(".origin-dot");
     if (originDot) {
-      postCreateEdge(endpointFromButton(originDot), drag.endpoint);
+      const from = endpointFromButton(originDot);
+      if (from) {
+        postCreateEdge(from, drag.endpoint);
+      }
     } else if (isBlankCanvasPoint(releaseElement)) {
       postCreateConnectedNode({ to: drag.endpoint }, event);
     }

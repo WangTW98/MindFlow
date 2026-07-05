@@ -114,9 +114,15 @@ function handleHostMessage(message) {
 
 function setCommandStatus(ok, message) {
   clearTimeout(commandStatusTimer);
+  const statusMessage = String(message || "").trim();
+  if (ok && !statusMessage) {
+    commandStatus = null;
+    persistUiState();
+    return;
+  }
   commandStatus = {
     kind: ok ? "ok" : "error",
-    message: message || (ok ? "修改已写入 VS Code 文档缓冲区。" : "操作失败，文档未更新。"),
+    message: statusMessage || "操作失败，文档未更新。",
     at: Date.now()
   };
   persistUiState();
