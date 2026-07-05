@@ -21,7 +21,12 @@ import {
   updateManualNodeDetails
 } from "../src/core/flowEditing";
 import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/core/taxonomyEditing";
-import { MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions } from "../src/core/untitledMindFlowDocument";
+import {
+  MINDFLOW_FILE_EXTENSION,
+  MINDFLOW_LANGUAGE_ID,
+  createUntitledMindFlowDocumentOptions,
+  createUntitledMindFlowFileName
+} from "../src/core/untitledMindFlowDocument";
 import { validateProductFlow } from "../src/models/productFlow";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
 import { RecentFlowStore } from "../src/storage/recentFlows";
@@ -116,10 +121,13 @@ test("Manual node details can set and clear a status group", () => {
 test("Blank MindFlow opens as an untitled document without a target file path", () => {
   const flow = createEmptyProductFlow();
   const options = createUntitledMindFlowDocumentOptions(flow);
+  const suggestedFileName = createUntitledMindFlowFileName(flow);
   const validation = validateProductFlow(JSON.parse(options.content) as unknown);
 
   assert.equal(options.language, MINDFLOW_LANGUAGE_ID);
   assert.equal("uri" in options, false);
+  assert.equal(suggestedFileName.startsWith("Untitled-MindFlow-"), true);
+  assert.equal(suggestedFileName.endsWith(MINDFLOW_FILE_EXTENSION), true);
   assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
 
@@ -638,6 +646,7 @@ test("Extension manifest contributes standalone .mindflow editor and sidebar onl
   assert.deepEqual(manifest.contributes?.commands?.map((item) => item.command), [
     "mindflow.newFlow",
     "mindflow.openFlow",
+    "mindflow.saveFlowAs",
     "mindflow.validateFlowJson"
   ]);
   assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), ["mindflow.storage.flowDirectory"]);

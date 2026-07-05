@@ -8,10 +8,12 @@ export class SidebarView implements vscode.WebviewViewProvider {
   public static readonly viewId = "mindflow.sidebar";
 
   private readonly recentFlows: RecentFlowStore;
+  private readonly workspaceRecentFlows: RecentFlowStore;
   private webviewView: vscode.WebviewView | undefined;
 
   public constructor(private readonly context: vscode.ExtensionContext, private readonly getWorkspaceRoot: () => string) {
-    this.recentFlows = new RecentFlowStore(context.workspaceState);
+    this.recentFlows = new RecentFlowStore(context.globalState);
+    this.workspaceRecentFlows = new RecentFlowStore(context.workspaceState);
   }
 
   public async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
@@ -34,10 +36,12 @@ export class SidebarView implements vscode.WebviewViewProvider {
           break;
         case "clearRecent":
           await this.recentFlows.clear();
+          await this.workspaceRecentFlows.clear();
           await this.refresh();
           break;
         case "removeRecent":
           await this.recentFlows.remove(message.flowPath);
+          await this.workspaceRecentFlows.remove(message.flowPath);
           await this.refresh();
           break;
         default:
@@ -124,7 +128,7 @@ export class SidebarView implements vscode.WebviewViewProvider {
     }
     const flowDirectory = vscode.workspace.getConfiguration("mindflow.storage").get<string>("flowDirectory", ".mindflow/flows");
     const repository = workspaceRoot ? new FlowRepository(workspaceRoot, flowDirectory) : undefined;
-    let recentRecords = this.recentFlows.get();
+    let recentRecords = await this.getGlobalRecentRecords();
     if (!recentRecords && repository) {
       const seededRecords = await seedRecentFlowRecords(await repository.list().catch(() => []));
       await this.recentFlows.replace(seededRecords);
@@ -135,6 +139,16 @@ export class SidebarView implements vscode.WebviewViewProvider {
     return {
       flows
     };
+  }
+
+  private async getGlobalRecentRecords(): Promise<RecentFlowRecord[] | undefined> {
+    const globalRecords = this.recentFlows.get();
+    const workspaceRecords = this.workspaceRecentFlows.get();
+    if (workspaceRecords?.length) {
+      await this.recentFlows.replace([...(globalRecords ?? []), ...workspaceRecords]);
+      return this.recentFlows.get();
+    }
+    return globalRecords;
   }
 }
 

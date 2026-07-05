@@ -23,6 +23,7 @@
     "onView:mindflow.sidebar",
     "onCommand:mindflow.newFlow",
     "onCommand:mindflow.openFlow",
+    "onCommand:mindflow.saveFlowAs",
     "onCustomEditor:mindflow.productFlow",
     "onLanguage:mindflow",
     "onCommand:mindflow.validateFlowJson"
@@ -93,8 +94,20 @@
         "title": "MindFlow: Open Product Flow"
       },
       {
+        "command": "mindflow.saveFlowAs",
+        "title": "MindFlow: Save Flow As..."
+      },
+      {
         "command": "mindflow.validateFlowJson",
         "title": "MindFlow: Validate Flow JSON"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "mindflow.saveFlowAs",
+        "key": "ctrl+s",
+        "mac": "cmd+s",
+        "when": "resourceScheme == untitled && resourceLangId == mindflow"
       }
     ],
     "configuration": {

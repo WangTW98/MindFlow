@@ -40,6 +40,10 @@
       description: "用户主动或系统自动触发，但跳转或执行目标仅在相同状态组内执行(用于状态变更);"
     }
   ];
+  const PAGE_TYPE_OPTIONS = [
+    { value: "page", label: "页面", icon: "file-text" },
+    { value: "popup", label: "弹窗", icon: "panel-top" }
+  ];
   const PENDING_EDGE_DETAILS_TTL_MS = 15000;
   const APP_SURFACE_SOURCE_X = -360;
   const APP_SURFACE_SOURCE_Y = 0;
@@ -97,6 +101,7 @@
   let edgeDetailsSaveTimer = null;
   let edgeDetailsSaveRevision = 0;
   let pendingEdgeDetailsSaves = readPendingEdgeDetailsSaves(persisted.pendingEdgeDetailsSaves);
+  let inspectorScrollState = readInspectorScrollState(persisted.inspectorScrollState);
   let framePending = false;
   let toastTimer = null;
   const nodePositions = new Map();
@@ -160,6 +165,7 @@
     `;
 
     bindEvents();
+    restoreInspectorScroll();
     positionCards();
     applyCamera();
     persistUiState();
@@ -389,6 +395,7 @@
       network: '<rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path>',
       "octagon-alert": '<path d="M12 16h.01"></path><path d="M12 8v4"></path><path d="M15.31 2a2 2 0 0 1 1.42.59l4.68 4.68A2 2 0 0 1 22 8.69v6.62a2 2 0 0 1-.59 1.42l-4.68 4.68a2 2 0 0 1-1.42.59H8.69a2 2 0 0 1-1.42-.59l-4.68-4.68A2 2 0 0 1 2 15.31V8.69a2 2 0 0 1 .59-1.42l4.68-4.68A2 2 0 0 1 8.69 2Z"></path>',
       palette: '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.4-.4-.8-.4-1.3 0-1.1.9-2 2-2H16c3.3 0 6-2.7 6-6 0-4.4-4.5-8-10-8Z"></path>',
+      "panel-top": '<rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M3 9h18"></path>',
       "pen-line": '<path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>',
       plus: '<path d="M5 12h14"></path><path d="M12 5v14"></path>',
       "trash-2": '<path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
@@ -515,7 +522,7 @@
             <h3>${escapeHtml(node.title)}</h3>
             <small>${escapeHtml(surfaces || "全部应用端")}${entryAppNames ? ` · 起始: ${escapeHtml(entryAppNames)}` : ""}</small>
           </div>
-          <span>${escapeHtml(node.pageType)}</span>
+          <span>${escapeHtml(getPageTypeOption(node.pageType).label)}</span>
           <button class="origin-dot outlet-dot card-outlet ${connectingFrom && endpointKey(connectingFrom) === nodeOriginKey ? "active" : ""}"
             data-origin-kind="node"
             data-origin-node-id="${escapeAttr(node.nodeId)}"
@@ -597,29 +604,25 @@
 
   function renderNodeInspector(flow, node) {
     return `
-      <form class="details-form" id="nodeDetailsForm">
+      <form class="details-form" id="nodeDetailsForm" data-inspector-key="${escapeAttr(inspectorScrollKey("node", node.nodeId))}">
         <header class="inspector-head">
           <div>
-            <h2>${escapeHtml(node.title)}</h2>
+            <h2 id="nodePanelTitle" class="inline-title-editor" tabindex="0" title="双击编辑标题">${escapeHtml(node.title)}</h2>
             <code>${escapeHtml(node.nodeId)}</code>
           </div>
           <div class="inspector-actions">
             ${renderIconButton("closeInspector", "关闭详情", "x")}
           </div>
         </header>
-        <label>页面名称
-          <input id="nodeTitle" value="${escapeAttr(node.title)}">
-        </label>
-        <label>页面类型
-          <input id="nodePageType" value="${escapeAttr(node.pageType)}">
-        </label>
+        <input id="nodeTitle" type="hidden" value="${escapeAttr(node.title)}">
+        ${renderPageTypePicker(node.pageType)}
         <label>页面目的
           <textarea id="nodePurpose" rows="4">${escapeHtml(node.purpose)}</textarea>
         </label>
         ${renderStatusGroupSelect(flow, node)}
-        ${renderMultiSelect("nodeAppSurfaceIds", "应用端", flow.appSurfaces || [], "appId", "name", node.appSurfaceIds || [])}
-        ${renderMultiSelect("nodeDomainIds", "业务域", flow.domains, "domainId", "name", node.domainIds || [])}
-        ${renderMultiSelect("nodeRoleIds", "角色", flow.roles, "roleId", "name", node.roleIds || [])}
+        ${renderTagMultiSelect("nodeAppSurfaceIds", "应用端", flow.appSurfaces || [], "appId", "name", node.appSurfaceIds || [])}
+        ${renderTagMultiSelect("nodeDomainIds", "业务域", flow.domains, "domainId", "name", node.domainIds || [])}
+        ${renderTagMultiSelect("nodeRoleIds", "角色", flow.roles, "roleId", "name", node.roleIds || [])}
         <section class="feature-editor-section">
           <div class="section-title">
             <h3>功能分组</h3>
@@ -631,6 +634,45 @@
         </section>
         <p class="form-error" id="nodeFormError"></p>
       </form>
+    `;
+  }
+
+  function renderPageTypePicker(pageType) {
+    const selected = getPageTypeOption(pageType);
+    return `
+      <div class="page-type-field">
+        <span class="field-label">页面类型</span>
+        <input id="nodePageType" type="hidden" value="${escapeAttr(selected.value)}">
+        <div class="page-type-picker" data-page-type-picker>
+          <button type="button"
+            class="page-type-trigger"
+            data-page-type-value="${escapeAttr(selected.value)}"
+            aria-haspopup="listbox"
+            aria-expanded="false">
+            ${renderPageTypeOptionContent(selected)}
+          </button>
+          <div class="page-type-menu" role="listbox" aria-label="页面类型">
+            ${PAGE_TYPE_OPTIONS.map((type) => `
+              <button type="button"
+                class="page-type-option ${type.value === selected.value ? "selected" : ""}"
+                data-page-type-option="${escapeAttr(type.value)}"
+                role="option"
+                aria-selected="${type.value === selected.value ? "true" : "false"}">
+                ${renderPageTypeOptionContent(type)}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPageTypeOptionContent(type) {
+    return `
+      <span class="page-type-icon" aria-hidden="true">${renderLucideIcon(type.icon)}</span>
+      <span class="page-type-copy">
+        <strong>${escapeHtml(type.label)}</strong>
+      </span>
     `;
   }
 
@@ -767,17 +809,15 @@
     const selectedType = normalizeEdgeTypeForSelect(edge.type);
     const triggerRule = edge.trigger || edge.action || "";
     return `
-      <form class="details-form" id="edgeDetailsForm">
+      <form class="details-form" id="edgeDetailsForm" data-inspector-key="${escapeAttr(inspectorScrollKey("edge", edge.edgeId))}">
         <header class="inspector-head">
           <div>
-            <h2 id="edgePanelTitle">${escapeHtml(triggerRule)}</h2>
+            <h2 id="edgePanelTitle" class="inline-title-editor" tabindex="0" title="双击编辑标题">${escapeHtml(triggerRule)}</h2>
             <code>${escapeHtml(edge.edgeId)}</code>
           </div>
           ${renderIconButton("closeInspector", "关闭详情", "x")}
         </header>
-        <label>触发规则描述
-          <input id="edgeTriggerRule" value="${escapeAttr(triggerRule)}" placeholder="输入连线触发规则">
-        </label>
+        <input id="edgeTriggerRule" type="hidden" value="${escapeAttr(triggerRule)}">
         ${renderEndpointPicker("edgeFromEndpoint", "起点", flow, edge.from || { kind: "node", nodeId: edge.fromNodeId }, true)}
         ${renderEndpointPicker("edgeToEndpoint", "终点", flow, edge.to || { kind: "node", nodeId: edge.toNodeId }, false)}
         ${renderEdgeTypePicker(selectedType)}
@@ -824,7 +864,7 @@
 
   function renderEdgeTypeOptionContent(type) {
     return `
-      <span class="edge-type-swatch" style="--edge-type-color: ${escapeAttr(type.color)};" aria-hidden="true"></span>
+      <span class="edge-type-swatch" data-edge-type-color="${escapeAttr(type.color)}" aria-hidden="true"></span>
       <span class="edge-type-copy">
         <strong>${escapeHtml(type.label)}</strong>
         <small>${escapeHtml(type.description)}</small>
@@ -1025,10 +1065,15 @@
     if (closeInspectorButton) {
       closeInspectorButton.addEventListener("click", clearSelection);
     }
+    const inspector = document.querySelector(".inspector");
+    if (inspector) {
+      inspector.addEventListener("scroll", persistCurrentInspectorScroll, { passive: true });
+    }
 
     bindTaxonomyPanelToggles(document);
     bindTaxonomyControls(document);
     bindProductIssueControls(document);
+    applyEdgeTypeColorSwatches(document);
     applyStatusGroupColorSwatches(document);
 
     bindAction("closeProductIssuePanel", () => {
@@ -1107,6 +1152,97 @@
         nextInput.setSelectionRange(nodeSearch.length, nodeSearch.length);
       }
     });
+  }
+
+  function bindInlineTitleEditor(titleId, inputId, commit) {
+    const title = document.getElementById(titleId);
+    const input = document.getElementById(inputId);
+    if (!title || !input) {
+      return;
+    }
+    title.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      startInlineTitleEdit(title, input, commit);
+    });
+    title.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (title.dataset.inlineEditing === "true") {
+        return;
+      }
+      if (event.key === "Enter" || event.key === "F2") {
+        event.preventDefault();
+        startInlineTitleEdit(title, input, commit);
+      }
+    });
+  }
+
+  function startInlineTitleEdit(title, input, commit) {
+    if (title.dataset.inlineEditing === "true") {
+      return;
+    }
+    const original = normalizeInlineTitleText(input.value || title.textContent);
+    let finished = false;
+    title.dataset.inlineEditing = "true";
+    title.setAttribute("contenteditable", "true");
+    title.setAttribute("role", "textbox");
+    title.classList.add("editing");
+    title.textContent = original;
+
+    const finish = (save) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      title.removeEventListener("blur", handleBlur);
+      title.removeEventListener("keydown", handleKeydown);
+      const next = save ? normalizeInlineTitleText(title.textContent) || original : original;
+      input.value = next;
+      title.textContent = next;
+      title.removeAttribute("contenteditable");
+      title.removeAttribute("role");
+      title.classList.remove("editing");
+      delete title.dataset.inlineEditing;
+      if (save && next !== original) {
+        commit();
+      }
+    };
+
+    const handleBlur = () => finish(true);
+    const handleKeydown = (event) => {
+      event.stopPropagation();
+      if (event.key === "Enter") {
+        event.preventDefault();
+        finish(true);
+        title.blur();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        finish(false);
+        title.blur();
+      }
+    };
+
+    title.addEventListener("blur", handleBlur);
+    title.addEventListener("keydown", handleKeydown);
+    requestAnimationFrame(() => {
+      title.focus({ preventScroll: true });
+      selectInlineTitleText(title);
+    });
+  }
+
+  function normalizeInlineTitleText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function selectInlineTitleText(element) {
+    const selection = window.getSelection?.();
+    if (!selection) {
+      return;
+    }
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    selection.removeAllRanges();
+    selection.addRange(range);
   }
 
   function bindProductIssueControls(root = document) {
@@ -1274,18 +1410,38 @@
   }
 
   function bindNodeInspector(nodeForm) {
+    bindInlineTitleEditor("nodePanelTitle", "nodeTitle", () => commitNodeDetailsChange({ immediate: true }));
     nodeForm.addEventListener("submit", (event) => {
       event.preventDefault();
       commitNodeDetailsChange({ immediate: true });
     });
     nodeForm.addEventListener("input", (event) => {
-      if (event.target.closest(".drag-handle")) {
+      if (event.target.closest(".drag-handle, .inline-title-editor")) {
         return;
       }
       commitNodeDetailsChange();
     });
-    nodeForm.addEventListener("change", () => {
+    nodeForm.addEventListener("change", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
       commitNodeDetailsChange({ immediate: true });
+    });
+    nodeForm.querySelectorAll(".page-type-trigger").forEach((trigger) => {
+      trigger.addEventListener("click", () => togglePageTypePicker(trigger));
+      trigger.addEventListener("keydown", (event) => event.stopPropagation());
+    });
+    nodeForm.querySelectorAll(".page-type-picker").forEach((picker) => {
+      picker.addEventListener("focusout", () => {
+        setTimeout(() => {
+          if (!picker.contains(document.activeElement)) {
+            closePageTypePicker(picker);
+          }
+        }, 0);
+      });
+    });
+    nodeForm.querySelectorAll(".page-type-option").forEach((option) => {
+      option.addEventListener("click", () => selectPageTypeOption(option));
     });
     nodeForm.querySelectorAll(".status-group-trigger").forEach((trigger) => {
       trigger.addEventListener("click", () => toggleStatusGroupPicker(trigger));
@@ -1410,16 +1566,23 @@
   }
 
   function bindEdgeInspector(edgeForm) {
+    bindInlineTitleEditor("edgePanelTitle", "edgeTriggerRule", () => submitEdgeDetails({ immediate: true }));
     edgeForm.addEventListener("submit", (event) => {
       event.preventDefault();
     });
     edgeForm.addEventListener("change", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
       if (event.target.closest(".endpoint-combobox")) {
         return;
       }
       submitEdgeDetails();
     });
     edgeForm.addEventListener("input", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
       if (event.target.closest(".endpoint-combobox")) {
         filterEndpointOptions(event.target);
         return;
@@ -2467,14 +2630,15 @@
       pageType: document.getElementById("nodePageType").value,
       purpose: document.getElementById("nodePurpose").value,
       statusGroupId: document.getElementById("nodeStatusGroupId")?.value || "",
-      appSurfaceIds: collectMultiSelect("nodeAppSurfaceIds"),
-      domainIds: collectMultiSelect("nodeDomainIds"),
-      roleIds: collectMultiSelect("nodeRoleIds"),
+      appSurfaceIds: collectTagMultiSelect("nodeAppSurfaceIds"),
+      domainIds: collectTagMultiSelect("nodeDomainIds"),
+      roleIds: collectTagMultiSelect("nodeRoleIds"),
       featureGroups: collectFeatureGroups()
     };
   }
 
   function postNodeDetails(nodeId, patch) {
+    persistCurrentInspectorScroll();
     clearTimeout(nodeDetailsSaveTimer);
     nodeDetailsSaveTimer = null;
     vscode.postMessage({
@@ -2722,6 +2886,7 @@
   }
 
   function postEdgeDetails(edgeId, patch, revision) {
+    persistCurrentInspectorScroll();
     clearTimeout(edgeDetailsSaveTimer);
     edgeDetailsSaveTimer = null;
     rememberPendingEdgeDetailsSave(edgeId, patch, revision);
@@ -2750,6 +2915,14 @@
     node.domainIds = patch.domainIds;
     node.roleIds = patch.roleIds;
     node.featureGroups = patch.featureGroups;
+    const title = document.getElementById("nodePanelTitle");
+    const titleInput = document.getElementById("nodeTitle");
+    if (title && title.dataset.inlineEditing !== "true") {
+      title.textContent = node.title;
+    }
+    if (titleInput) {
+      titleInput.value = node.title;
+    }
   }
 
   function applyEdgeDetailsLocally(edgeId, patch) {
@@ -2769,8 +2942,12 @@
     edge.domainIds = patch.domainIds;
     edge.roleIds = patch.roleIds;
     const title = document.getElementById("edgePanelTitle");
-    if (title) {
+    const titleInput = document.getElementById("edgeTriggerRule");
+    if (title && title.dataset.inlineEditing !== "true") {
       title.textContent = edge.trigger;
+    }
+    if (titleInput) {
+      titleInput.value = edge.trigger;
     }
   }
 
@@ -3347,6 +3524,7 @@
     const type = getEdgeTypeOption(option.dataset.edgeTypeOption);
     trigger.dataset.edgeTypeValue = type.value;
     trigger.innerHTML = renderEdgeTypeOptionContent(type);
+    applyEdgeTypeColorSwatches(trigger);
     picker.querySelectorAll(".edge-type-option.selected").forEach((item) => {
       item.classList.remove("selected");
       item.setAttribute("aria-selected", "false");
@@ -3355,6 +3533,42 @@
     option.setAttribute("aria-selected", "true");
     closeEdgeTypePicker(picker);
     submitEdgeDetails({ immediate: true });
+  }
+
+  function togglePageTypePicker(trigger) {
+    const picker = trigger.closest(".page-type-picker");
+    if (!picker) {
+      return;
+    }
+    const open = !picker.classList.contains("open");
+    picker.classList.toggle("open", open);
+    trigger.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function closePageTypePicker(picker) {
+    picker.classList.remove("open");
+    picker.querySelector(".page-type-trigger")?.setAttribute("aria-expanded", "false");
+  }
+
+  function selectPageTypeOption(option) {
+    const picker = option.closest(".page-type-picker");
+    const trigger = picker?.querySelector(".page-type-trigger");
+    const input = document.getElementById("nodePageType");
+    if (!picker || !trigger || !input) {
+      return;
+    }
+    const type = getPageTypeOption(option.dataset.pageTypeOption);
+    input.value = type.value;
+    trigger.dataset.pageTypeValue = type.value;
+    trigger.innerHTML = renderPageTypeOptionContent(type);
+    picker.querySelectorAll(".page-type-option.selected").forEach((item) => {
+      item.classList.remove("selected");
+      item.setAttribute("aria-selected", "false");
+    });
+    option.classList.add("selected");
+    option.setAttribute("aria-selected", "true");
+    closePageTypePicker(picker);
+    commitNodeDetailsChange({ immediate: true });
   }
 
   function toggleStatusGroupPicker(trigger) {
@@ -3392,6 +3606,19 @@
     option.setAttribute("aria-selected", "true");
     closeStatusGroupPicker(picker);
     commitNodeDetailsChange({ immediate: true });
+  }
+
+  function getPageTypeOption(type) {
+    const value = normalizePageTypeForSelect(type);
+    return PAGE_TYPE_OPTIONS.find((option) => option.value === value) || PAGE_TYPE_OPTIONS[0];
+  }
+
+  function normalizePageTypeForSelect(type) {
+    const value = String(type || "").trim().toLowerCase();
+    if (value === "popup" || value === "modal" || value === "dialog" || value === "弹窗") {
+      return "popup";
+    }
+    return "page";
   }
 
   function normalizeEdgeTypeForSelect(type) {
@@ -3635,6 +3862,14 @@
     });
   }
 
+  function applyEdgeTypeColorSwatches(root = document) {
+    root.querySelectorAll(".edge-type-swatch[data-edge-type-color]").forEach((swatch) => {
+      const color = String(swatch.dataset.edgeTypeColor || "").trim() || "var(--vscode-charts-blue, #3794ff)";
+      swatch.style.background = color;
+      swatch.style.borderColor = color;
+    });
+  }
+
   function randomStatusGroupColor(existingGroups = []) {
     const usedColors = new Set(existingGroups.map((group) => normalizeStatusGroupColor(group.color).toLowerCase()));
     const hue = Math.floor(Math.random() * 360);
@@ -3806,6 +4041,59 @@
     };
   }
 
+  function readInspectorScrollState(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {};
+    }
+    return Object.entries(value).reduce((result, [key, scrollTop]) => {
+      const normalized = Number(scrollTop);
+      if (typeof key === "string" && key && Number.isFinite(normalized) && normalized >= 0) {
+        result[key] = Math.round(normalized);
+      }
+      return result;
+    }, {});
+  }
+
+  function inspectorScrollKey(kind, id) {
+    return `${kind}:${id || ""}`;
+  }
+
+  function currentInspectorScrollKey() {
+    const form = document.querySelector(".inspector .details-form[data-inspector-key]");
+    return typeof form?.dataset.inspectorKey === "string" ? form.dataset.inspectorKey : "";
+  }
+
+  function persistCurrentInspectorScroll() {
+    const inspector = document.querySelector(".inspector");
+    const key = currentInspectorScrollKey();
+    if (!inspector || !key) {
+      return;
+    }
+    const scrollTop = Math.max(0, Math.round(inspector.scrollTop));
+    if (inspectorScrollState[key] === scrollTop) {
+      return;
+    }
+    inspectorScrollState = {
+      ...inspectorScrollState,
+      [key]: scrollTop
+    };
+    persistUiState();
+  }
+
+  function restoreInspectorScroll() {
+    const inspector = document.querySelector(".inspector");
+    const key = currentInspectorScrollKey();
+    const scrollTop = Number(inspectorScrollState[key]);
+    if (!inspector || !key || !Number.isFinite(scrollTop)) {
+      return;
+    }
+    const restore = () => {
+      inspector.scrollTop = scrollTop;
+    };
+    restore();
+    requestAnimationFrame(restore);
+  }
+
   function makeClientId(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   }
@@ -3829,7 +4117,8 @@
       zoom,
       camera,
       connectingFrom,
-      pendingEdgeDetailsSaves
+      pendingEdgeDetailsSaves,
+      inspectorScrollState
     });
   }
 

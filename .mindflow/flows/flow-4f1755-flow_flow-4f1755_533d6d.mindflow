@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.0",
   "flowId": "flow_flow-4f1755_533d6d",
-  "revision": 36,
+  "revision": 90,
   "title": "多应用端采购协同平台",
   "sourceDocumentId": "samples/example-requirements.md",
   "sourceSummary": "从 samples/example-requirements.md 提取四个应用端、采购协同核心流程、业务域、角色、功能分组与跨应用端连线。",
   "createdAt": "2026-07-05T08:12:37.260Z",
-  "updatedAt": "2026-07-05T08:58:48.684Z",
+  "updatedAt": "2026-07-05T09:34:44.880Z",
   "domains": [
     {
       "domainId": "domain_purchase_plan",
@@ -178,19 +178,19 @@
   ],
   "statusGroups": [
     {
-      "statusGroupId": "status_mr7js88o_ieffv",
+      "statusGroupId": "status_mr7lhhsx_2wgup",
       "title": "新状态组 1",
-      "color": "#553ad9"
+      "color": "#3ad93f"
     },
     {
-      "statusGroupId": "status_mr7js8tz_0gb06",
+      "statusGroupId": "status_mr7lhhx2_zci5g",
       "title": "新状态组 2",
-      "color": "#3ad982"
+      "color": "#3a74d9"
     },
     {
-      "statusGroupId": "status_mr7js8yl_do067",
+      "statusGroupId": "status_mr7lhi17_9h65t",
       "title": "新状态组 3",
-      "color": "#a2d93a"
+      "color": "#3a6cd9"
     }
   ],
   "nodes": [
@@ -198,14 +198,19 @@
       "nodeId": "page_page-64451e_cdb276",
       "stableKey": "3b6bf271c6cd",
       "status": "active",
-      "version": 5,
-      "title": "新建页面",
+      "version": 14,
+      "title": "新建页面1",
       "pageType": "page",
       "appSurfaceIds": [
         "app_admin_backend"
       ],
-      "domainIds": [],
-      "roleIds": [],
+      "domainIds": [
+        "domain_purchase_plan",
+        "domain_inquiry_comparison"
+      ],
+      "roleIds": [
+        "role_procurement_manager"
+      ],
       "purpose": "手动创建的产品页面节点。",
       "featureGroups": [
         {
@@ -655,6 +660,44 @@
           "sourceId": "manual",
           "label": "MindFlow manual edge",
           "excerpt": "管理后台 -> page_page-64451e_d5c1fd"
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "edgeId": "edge_6a33e6ce27",
+      "status": "active",
+      "fromNodeId": "page_page-64451e_d5c1fd",
+      "toNodeId": "app_public_site",
+      "from": {
+        "kind": "featureItem",
+        "nodeId": "page_page-64451e_d5c1fd",
+        "groupId": "group_group-6b9957_24d61b",
+        "itemId": "item_item-da1a76_b49cb1"
+      },
+      "to": {
+        "kind": "appSurface",
+        "nodeId": "app_public_site",
+        "appId": "app_public_site"
+      },
+      "action": "手动连接",
+      "trigger": "手动连接",
+      "type": "interaction",
+      "appSurfaceIds": [
+        "app_admin_backend",
+        "app_public_site"
+      ],
+      "domainIds": [
+        "domain_public_procurement"
+      ],
+      "roleIds": [
+        "role_guest_supplier"
+      ],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edge",
+          "excerpt": "page_page-64451e_d5c1fd/group_group-6b9957_24d61b/item_item-da1a76_b49cb1 -> 公开采购网站"
         }
       ],
       "confidence": 1

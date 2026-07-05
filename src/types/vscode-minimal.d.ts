@@ -15,6 +15,7 @@ declare module "vscode" {
     subscriptions: { push(...items: Disposable[]): void };
     extensionUri: Uri;
     workspaceState: Memento;
+    globalState: Memento;
     secrets: {
       get(key: string): Thenable<string | undefined>;
       store(key: string, value: string): Thenable<void>;
@@ -91,6 +92,13 @@ declare module "vscode" {
     filters?: Record<string, string[]>;
   }
 
+  export interface SaveDialogOptions {
+    title?: string;
+    defaultUri?: Uri;
+    filters?: Record<string, string[]>;
+    saveLabel?: string;
+  }
+
   export interface QuickPickItem {
     label: string;
     description?: string;
@@ -117,6 +125,7 @@ declare module "vscode" {
   export interface WebviewPanel {
     webview: Webview;
     reveal(column?: ViewColumn): void;
+    dispose(): unknown;
     onDidDispose(listener: () => any): Disposable;
   }
 
@@ -180,6 +189,7 @@ declare module "vscode" {
     function showErrorMessage(message: string): Thenable<string | undefined>;
     function showInputBox(options?: InputBoxOptions): Thenable<string | undefined>;
     function showOpenDialog(options?: OpenDialogOptions): Thenable<Uri[] | undefined>;
+    function showSaveDialog(options?: SaveDialogOptions): Thenable<Uri | undefined>;
     function showTextDocument(document: TextDocument, column?: ViewColumn): Thenable<TextEditor>;
     function showQuickPick(items: readonly string[], options?: { title?: string }): Thenable<string | undefined>;
     function showQuickPick<T extends QuickPickItem>(items: readonly T[], options?: { title?: string }): Thenable<T | undefined>;

@@ -1,5 +1,7 @@
+import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { MINDFLOW_FILE_EXTENSION, createUntitledMindFlowDocumentOptions } from "../core/untitledMindFlowDocument";
 import type { ProductFlow } from "../models/productFlow";
 import { validateProductFlow } from "../models/productFlow";
 
@@ -33,13 +35,14 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
   public static createOrShow(
     _extensionUri: vscode.Uri,
     flow: ProductFlow,
-    flowPath: string
+    flowUri: vscode.Uri | string
   ): void {
+    const uri = typeof flowUri === "string" ? vscode.Uri.file(flowUri) : flowUri;
     const provider = FlowPanel.provider;
-    if (provider?.renderSession(flowPath, flow)) {
+    if (provider?.renderSession(uri, flow)) {
       return;
     }
-    void vscode.commands.executeCommand("vscode.openWith", vscode.Uri.file(flowPath), FlowPanel.viewType);
+    void vscode.commands.executeCommand("vscode.openWith", uri, FlowPanel.viewType);
   }
 
   private constructor(
@@ -52,7 +55,8 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): void {
-    const flowPath = document.uri.fsPath;
+    const flowKey = document.uri.toString();
+    let migrationQueued = false;
     this.onDidOpenFlow(document.uri);
     webviewPanel.webview.options = {
       enableScripts: true,
@@ -64,32 +68,59 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
       document,
       webviewPanel
     );
-    this.sessions.set(flowPath, session);
+    this.sessions.set(flowKey, session);
 
     const changeListener = vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.document.uri.toString() === document.uri.toString()) {
+        if (queueMindFlowUntitledMigration(event.document)) {
+          return;
+        }
         session.renderFromDocument(event.document);
       }
     });
     const disposeListener = webviewPanel.onDidDispose(() => {
       changeListener.dispose();
       disposeListener.dispose();
-      if (this.sessions.get(flowPath) === session) {
-        this.sessions.delete(flowPath);
+      if (this.sessions.get(flowKey) === session) {
+        this.sessions.delete(flowKey);
       }
     });
 
-    session.renderFromDocument(document);
+    if (!queueMindFlowUntitledMigration(document)) {
+      session.renderFromDocument(document);
+    }
+
+    function queueMindFlowUntitledMigration(candidate: vscode.TextDocument): boolean {
+      if (migrationQueued || !isAssociatedMindFlowUntitled(candidate)) {
+        return false;
+      }
+      const flow = parseValidFlow(candidate.getText());
+      if (!flow) {
+        return false;
+      }
+      migrationQueued = true;
+      void FlowPanel.provider?.reopenAsMindFlowUntitled(flow, webviewPanel).catch(() => {
+        migrationQueued = false;
+        session.renderFromDocument(candidate);
+      });
+      return true;
+    }
   }
 
-  private renderSession(flowPath: string, fallbackFlow: ProductFlow): boolean {
-    const session = this.sessions.get(flowPath);
+  private renderSession(flowUri: vscode.Uri, fallbackFlow: ProductFlow): boolean {
+    const session = this.sessions.get(flowUri.toString());
     if (session) {
       session.renderWithFallback(fallbackFlow);
       session.reveal();
       return true;
     }
     return false;
+  }
+
+  private async reopenAsMindFlowUntitled(flow: ProductFlow, webviewPanel: vscode.WebviewPanel): Promise<void> {
+    const replacementDocument = await vscode.workspace.openTextDocument(createUntitledMindFlowDocumentOptions(flow));
+    await vscode.commands.executeCommand("vscode.openWith", replacementDocument.uri, FlowPanel.viewType);
+    webviewPanel.dispose();
   }
 }
 
@@ -108,7 +139,16 @@ class FlowEditorSession {
 
   public renderFromDocument(document: vscode.TextDocument): void {
     try {
-      const parsed = JSON.parse(document.getText()) as unknown;
+      const text = this.getRenderableDocumentText(document);
+      if (!text.trim()) {
+        if (document.isUntitled) {
+          this.renderRestorePending();
+        } else {
+          this.renderError("MindFlow file is empty. Save valid .mindflow JSON or create a new blank MindFlow.");
+        }
+        return;
+      }
+      const parsed = JSON.parse(text) as unknown;
       const validation = validateProductFlow(parsed);
       if (!validation.valid) {
         this.renderError(`Invalid ProductFlow:\n${validation.errors.join("\n")}`);
@@ -123,7 +163,7 @@ class FlowEditorSession {
 
   public renderWithFallback(fallbackFlow: ProductFlow): void {
     try {
-      const parsed = JSON.parse(this.document.getText()) as unknown;
+      const parsed = JSON.parse(this.getRenderableDocumentText(this.document, fallbackFlow)) as unknown;
       const validation = validateProductFlow(parsed);
       const documentFlow = validation.valid ? parsed as ProductFlow : undefined;
       this.flow = documentFlow ? chooseFresherFlow(documentFlow, fallbackFlow) : fallbackFlow;
@@ -136,6 +176,47 @@ class FlowEditorSession {
 
   public reveal(): void {
     this.panel.reveal(vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One);
+  }
+
+  private getRenderableDocumentText(document: vscode.TextDocument, fallbackFlow?: ProductFlow): string {
+    const documentText = document.getText();
+    if (documentText.trim()) {
+      return documentText;
+    }
+
+    const replacementText = this.createHydratedDocumentText(document, fallbackFlow);
+    if (replacementText) {
+      void this.replaceDocumentText(document, replacementText);
+      return replacementText;
+    }
+
+    return documentText;
+  }
+
+  private createHydratedDocumentText(document: vscode.TextDocument, fallbackFlow?: ProductFlow): string | undefined {
+    if (document.uri.scheme === "file" && document.uri.fsPath) {
+      try {
+        const diskText = fs.readFileSync(document.uri.fsPath, "utf8");
+        if (diskText.trim()) {
+          return diskText;
+        }
+      } catch {
+        // Fall through to the normal validation error below.
+      }
+    }
+
+    if (fallbackFlow) {
+      return serializeFlow(fallbackFlow);
+    }
+
+    return undefined;
+  }
+
+  private async replaceDocumentText(document: vscode.TextDocument, text: string): Promise<void> {
+    const applied = await replaceDocumentText(document, text);
+    if (!applied) {
+      this.renderError("VSCode refused to restore the MindFlow document content.");
+    }
   }
 
   private enqueueMessage(message: WebviewMessage): void {
@@ -195,13 +276,13 @@ class FlowEditorSession {
         FlowPanel.selectedAppSurfaceId = undefined;
         FlowPanel.selectedDomainId = undefined;
         FlowPanel.selectedRoleId = undefined;
-        await vscode.commands.executeCommand("mindflow.removeNode", message.nodeId);
+        await vscode.commands.executeCommand("mindflow.removeNode", message.nodeId, this.document.uri);
         break;
       case "saveNodePosition":
-        await vscode.commands.executeCommand("mindflow.updateNodePosition", message.nodeId, message.x, message.y);
+        await vscode.commands.executeCommand("mindflow.updateNodePosition", message.nodeId, message.x, message.y, this.document.uri);
         break;
       case "saveAppSurfacePosition":
-        await vscode.commands.executeCommand("mindflow.updateAppSurfacePosition", message.appId, message.x, message.y);
+        await vscode.commands.executeCommand("mindflow.updateAppSurfacePosition", message.appId, message.x, message.y, this.document.uri);
         break;
       case "createNodeAt":
         await vscode.commands.executeCommand(
@@ -210,17 +291,18 @@ class FlowEditorSession {
           message.y,
           message.appSurfaceIds,
           message.domainIds,
-          message.roleIds
+          message.roleIds,
+          this.document.uri
         );
         break;
       case "updateNodeDetails":
-        await vscode.commands.executeCommand("mindflow.updateNodeDetails", message.nodeId, message.patch);
+        await vscode.commands.executeCommand("mindflow.updateNodeDetails", message.nodeId, message.patch, this.document.uri);
         break;
       case "createEdge":
-        await vscode.commands.executeCommand("mindflow.createEdge", message.from, message.to, message.trigger, message.edgeType);
+        await vscode.commands.executeCommand("mindflow.createEdge", message.from, message.to, message.trigger, message.edgeType, this.document.uri);
         break;
       case "createConnectedNodeAt":
-        await vscode.commands.executeCommand("mindflow.createConnectedNodeAt", message.request);
+        await vscode.commands.executeCommand("mindflow.createConnectedNodeAt", message.request, this.document.uri);
         break;
       case "updateEdgeDetails":
         if (typeof message.revision === "number") {
@@ -230,10 +312,10 @@ class FlowEditorSession {
           }
           this.latestEdgeDetailsRevisions.set(message.edgeId, message.revision);
         }
-        await vscode.commands.executeCommand("mindflow.updateEdgeDetails", message.edgeId, message.patch);
+        await vscode.commands.executeCommand("mindflow.updateEdgeDetails", message.edgeId, message.patch, this.document.uri);
         break;
       case "removeEdge":
-        await vscode.commands.executeCommand("mindflow.removeEdge", message.edgeId);
+        await vscode.commands.executeCommand("mindflow.removeEdge", message.edgeId, this.document.uri);
         break;
       case "updateTaxonomy":
         if (message.request.action === "delete") {
@@ -245,7 +327,7 @@ class FlowEditorSession {
             FlowPanel.selectedRoleId = undefined;
           }
         }
-        await vscode.commands.executeCommand("mindflow.updateTaxonomy", message.request);
+        await vscode.commands.executeCommand("mindflow.updateTaxonomy", message.request, this.document.uri);
         break;
       default:
         break;
@@ -302,6 +384,24 @@ class FlowEditorSession {
 </body>
 </html>`;
   }
+
+  private renderRestorePending(): void {
+    const nonce = getNonce();
+    this.panel.webview.html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindFlow</title>
+</head>
+<body style="font-family: var(--vscode-font-family); color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); padding: 16px;">
+  <h2>MindFlow 正在恢复未保存内容</h2>
+  <p>如果此状态持续存在，请从 VS Code 的时间线或备份恢复该未保存文档。</p>
+  <script nonce="${nonce}"></script>
+</body>
+</html>`;
+  }
 }
 
 type WebviewMessage =
@@ -341,6 +441,36 @@ function escapeHtml(value: unknown): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function serializeFlow(flow: ProductFlow): string {
+  return `${JSON.stringify(flow, null, 2)}\n`;
+}
+
+async function replaceDocumentText(document: vscode.TextDocument, text: string): Promise<boolean> {
+  const edit = new vscode.WorkspaceEdit();
+  const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
+  edit.replace(document.uri, fullRange, text);
+  return vscode.workspace.applyEdit(edit);
+}
+
+function isAssociatedMindFlowUntitled(document: vscode.TextDocument): boolean {
+  if (!document.isUntitled) {
+    return false;
+  }
+  const uriText = document.uri.toString().toLowerCase();
+  const fsPath = document.uri.fsPath.toLowerCase();
+  return uriText.endsWith(MINDFLOW_FILE_EXTENSION) || path.extname(fsPath) === MINDFLOW_FILE_EXTENSION;
+}
+
+function parseValidFlow(text: string): ProductFlow | undefined {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    const validation = validateProductFlow(parsed);
+    return validation.valid ? parsed as ProductFlow : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function chooseFresherFlow(documentFlow: ProductFlow, fallbackFlow: ProductFlow): ProductFlow {
