@@ -79,6 +79,7 @@ export function createManualNode(flow: ProductFlow, input: CreateNodeInput = {})
   const groups = featureGroups.length > 0 ? featureGroups : defaultFeatureGroups(nodeId);
   const elements = featureGroupsToElements(nodeId, groups);
   const actions = featureGroupsToActions(nodeId, groups);
+  const hasExplicitPosition = Number.isFinite(input.x) || Number.isFinite(input.y);
   const node: PageNode = {
     nodeId,
     stableKey: stableKey(title, purpose, seed),
@@ -100,12 +101,16 @@ export function createManualNode(flow: ProductFlow, input: CreateNodeInput = {})
     permissions: normalizeStringArray(input.roleIds),
     sourceRefs: [{ sourceId: "manual", label: "MindFlow manual edit", excerpt: purpose }],
     artifacts: { prdIds: [], pencilIds: [] },
-    view: {
-      position: {
-        x: Math.round(input.x ?? 80),
-        y: Math.round(input.y ?? 80)
-      }
-    },
+    ...(hasExplicitPosition
+      ? {
+          view: {
+            position: {
+              x: Math.round(input.x ?? 80),
+              y: Math.round(input.y ?? 80)
+            }
+          }
+        }
+      : {}),
     confidence: 1
   };
   flow.nodes.push(node);

@@ -7,6 +7,7 @@ import { applyFlowChangePlan } from "../changes/flowChangeApplier";
 import { proposeValidatedFlowChange } from "../changes/flowChangePlanner";
 import { summarizeChangePlan } from "../changes/flowDiff";
 import { revertLastChangeSet } from "../changes/revertChangeSet";
+import { ensureReasonableNodeLayout } from "../core/canvasLayout";
 import { createEmptyProductFlow } from "../core/emptyFlow";
 import {
   createManualEdge,
@@ -50,7 +51,8 @@ const serverInfo = {
 const serverInstructions = [
   "Use MindFlow MCP tools for all AI-assisted ProductFlow creation, document analysis, flow changes, and artifact generation.",
   "The VSCode extension is only a .mindflow canvas editor; call these tools rather than expecting VSCode commands to generate content.",
-  "Prefer targeted node, edge, taxonomy, and layout tools over rewriting whole flow files."
+  "Prefer targeted node, edge, taxonomy, and layout tools over rewriting whole flow files.",
+  "When nodes are created without canvas coordinates, the server assigns a structural layout before saving."
 ].join(" ");
 
 const tools: ToolDefinition[] = [
@@ -109,7 +111,7 @@ const tools: ToolDefinition[] = [
   },
   {
     name: "mindflow_create_node",
-    description: "Create a page node at a canvas position.",
+    description: "Create a page node. If x/y are omitted, MindFlow assigns a structural canvas position.",
     inputSchema: objectSchema({
       workspaceRoot: stringSchema("Workspace root."),
       flowPath: stringSchema("MindFlow ProductFlow file path."),
@@ -176,7 +178,7 @@ const tools: ToolDefinition[] = [
   },
   {
     name: "mindflow_create_connected_node",
-    description: "Create a new node at a canvas position and connect it from or to an existing endpoint.",
+    description: "Create a new node and connect it from or to an existing endpoint. If x/y are omitted, MindFlow assigns a structural canvas position.",
     inputSchema: objectSchema({
       workspaceRoot: stringSchema("Workspace root."),
       flowPath: stringSchema("MindFlow ProductFlow file path."),
@@ -504,6 +506,7 @@ async function generateFlowFromDocument(args: Record<string, unknown>): Promise<
     documentName,
     sourceDocumentId: documentPath ?? documentName
   });
+  ensureReasonableNodeLayout(flow);
   const flowPath = await repository.save(flow);
   return flowResult(workspaceRoot, repository, flowPath, flow);
 }
@@ -646,6 +649,7 @@ async function applyChangePlan(args: Record<string, unknown>): Promise<unknown> 
   const { repository, flowPath, flow } = await loadFlow(args);
   const plan = asRecord(args.plan) as unknown as FlowChangePlan;
   const next = applyFlowChangePlan(flow, plan, { confirmedDestructive: optionalBoolean(args.confirmedDestructive) });
+  ensureReasonableNodeLayout(next);
   await repository.saveToPath(flowPath, next);
   return {
     flowPath: repository.relativePath(flowPath),
@@ -672,6 +676,7 @@ async function mutateFlow(
 ): Promise<unknown> {
   const { repository, flowPath, flow } = await loadFlow(args);
   const result = mutator(flow);
+  ensureReasonableNodeLayout(flow);
   await repository.saveToPath(flowPath, flow);
   return {
     flowPath: repository.relativePath(flowPath),

@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.0",
   "flowId": "flow_flow-4f1755_533d6d",
-  "revision": 24,
+  "revision": 31,
   "title": "多应用端采购协同平台",
   "sourceDocumentId": "samples/example-requirements.md",
   "sourceSummary": "从 samples/example-requirements.md 提取四个应用端、采购协同核心流程、业务域、角色、功能分组与跨应用端连线。",
   "createdAt": "2026-07-05T08:12:37.260Z",
-  "updatedAt": "2026-07-05T08:22:17.728Z",
+  "updatedAt": "2026-07-05T08:47:07.104Z",
   "domains": [
     {
       "domainId": "domain_purchase_plan",
@@ -176,7 +176,23 @@
       ]
     }
   ],
-  "statusGroups": [],
+  "statusGroups": [
+    {
+      "statusGroupId": "status_mr7js88o_ieffv",
+      "title": "新状态组 1",
+      "color": "#553ad9"
+    },
+    {
+      "statusGroupId": "status_mr7js8tz_0gb06",
+      "title": "新状态组 2",
+      "color": "#3ad982"
+    },
+    {
+      "statusGroupId": "status_mr7js8yl_do067",
+      "title": "新状态组 3",
+      "color": "#a2d93a"
+    }
+  ],
   "nodes": [
     {
       "nodeId": "page_page-64451e_cdb276",
@@ -358,11 +374,199 @@
       },
       "view": {
         "position": {
-          "x": 265,
-          "y": 465
+          "x": 274,
+          "y": 405
         }
       },
       "confidence": 1
+    },
+    {
+      "nodeId": "page_page-64451e_99845a",
+      "stableKey": "2419c6a85177",
+      "status": "removed",
+      "version": 2,
+      "title": "新建页面",
+      "pageType": "page",
+      "appSurfaceIds": [],
+      "domainIds": [],
+      "roleIds": [],
+      "purpose": "手动创建的产品页面节点。",
+      "featureGroups": [
+        {
+          "groupId": "group_group-6b9957_0490fa",
+          "name": "基础功能",
+          "type": "section",
+          "description": "页面默认功能分组，可在右侧详情栏编辑。",
+          "items": [
+            {
+              "itemId": "item_item-da1a76_167739",
+              "name": "主要内容",
+              "type": "content",
+              "description": "承载此页面的核心业务内容。"
+            },
+            {
+              "itemId": "item_item-16de57_90f5ad",
+              "name": "确认按钮",
+              "type": "button",
+              "description": "触发页面主要业务操作。"
+            }
+          ]
+        }
+      ],
+      "elements": [
+        {
+          "elementId": "el_element-da1a76_6abbad",
+          "name": "主要内容",
+          "type": "content",
+          "description": "承载此页面的核心业务内容。"
+        },
+        {
+          "elementId": "el_element-16de57_7561f8",
+          "name": "确认按钮",
+          "type": "button",
+          "description": "触发页面主要业务操作。"
+        }
+      ],
+      "actions": [
+        {
+          "actionId": "act_action-16de57_7561f8",
+          "label": "确认按钮",
+          "type": "user",
+          "result": "触发页面主要业务操作。"
+        }
+      ],
+      "states": [
+        {
+          "stateId": "state_1665c38909a3",
+          "name": "默认态",
+          "description": "页面加载并可正常操作。"
+        }
+      ],
+      "exceptions": [
+        {
+          "exceptionId": "ex_cfc05869f7ab",
+          "name": "异常处理",
+          "handling": "按业务规则提示用户并支持重试。"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "permissions": [],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edit",
+          "excerpt": "手动创建的产品页面节点。"
+        }
+      ],
+      "artifacts": {
+        "prdIds": [],
+        "pencilIds": []
+      },
+      "view": {
+        "position": {
+          "x": -790,
+          "y": 28
+        }
+      },
+      "confidence": 1,
+      "removedAt": "2026-07-05T08:37:00.176Z",
+      "removedByChangeSetId": "manual",
+      "updatedByChangeSetId": "manual"
+    },
+    {
+      "nodeId": "page_page-64451e_12461c",
+      "stableKey": "2a096eeff96c",
+      "status": "removed",
+      "version": 2,
+      "title": "新建页面",
+      "pageType": "page",
+      "appSurfaceIds": [],
+      "domainIds": [],
+      "roleIds": [],
+      "purpose": "手动创建的产品页面节点。",
+      "featureGroups": [
+        {
+          "groupId": "group_group-6b9957_b6b828",
+          "name": "基础功能",
+          "type": "section",
+          "description": "页面默认功能分组，可在右侧详情栏编辑。",
+          "items": [
+            {
+              "itemId": "item_item-da1a76_3a6ac1",
+              "name": "主要内容",
+              "type": "content",
+              "description": "承载此页面的核心业务内容。"
+            },
+            {
+              "itemId": "item_item-16de57_b9fcc2",
+              "name": "确认按钮",
+              "type": "button",
+              "description": "触发页面主要业务操作。"
+            }
+          ]
+        }
+      ],
+      "elements": [
+        {
+          "elementId": "el_element-da1a76_bec7e0",
+          "name": "主要内容",
+          "type": "content",
+          "description": "承载此页面的核心业务内容。"
+        },
+        {
+          "elementId": "el_element-16de57_799e86",
+          "name": "确认按钮",
+          "type": "button",
+          "description": "触发页面主要业务操作。"
+        }
+      ],
+      "actions": [
+        {
+          "actionId": "act_action-16de57_799e86",
+          "label": "确认按钮",
+          "type": "user",
+          "result": "触发页面主要业务操作。"
+        }
+      ],
+      "states": [
+        {
+          "stateId": "state_6bf9481d77a0",
+          "name": "默认态",
+          "description": "页面加载并可正常操作。"
+        }
+      ],
+      "exceptions": [
+        {
+          "exceptionId": "ex_ee9616dca262",
+          "name": "异常处理",
+          "handling": "按业务规则提示用户并支持重试。"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "permissions": [],
+      "sourceRefs": [
+        {
+          "sourceId": "manual",
+          "label": "MindFlow manual edit",
+          "excerpt": "手动创建的产品页面节点。"
+        }
+      ],
+      "artifacts": {
+        "prdIds": [],
+        "pencilIds": []
+      },
+      "view": {
+        "position": {
+          "x": -590,
+          "y": 134
+        }
+      },
+      "confidence": 1,
+      "removedAt": "2026-07-05T08:37:07.494Z",
+      "removedByChangeSetId": "manual",
+      "updatedByChangeSetId": "manual"
     }
   ],
   "edges": [

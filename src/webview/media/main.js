@@ -6,10 +6,8 @@
 
   const CARD_WIDTH = 300;
   const CARD_MIN_HEIGHT = 230;
-  const LAYOUT_START_X = 0;
-  const LAYOUT_START_Y = 0;
-  const LAYOUT_COLUMN_GAP = 480;
-  const LAYOUT_ROW_GAP = 84;
+  const CARD_DRAG_THRESHOLD_PX = 4;
+  const CARD_CLICK_SUPPRESS_MS = 100;
   const MIN_ZOOM = 0.2;
   const MAX_ZOOM = 2.6;
   const EDGE_TYPE_OPTIONS = [
@@ -53,9 +51,15 @@
   ];
 
   let selectedNodeIds = readIdSelection(persisted.selectedNodeIds, state.selectedNodeId || persisted.selectedNodeId);
-  let selectedNodeId = state.selectedNodeId || persisted.selectedNodeId || selectedNodeIds[0] || "";
-  if (selectedNodeId && !selectedNodeIds.includes(selectedNodeId)) {
+  let selectedNodeId = selectedNodeIds.includes(persisted.selectedNodeId)
+    ? persisted.selectedNodeId
+    : selectedNodeIds.includes(state.selectedNodeId)
+      ? state.selectedNodeId
+      : selectedNodeIds[0] || state.selectedNodeId || persisted.selectedNodeId || "";
+  if (selectedNodeIds.length === 0 && selectedNodeId) {
     selectedNodeIds = [selectedNodeId];
+  } else if (selectedNodeId && !selectedNodeIds.includes(selectedNodeId)) {
+    selectedNodeId = selectedNodeIds[0] || "";
   }
   let selectedEdgeId = state.selectedEdgeId || "";
   let selectedAppSurfaceId = state.selectedAppSurfaceId || persisted.selectedAppSurfaceId || "";
@@ -84,6 +88,7 @@
   let dragState = null;
   let panState = null;
   let suppressNextCanvasClick = false;
+  let suppressNextNodeCardClick = false;
   let featureDrag = null;
   let nodeDetailsSaveTimer = null;
   let appSurfaceDetailsSaveTimer = null;
@@ -256,7 +261,6 @@
         ${renderTaxonomyToggleButton("domain", "业务域", "network")}
         ${renderTaxonomyToggleButton("role", "角色", "users")}
         ${renderTaxonomyToggleButton("statusGroup", "状态组", "palette")}
-        ${renderIconButton("autoLayoutCanvas", "自动排版", "layout-dashboard", "floating-icon")}
       </div>
     `;
   }
@@ -381,7 +385,6 @@
       "file-text": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path>',
       "globe-2": '<path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"></path><path d="M7 3.34V5a3 3 0 0 0 3 3 2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17"></path><path d="M11 21.95V18a2 2 0 0 0-2-2 2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"></path><circle cx="12" cy="12" r="10"></circle>',
       "grip-vertical": '<circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle>',
-      "layout-dashboard": '<rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect>',
       "monitor-smartphone": '<path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"></path><path d="M10 19v-4"></path><path d="M7 19h5"></path><rect width="6" height="10" x="16" y="12" rx="2"></rect>',
       network: '<rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path>',
       "octagon-alert": '<path d="M12 16h.01"></path><path d="M12 8v4"></path><path d="M15.31 2a2 2 0 0 1 1.42.59l4.68 4.68A2 2 0 0 1 22 8.69v6.62a2 2 0 0 1-.59 1.42l-4.68 4.68a2 2 0 0 1-1.42.59H8.69a2 2 0 0 1-1.42-.59l-4.68-4.68A2 2 0 0 1 2 15.31V8.69a2 2 0 0 1 .59-1.42l4.68-4.68A2 2 0 0 1 8.69 2Z"></path>',
@@ -984,7 +987,6 @@
     bindProductIssueControls(document);
     applyStatusGroupColorSwatches(document);
 
-    bindAction("autoLayoutCanvas", autoLayoutCanvas);
     bindAction("closeProductIssuePanel", () => {
       productIssuesPanelOpen = false;
       persistUiState();
@@ -1127,6 +1129,13 @@
     root.querySelectorAll(".node-card").forEach((card) => {
       card.addEventListener("pointerdown", startNodeDrag);
       card.addEventListener("click", (event) => {
+        if (suppressNextNodeCardClick) {
+          suppressNextNodeCardClick = false;
+          suppressNextCanvasClick = false;
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         if (event.target.closest("button, input, textarea, select")) {
           return;
         }
@@ -1787,254 +1796,6 @@
     });
   }
 
-  function autoLayoutCanvas() {
-    seedNodePositions(state.flow);
-    seedAppSurfacePositions(state.flow);
-    positionCards();
-
-    const layout = calculateAutoLayout();
-    if (!layout) {
-      return;
-    }
-
-    layout.nodes.forEach((item) => {
-      nodePositions.set(item.nodeId, { x: item.x, y: item.y });
-      const node = state.flow.nodes.find((candidate) => candidate.nodeId === item.nodeId);
-      if (node) {
-        node.view = {
-          ...node.view,
-          position: { x: item.x, y: item.y }
-        };
-      }
-    });
-    layout.appSurfaces.forEach((item) => {
-      appSurfacePositions.set(item.appId, { x: item.x, y: item.y });
-      const surface = (state.flow.appSurfaces || []).find((candidate) => candidate.appId === item.appId);
-      if (surface) {
-        surface.view = {
-          ...surface.view,
-          position: { x: item.x, y: item.y }
-        };
-      }
-    });
-
-    positionCards();
-    fitCameraToBounds(layout.bounds);
-    applyCamera();
-    scheduleDrawEdges();
-    vscode.postMessage({
-      type: "saveLayoutPositions",
-      nodes: layout.nodes.map((item) => ({ nodeId: item.nodeId, x: item.x, y: item.y })),
-      appSurfaces: layout.appSurfaces.map((item) => ({ appId: item.appId, x: item.x, y: item.y }))
-    });
-  }
-
-  function calculateAutoLayout() {
-    const activeNodes = state.flow.nodes.filter((node) => node.status !== "removed");
-    const appSurfaces = state.flow.appSurfaces || [];
-    if (activeNodes.length === 0 && appSurfaces.length === 0) {
-      return null;
-    }
-
-    const graph = buildLayoutGraph(activeNodes, appSurfaces);
-    const layers = assignLayoutLayers(graph, appSurfaces.length > 0);
-    const dimensions = measureLayoutCards();
-    const placed = new Map();
-    const layouts = [];
-    const layerNumbers = Array.from(new Set(Array.from(layers.values()))).sort((left, right) => left - right);
-
-    layerNumbers.forEach((layer) => {
-      const items = graph.entities
-        .filter((item) => layers.get(item.id) === layer)
-        .sort((left, right) => compareLayoutItems(left, right, graph, placed));
-      let y = LAYOUT_START_Y;
-      items.forEach((item) => {
-        const size = dimensions.get(item.id) || {
-          width: CARD_WIDTH,
-          height: item.type === "appSurface" ? 132 : CARD_MIN_HEIGHT
-        };
-        const layout = {
-          ...item,
-          x: LAYOUT_START_X + layer * LAYOUT_COLUMN_GAP,
-          y,
-          width: size.width,
-          height: size.height
-        };
-        layouts.push(layout);
-        placed.set(item.id, layout);
-        y += size.height + LAYOUT_ROW_GAP;
-      });
-    });
-
-    const bounds = getLayoutBounds(layouts);
-    return {
-      bounds,
-      nodes: layouts
-        .filter((item) => item.type === "node")
-        .map((item) => ({ nodeId: item.entityId, x: item.x, y: item.y })),
-      appSurfaces: layouts
-        .filter((item) => item.type === "appSurface")
-        .map((item) => ({ appId: item.entityId, x: item.x, y: item.y }))
-    };
-  }
-
-  function buildLayoutGraph(activeNodes, appSurfaces) {
-    const entities = [
-      ...appSurfaces.map((surface, index) => ({
-        id: layoutEntityId("appSurface", surface.appId),
-        entityId: surface.appId,
-        type: "appSurface",
-        order: index
-      })),
-      ...activeNodes.map((node, index) => ({
-        id: layoutEntityId("node", node.nodeId),
-        entityId: node.nodeId,
-        type: "node",
-        order: appSurfaces.length + index
-      }))
-    ];
-    const entityIds = new Set(entities.map((item) => item.id));
-    const edges = state.flow.edges
-      .filter((edge) => edge.status === "active")
-      .map((edge) => {
-        const from = endpointLayoutEntityId(edge.from || { kind: "node", nodeId: edge.fromNodeId });
-        const to = endpointLayoutEntityId(edge.to || { kind: "node", nodeId: edge.toNodeId });
-        return from && to && from !== to && entityIds.has(from) && entityIds.has(to) ? { from, to } : null;
-      })
-      .filter(Boolean);
-    const outgoing = new Map();
-    const incoming = new Map();
-    entities.forEach((item) => {
-      outgoing.set(item.id, []);
-      incoming.set(item.id, []);
-    });
-    edges.forEach((edge) => {
-      outgoing.get(edge.from)?.push(edge.to);
-      incoming.get(edge.to)?.push(edge.from);
-    });
-    return { entities, edges, outgoing, incoming };
-  }
-
-  function assignLayoutLayers(graph, hasAppSurfaces) {
-    const layers = new Map();
-    const indegree = new Map();
-    const processed = new Set();
-    graph.entities.forEach((item) => {
-      layers.set(item.id, item.type === "appSurface" ? 0 : (hasAppSurfaces ? 1 : 0));
-      indegree.set(item.id, graph.incoming.get(item.id)?.length || 0);
-    });
-
-    const queue = graph.entities
-      .filter((item) => (indegree.get(item.id) || 0) === 0)
-      .sort((left, right) => left.order - right.order);
-    for (let index = 0; index < queue.length; index += 1) {
-      const item = queue[index];
-      processed.add(item.id);
-      (graph.outgoing.get(item.id) || []).forEach((targetId) => {
-        layers.set(targetId, Math.max(layers.get(targetId) || 0, (layers.get(item.id) || 0) + 1));
-        indegree.set(targetId, (indegree.get(targetId) || 0) - 1);
-        if (indegree.get(targetId) === 0) {
-          const target = graph.entities.find((candidate) => candidate.id === targetId);
-          if (target) {
-            queue.push(target);
-          }
-        }
-      });
-    }
-
-    graph.entities.forEach((item) => {
-      if (processed.has(item.id) || item.type === "appSurface") {
-        return;
-      }
-      const predecessorLayers = (graph.incoming.get(item.id) || [])
-        .map((id) => layers.get(id))
-        .filter((layer) => Number.isFinite(layer));
-      if (predecessorLayers.length > 0) {
-        layers.set(item.id, Math.max(layers.get(item.id) || 0, Math.max(...predecessorLayers) + 1));
-      }
-    });
-    return layers;
-  }
-
-  function compareLayoutItems(left, right, graph, placed) {
-    const leftAnchor = averagePlacedY(graph.incoming.get(left.id) || [], placed);
-    const rightAnchor = averagePlacedY(graph.incoming.get(right.id) || [], placed);
-    if (leftAnchor !== rightAnchor) {
-      return leftAnchor - rightAnchor;
-    }
-    return left.order - right.order;
-  }
-
-  function averagePlacedY(ids, placed) {
-    const values = ids
-      .map((id) => placed.get(id))
-      .filter(Boolean)
-      .map((item) => item.y + item.height / 2);
-    if (values.length === 0) {
-      return Number.MAX_SAFE_INTEGER;
-    }
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
-  }
-
-  function measureLayoutCards() {
-    const dimensions = new Map();
-    document.querySelectorAll(".app-surface-card").forEach((card) => {
-      dimensions.set(layoutEntityId("appSurface", card.dataset.appSurfaceId), {
-        width: card.offsetWidth || CARD_WIDTH,
-        height: card.offsetHeight || 132
-      });
-    });
-    document.querySelectorAll(".node-card").forEach((card) => {
-      dimensions.set(layoutEntityId("node", card.dataset.nodeId), {
-        width: card.offsetWidth || CARD_WIDTH,
-        height: card.offsetHeight || CARD_MIN_HEIGHT
-      });
-    });
-    return dimensions;
-  }
-
-  function getLayoutBounds(layouts) {
-    return layouts.reduce((bounds, item) => ({
-      minX: Math.min(bounds.minX, item.x),
-      minY: Math.min(bounds.minY, item.y),
-      maxX: Math.max(bounds.maxX, item.x + item.width),
-      maxY: Math.max(bounds.maxY, item.y + item.height)
-    }), {
-      minX: Number.POSITIVE_INFINITY,
-      minY: Number.POSITIVE_INFINITY,
-      maxX: Number.NEGATIVE_INFINITY,
-      maxY: Number.NEGATIVE_INFINITY
-    });
-  }
-
-  function fitCameraToBounds(bounds) {
-    const canvas = document.getElementById("canvas");
-    if (!canvas || !Number.isFinite(bounds.minX) || !Number.isFinite(bounds.minY)) {
-      return;
-    }
-    const width = Math.max(1, bounds.maxX - bounds.minX);
-    const height = Math.max(1, bounds.maxY - bounds.minY);
-    const availableWidth = Math.max(320, canvas.clientWidth - 180);
-    const availableHeight = Math.max(260, canvas.clientHeight - 160);
-    zoom = clamp(Math.min(1, availableWidth / width, availableHeight / height), MIN_ZOOM, MAX_ZOOM);
-    camera.x = 86 - bounds.minX * zoom;
-    camera.y = 72 - bounds.minY * zoom;
-  }
-
-  function layoutEntityId(kind, id) {
-    return `${kind}:${id || ""}`;
-  }
-
-  function endpointLayoutEntityId(endpoint) {
-    if (!endpoint) {
-      return "";
-    }
-    if (endpoint.kind === "appSurface") {
-      return layoutEntityId("appSurface", endpointEntityId(endpoint));
-    }
-    return layoutEntityId("node", endpoint.nodeId);
-  }
-
   function applyCamera() {
     const world = document.getElementById("world");
     const canvas = document.getElementById("canvas");
@@ -2396,7 +2157,8 @@
       startY: event.clientY,
       originX: pos.x,
       originY: pos.y,
-      moved: false
+      moved: false,
+      multiSelect: kind === "node" && isNodeMultiSelectEvent(event)
     };
     card.classList.add("dragging");
     card.setPointerCapture(event.pointerId);
@@ -2409,9 +2171,14 @@
     if (!dragState || event.pointerId !== dragState.pointerId) {
       return;
     }
-    const dx = (event.clientX - dragState.startX) / zoom;
-    const dy = (event.clientY - dragState.startY) / zoom;
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+    const screenDx = event.clientX - dragState.startX;
+    const screenDy = event.clientY - dragState.startY;
+    if (!dragState.moved && Math.hypot(screenDx, screenDy) <= CARD_DRAG_THRESHOLD_PX) {
+      return;
+    }
+    const dx = screenDx / zoom;
+    const dy = screenDy / zoom;
+    if (!dragState.moved) {
       dragState.moved = true;
     }
     const next = {
@@ -2429,7 +2196,7 @@
     if (!dragState || event.pointerId !== dragState.pointerId) {
       return;
     }
-    const { kind, id, card, moved } = dragState;
+    const { kind, id, card, moved, multiSelect } = dragState;
     const positions = kind === "appSurface" ? appSurfacePositions : nodePositions;
     const pos = positions.get(id);
     card.classList.remove("dragging");
@@ -2458,13 +2225,13 @@
         vscode.postMessage({ type: "saveAppSurfacePosition", appId: id, x: pos.x, y: pos.y });
         vscode.postMessage({ type: "selectAppSurface", appId: id });
       } else {
-        setSelectedNodes([id], id);
-        selectedAppSurfaceId = "";
-        selectedDomainId = "";
-        selectedRoleId = "";
-        taxonomySelection = clearAllTaxonomySelections();
+        const multi = Boolean(multiSelect || isNodeMultiSelectEvent(event));
+        if (multi) {
+          event.preventDefault();
+        }
+        suppressNextNodeCardGeneratedClick();
         vscode.postMessage({ type: "saveNodePosition", nodeId: id, x: pos.x, y: pos.y });
-        vscode.postMessage({ type: "selectNode", nodeId: id });
+        selectNode(id, false, { multi });
       }
       return;
     }
@@ -2472,7 +2239,12 @@
       selectAppSurface(id);
       return;
     }
-    selectNode(id, false);
+    const multi = Boolean(multiSelect || isNodeMultiSelectEvent(event));
+    if (multi) {
+      event.preventDefault();
+    }
+    suppressNextNodeCardGeneratedClick();
+    selectNode(id, false, { multi });
   }
 
   function handleContextMenu(event) {
@@ -3106,6 +2878,15 @@
     return Boolean(event?.metaKey || event?.ctrlKey || event?.shiftKey);
   }
 
+  function suppressNextNodeCardGeneratedClick() {
+    suppressNextNodeCardClick = true;
+    suppressNextCanvasClick = true;
+    setTimeout(() => {
+      suppressNextNodeCardClick = false;
+      suppressNextCanvasClick = false;
+    }, CARD_CLICK_SUPPRESS_MS);
+  }
+
   function selectEdge(edgeId) {
     selectedEdgeId = edgeId;
     clearNodeSelectionState();
@@ -3592,12 +3373,10 @@
     const flow = state.flow;
     const activeNodeIds = new Set(flow.nodes.filter((node) => node.status !== "removed").map((node) => node.nodeId));
     selectedNodeIds = selectedNodeIds.filter((id) => activeNodeIds.has(id));
-    if (selectedNodeId && !activeNodeIds.has(selectedNodeId)) {
-      selectedNodeId = selectedNodeIds[0] || "";
-    } else if (selectedNodeId && !selectedNodeIds.includes(selectedNodeId)) {
+    if (selectedNodeIds.length === 0 && selectedNodeId && activeNodeIds.has(selectedNodeId)) {
       selectedNodeIds = [selectedNodeId];
-    } else if (!selectedNodeId && selectedNodeIds.length === 1) {
-      selectedNodeId = selectedNodeIds[0];
+    } else if (!selectedNodeIds.includes(selectedNodeId)) {
+      selectedNodeId = selectedNodeIds[0] || "";
     }
     appFilters = appFilters.filter((id) => (flow.appSurfaces || []).some((surface) => surface.appId === id));
     domainFilters = domainFilters.filter((id) => getAvailableDomains(flow).some((domain) => domain.domainId === id));

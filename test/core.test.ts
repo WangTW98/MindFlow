@@ -9,6 +9,7 @@ import type { AppSurface, FeatureGroup, FlowEdge, PageAction, PageElement, PageN
 import { applyFlowChangePlan } from "../src/changes/flowChangeApplier";
 import { revertLastChangeSet } from "../src/changes/revertChangeSet";
 import { ensureAppSurfaceEntryEdges } from "../src/core/appSurfaceEntryEdges";
+import { ensureReasonableNodeLayout } from "../src/core/canvasLayout";
 import { createEmptyProductFlow } from "../src/core/emptyFlow";
 import {
   createManualEdge,
@@ -56,6 +57,45 @@ test("Empty ProductFlow starts as a valid blank canvas", () => {
   assert.equal(flow.appSurfaces?.length, 0);
   assert.equal(flow.statusGroups?.length, 0);
   assert.equal(flow.productDesignIssues?.length, 0);
+});
+
+test("Generated nodes without coordinates receive a structural canvas layout", () => {
+  const flow = createEmptyProductFlow();
+  const start = createManualNode(flow, { title: "开始页" });
+  const review = createManualNode(flow, { title: "审核页" });
+  const done = createManualNode(flow, { title: "完成页" });
+
+  createManualEdge(flow, { from: { kind: "node", nodeId: start.nodeId }, to: { kind: "node", nodeId: review.nodeId } });
+  createManualEdge(flow, { from: { kind: "node", nodeId: review.nodeId }, to: { kind: "node", nodeId: done.nodeId } });
+
+  const result = ensureReasonableNodeLayout(flow);
+  const startPosition = start.view?.position;
+  const reviewPosition = review.view?.position;
+  const donePosition = done.view?.position;
+
+  assert.deepEqual(new Set(result.updatedNodeIds), new Set([start.nodeId, review.nodeId, done.nodeId]));
+  assert.ok(startPosition);
+  assert.ok(reviewPosition);
+  assert.ok(donePosition);
+  assert.ok(startPosition.x < reviewPosition.x);
+  assert.ok(reviewPosition.x < donePosition.x);
+  assert.ok(startPosition.x !== reviewPosition.x || startPosition.y !== reviewPosition.y);
+  assert.ok(reviewPosition.x !== donePosition.x || reviewPosition.y !== donePosition.y);
+
+  const validation = validateProductFlow(flow);
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+});
+
+test("Canvas layout repair preserves explicit node positions", () => {
+  const flow = createEmptyProductFlow();
+  const fixed = createManualNode(flow, { title: "固定页", x: 640, y: 120 });
+  const generated = createManualNode(flow, { title: "生成页" });
+
+  const result = ensureReasonableNodeLayout(flow);
+
+  assert.deepEqual(result.updatedNodeIds, [generated.nodeId]);
+  assert.deepEqual(fixed.view?.position, { x: 640, y: 120 });
+  assert.ok(generated.view?.position);
 });
 
 test("Manual node details can set and clear a status group", () => {

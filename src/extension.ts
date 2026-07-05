@@ -55,9 +55,6 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("mindflow.updateAppSurfacePosition", (appId?: string, x?: number, y?: number) =>
       updateAppSurfacePosition(appId, x, y)
     ),
-    vscode.commands.registerCommand("mindflow.updateLayoutPositions", (request?: LayoutPositionsRequest) =>
-      updateLayoutPositions(request)
-    ),
     vscode.commands.registerCommand(
       "mindflow.createNodeAt",
       (x?: number, y?: number, appSurfaceIds?: string[], domainIds?: string[], roleIds?: string[]) =>
@@ -153,47 +150,6 @@ async function updateAppSurfacePosition(appId?: string, x?: number, y?: number):
     await applyFlowDocumentEdit(flowPath, flow);
   } catch (error) {
     showError("Update app surface position failed", error);
-  }
-}
-
-interface LayoutNodePositionInput {
-  nodeId?: string;
-  x?: number;
-  y?: number;
-}
-
-interface LayoutAppSurfacePositionInput {
-  appId?: string;
-  x?: number;
-  y?: number;
-}
-
-interface LayoutPositionsRequest {
-  nodes?: LayoutNodePositionInput[];
-  appSurfaces?: LayoutAppSurfacePositionInput[];
-}
-
-async function updateLayoutPositions(request?: LayoutPositionsRequest): Promise<void> {
-  try {
-    const nodePositions = Array.isArray(request?.nodes) ? request.nodes : [];
-    const appSurfacePositions = Array.isArray(request?.appSurfaces) ? request.appSurfaces : [];
-    if (nodePositions.length === 0 && appSurfacePositions.length === 0) {
-      return;
-    }
-    const { flow, flowPath } = await loadCurrentFlow();
-    for (const item of nodePositions) {
-      if (item.nodeId && typeof item.x === "number" && typeof item.y === "number") {
-        updateManualNodePosition(flow, item.nodeId, item.x, item.y);
-      }
-    }
-    for (const item of appSurfacePositions) {
-      if (item.appId && typeof item.x === "number" && typeof item.y === "number") {
-        updateManualAppSurfacePosition(flow, item.appId, item.x, item.y);
-      }
-    }
-    await applyFlowDocumentEdit(flowPath, flow);
-  } catch (error) {
-    showError("Update layout positions failed", error);
   }
 }
 
