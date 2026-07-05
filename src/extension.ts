@@ -209,6 +209,7 @@ async function createNodeAt(
     FlowPanel.selectedAppSurfaceId = undefined;
     FlowPanel.selectedDomainId = undefined;
     FlowPanel.selectedRoleId = undefined;
+    FlowPanel.selectedStatusGroupId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowUri);
   } catch (error) {
     showError("Create node failed", error);
@@ -228,6 +229,7 @@ async function updateNodeDetails(context: vscode.ExtensionContext, nodeId?: stri
     FlowPanel.selectedAppSurfaceId = undefined;
     FlowPanel.selectedDomainId = undefined;
     FlowPanel.selectedRoleId = undefined;
+    FlowPanel.selectedStatusGroupId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowUri);
   } catch (error) {
     showError("Update node details failed", error);
@@ -254,6 +256,7 @@ async function createEdge(
     FlowPanel.selectedAppSurfaceId = undefined;
     FlowPanel.selectedDomainId = undefined;
     FlowPanel.selectedRoleId = undefined;
+    FlowPanel.selectedStatusGroupId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowUri);
   } catch (error) {
     showError("Create edge failed", error);
@@ -314,6 +317,7 @@ async function createConnectedNodeAt(context: vscode.ExtensionContext, request?:
     FlowPanel.selectedAppSurfaceId = undefined;
     FlowPanel.selectedDomainId = undefined;
     FlowPanel.selectedRoleId = undefined;
+    FlowPanel.selectedStatusGroupId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowUri);
   } catch (error) {
     showError("Create connected node failed", error);
@@ -337,6 +341,7 @@ async function deleteNode(context: vscode.ExtensionContext, nodeId?: string, sou
     FlowPanel.selectedAppSurfaceId = undefined;
     FlowPanel.selectedDomainId = undefined;
     FlowPanel.selectedRoleId = undefined;
+    FlowPanel.selectedStatusGroupId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowUri);
   } catch (error) {
     showError("Delete node failed", error);
@@ -356,6 +361,7 @@ async function updateEdgeDetails(context: vscode.ExtensionContext, edgeId?: stri
     FlowPanel.selectedAppSurfaceId = undefined;
     FlowPanel.selectedDomainId = undefined;
     FlowPanel.selectedRoleId = undefined;
+    FlowPanel.selectedStatusGroupId = undefined;
     FlowPanel.createOrShow(context.extensionUri, flow, flowUri);
   } catch (error) {
     showError("Update edge details failed", error);
@@ -392,6 +398,8 @@ async function updateTaxonomy(context: vscode.ExtensionContext, request?: Taxono
         FlowPanel.selectedDomainId = undefined;
       } else if (request.kind === "role") {
         FlowPanel.selectedRoleId = undefined;
+      } else if (request.kind === "statusGroup") {
+        FlowPanel.selectedStatusGroupId = undefined;
       }
     }
     FlowPanel.createOrShow(context.extensionUri, flow, flowUri);

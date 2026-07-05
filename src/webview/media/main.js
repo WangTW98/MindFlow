@@ -38,11 +38,21 @@
       label: "状态变更",
       color: "var(--vscode-charts-pink, #f472b6)",
       description: "用户主动或系统自动触发，但跳转或执行目标仅在相同状态组内执行(用于状态变更);"
+    },
+    {
+      value: "nestedRelation",
+      group: "nesting",
+      label: "嵌套关系",
+      color: "var(--vscode-charts-yellow, #facc15)",
+      description: "此类型仅描述页面元素/组件间的嵌套关系(如父子组件/元素组的嵌套)"
     }
   ];
   const PAGE_TYPE_OPTIONS = [
     { value: "page", label: "页面", icon: "file-text" },
-    { value: "popup", label: "弹窗", icon: "panel-top" }
+    { value: "popup", label: "弹窗", icon: "panel-top" },
+    { value: "component", label: "组件", icon: "component" },
+    { value: "navigation", label: "导航", icon: "navigation" },
+    { value: "skeleton", label: "骨架", icon: "layout-template" }
   ];
   const APP_SURFACE_TYPE_OPTIONS = [
     { value: "admin", label: "管理后台", icon: "shield-check" },
@@ -77,6 +87,7 @@
   let selectedAppSurfaceId = state.selectedAppSurfaceId || persisted.selectedAppSurfaceId || "";
   let selectedDomainId = state.selectedDomainId || persisted.selectedDomainId || "";
   let selectedRoleId = state.selectedRoleId || persisted.selectedRoleId || "";
+  let selectedStatusGroupId = state.selectedStatusGroupId || persisted.selectedStatusGroupId || "";
   let appFilters = readIdSelection(persisted.appFilters, persisted.appFilter);
   let domainFilters = readIdSelection(persisted.domainFilters, persisted.domainFilter);
   let roleFilters = readIdSelection(persisted.roleFilters, persisted.roleFilter);
@@ -84,6 +95,7 @@
   selectedAppSurfaceId ||= taxonomySelection.appSurface;
   selectedDomainId ||= taxonomySelection.domain;
   selectedRoleId ||= taxonomySelection.role;
+  selectedStatusGroupId ||= taxonomySelection.statusGroup;
   let taxonomyPanelsOpen = readTaxonomyPanelsOpen();
   let nodeSearch = persisted.nodeSearch || "";
   let nodeSearchComposing = false;
@@ -106,6 +118,7 @@
   let appSurfaceDetailsSaveTimer = null;
   let domainDetailsSaveTimer = null;
   let roleDetailsSaveTimer = null;
+  let statusGroupDetailsSaveTimer = null;
   let edgeDetailsSaveTimer = null;
   let edgeDetailsSaveRevision = 0;
   let pendingEdgeDetailsSaves = readPendingEdgeDetailsSaves(persisted.pendingEdgeDetailsSaves);
@@ -129,12 +142,13 @@
     const selectedAppSurface = (flow.appSurfaces || []).find((surface) => surface.appId === selectedAppSurfaceId) || null;
     const selectedDomain = (flow.domains || []).find((domain) => domain.domainId === selectedDomainId) || null;
     const selectedRole = (flow.roles || []).find((role) => role.roleId === selectedRoleId) || null;
+    const selectedStatusGroup = getStatusGroup(flow, selectedStatusGroupId);
     const visibleListNodes = activeNodes.filter((node) => matchesNodeSearch(flow, node, nodeSearch));
     const productIssues = getProductDesignIssues(flow);
     const productIssueCounts = countProductIssues(productIssues);
 
     app.innerHTML = `
-      <main class="app-shell ${leftPanelCollapsed ? "left-collapsed" : ""} ${selectedNode || selectedEdge || selectedAppSurface || selectedDomain || selectedRole ? "" : "inspector-collapsed"} ${productIssuesPanelOpen ? "product-issues-open" : ""}">
+      <main class="app-shell ${leftPanelCollapsed ? "left-collapsed" : ""} ${selectedNode || selectedEdge || selectedAppSurface || selectedDomain || selectedRole || selectedStatusGroup ? "" : "inspector-collapsed"} ${productIssuesPanelOpen ? "product-issues-open" : ""}">
         <aside class="left-panel">
           <section class="node-sidebar">
             <header class="nodes-toolbar">
@@ -164,7 +178,7 @@
         </section>
 
         <aside class="inspector">
-          ${selectedAppSurface ? renderAppSurfaceInspector(flow, selectedAppSurface) : selectedDomain ? renderDomainInspector(selectedDomain) : selectedRole ? renderRoleInspector(flow, selectedRole) : selectedEdge ? renderEdgeInspector(flow, selectedEdge) : selectedNode ? renderNodeInspector(flow, selectedNode) : ""}
+          ${selectedAppSurface ? renderAppSurfaceInspector(flow, selectedAppSurface) : selectedDomain ? renderDomainInspector(selectedDomain) : selectedRole ? renderRoleInspector(flow, selectedRole) : selectedStatusGroup ? renderStatusGroupInspector(selectedStatusGroup) : selectedEdge ? renderEdgeInspector(flow, selectedEdge) : selectedNode ? renderNodeInspector(flow, selectedNode) : ""}
         </aside>
 
         ${renderProductIssueFab(productIssueCounts)}
@@ -281,7 +295,7 @@
     const panelButtonLabel = leftPanelCollapsed ? "展开左侧栏" : "收起左侧栏";
     const panelButtonIcon = leftPanelCollapsed ? "panel-left-open" : "panel-left-close";
     return `
-      <div class="floating-taxonomy-controls" aria-label="应用端、业务域、角色面板">
+      <div class="floating-taxonomy-controls" aria-label="应用端、业务域、角色、状态组面板">
         ${renderIconButton(panelButtonId, panelButtonLabel, panelButtonIcon, "floating-icon")}
         ${renderTaxonomyToggleButton("appSurface", "应用端", "monitor-smartphone")}
         ${renderTaxonomyToggleButton("domain", "业务域", "network")}
@@ -302,7 +316,7 @@
 
   function renderTaxonomyPanels(flow) {
     return `
-      <div class="floating-taxonomy-panels" aria-label="应用端、业务域、角色列表">
+      <div class="floating-taxonomy-panels" aria-label="应用端、业务域、角色、状态组列表">
         ${taxonomyPanelsOpen.appSurface === true ? renderManagedList("appSurface", "应用端", flow.appSurfaces || [], "appId", "name", "description", appFilters) : ""}
         ${taxonomyPanelsOpen.domain === true ? renderManagedList("domain", "业务域", getAvailableDomains(flow), "domainId", "name", "description", domainFilters) : ""}
         ${taxonomyPanelsOpen.role === true ? renderManagedList("role", "角色", getAvailableRoles(flow), "roleId", "name", "description", roleFilters) : ""}
@@ -408,13 +422,16 @@
       "panel-left-open": '<rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m14 9 3 3-3 3"></path>',
       copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>',
       "circle-help": '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 2-3 4"></path><path d="M12 17h.01"></path>',
+      component: '<path d="M5.5 8.5 9 12l-3.5 3.5L2 12l3.5-3.5Z"></path><path d="m12 2 3.5 3.5L12 9 8.5 5.5 12 2Z"></path><path d="M18.5 8.5 22 12l-3.5 3.5L15 12l3.5-3.5Z"></path><path d="m12 15 3.5 3.5L12 22l-3.5-3.5L12 15Z"></path>',
       "file-text": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path>',
       globe: '<circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path>',
       "globe-2": '<path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"></path><path d="M7 3.34V5a3 3 0 0 0 3 3 2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17"></path><path d="M11 21.95V18a2 2 0 0 0-2-2 2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"></path><circle cx="12" cy="12" r="10"></circle>',
       "grip-vertical": '<circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle>',
+      "layout-template": '<rect width="18" height="7" x="3" y="3" rx="1"></rect><rect width="9" height="7" x="3" y="14" rx="1"></rect><rect width="5" height="7" x="16" y="14" rx="1"></rect>',
       monitor: '<rect width="20" height="14" x="2" y="3" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path>',
       "monitor-smartphone": '<path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"></path><path d="M10 19v-4"></path><path d="M7 19h5"></path><rect width="6" height="10" x="16" y="12" rx="2"></rect>',
       network: '<rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path>',
+      navigation: '<polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>',
       "octagon-alert": '<path d="M12 16h.01"></path><path d="M12 8v4"></path><path d="M15.31 2a2 2 0 0 1 1.42.59l4.68 4.68A2 2 0 0 1 22 8.69v6.62a2 2 0 0 1-.59 1.42l-4.68 4.68a2 2 0 0 1-1.42.59H8.69a2 2 0 0 1-1.42-.59l-4.68-4.68A2 2 0 0 1 2 15.31V8.69a2 2 0 0 1 .59-1.42l4.68-4.68A2 2 0 0 1 8.69 2Z"></path>',
       palette: '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.4-.4-.8-.4-1.3 0-1.1.9-2 2-2H16c3.3 0 6-2.7 6-6 0-4.4-4.5-8-10-8Z"></path>',
       "panel-top": '<rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M3 9h18"></path>',
@@ -465,6 +482,7 @@
   }
 
   function renderStatusGroupList(groups) {
+    const currentId = getSelectedTaxonomyId("statusGroup");
     return `
       <section class="managed-list taxonomy-panel status-group-panel" data-kind="statusGroup" data-taxonomy-panel="statusGroup">
         <header class="managed-list-head">
@@ -473,14 +491,20 @@
             ${renderTaxonomyActionButton("statusGroup", "create", "新增状态组", "plus")}
           </div>
         </header>
-        <div class="managed-list-body status-group-list" role="list" aria-label="状态组列表">
-          ${groups.map((group) => `
-            <div class="status-group-list-item" role="listitem">
-              <span class="status-group-color-square" data-status-group-color="${escapeAttr(normalizeStatusGroupColor(group.color))}" aria-hidden="true"></span>
-              <strong title="${escapeAttr(group.title)}">${escapeHtml(group.title)}</strong>
-              ${renderTaxonomyActionButton("statusGroup", "delete", `删除 ${group.title}`, "trash-2", false, "danger managed-list-row-action", `data-taxonomy-id="${escapeAttr(group.statusGroupId)}"`)}
-            </div>
-          `).join("") || "<p class=\"empty compact\">暂无状态组</p>"}
+        <div class="managed-list-body status-group-list" role="listbox" aria-label="状态组列表">
+          ${groups.map((group) => {
+            const active = group.statusGroupId === currentId;
+            return `
+              <div class="managed-list-item status-group-list-item ${active ? "active" : ""}" data-kind="statusGroup" data-taxonomy-id="${escapeAttr(group.statusGroupId)}" role="option" tabindex="0" aria-selected="${active ? "true" : "false"}">
+                <span class="status-group-color-square" data-status-group-color="${escapeAttr(normalizeStatusGroupColor(group.color))}" aria-hidden="true"></span>
+                <span class="managed-list-text">
+                  <strong title="${escapeAttr(group.title)}">${escapeHtml(group.title)}</strong>
+                  <small>${escapeHtml(group.description || "无说明")}</small>
+                </span>
+                ${renderTaxonomyActionButton("statusGroup", "delete", `删除 ${group.title}`, "trash-2", false, "danger managed-list-row-action", `data-taxonomy-id="${escapeAttr(group.statusGroupId)}"`)}
+              </div>
+            `;
+          }).join("") || "<p class=\"empty compact\">暂无状态组</p>"}
         </div>
       </section>
     `;
@@ -502,7 +526,7 @@
       return selectedDomainId;
     }
     if (kind === "statusGroup") {
-      return "";
+      return selectedStatusGroupId;
     }
     return selectedRoleId;
   }
@@ -511,7 +535,8 @@
     return {
       appSurface: "",
       domain: "",
-      role: ""
+      role: "",
+      statusGroup: ""
     };
   }
 
@@ -823,14 +848,12 @@
       <form class="details-form" id="domainDetailsForm">
         <header class="inspector-head">
           <div>
-            <h2 id="domainPanelTitle">${escapeHtml(domain.name)}</h2>
+            <h2 id="domainPanelTitle" class="inline-title-editor" tabindex="0" title="双击编辑标题">${escapeHtml(domain.name)}</h2>
             <code>${escapeHtml(domain.domainId)}</code>
           </div>
           ${renderIconButton("closeInspector", "关闭详情", "x")}
         </header>
-        <label>业务域名称
-          <input id="domainName" value="${escapeAttr(domain.name)}">
-        </label>
+        <input id="domainName" type="hidden" value="${escapeAttr(domain.name)}">
         <label>业务域说明
           <textarea id="domainDescription" rows="4">${escapeHtml(domain.description || "")}</textarea>
         </label>
@@ -844,19 +867,43 @@
       <form class="details-form" id="roleDetailsForm">
         <header class="inspector-head">
           <div>
-            <h2 id="rolePanelTitle">${escapeHtml(role.name)}</h2>
+            <h2 id="rolePanelTitle" class="inline-title-editor" tabindex="0" title="双击编辑标题">${escapeHtml(role.name)}</h2>
             <code>${escapeHtml(role.roleId)}</code>
           </div>
           ${renderIconButton("closeInspector", "关闭详情", "x")}
         </header>
-        <label>角色名称
-          <input id="roleName" value="${escapeAttr(role.name)}">
-        </label>
+        <input id="roleName" type="hidden" value="${escapeAttr(role.name)}">
         <label>角色说明
           <textarea id="roleDescription" rows="4">${escapeHtml(role.description || "")}</textarea>
         </label>
         ${renderMultiSelect("roleDomainIds", "关联业务域", flow.domains || [], "domainId", "name", role.domainIds || [])}
         <p class="form-error" id="roleFormError"></p>
+      </form>
+    `;
+  }
+
+  function renderStatusGroupInspector(statusGroup) {
+    const color = normalizeStatusGroupColor(statusGroup.color);
+    return `
+      <form class="details-form" id="statusGroupDetailsForm" data-inspector-key="${escapeAttr(inspectorScrollKey("statusGroup", statusGroup.statusGroupId))}">
+        <header class="inspector-head">
+          <div>
+            <h2 id="statusGroupPanelTitle" class="inline-title-editor" tabindex="0" title="双击编辑标题">${escapeHtml(statusGroup.title)}</h2>
+            <code>${escapeHtml(statusGroup.statusGroupId)}</code>
+          </div>
+          ${renderIconButton("closeInspector", "关闭详情", "x")}
+        </header>
+        <input id="statusGroupTitle" type="hidden" value="${escapeAttr(statusGroup.title)}">
+        <label>状态组说明
+          <textarea id="statusGroupDescription" rows="4">${escapeHtml(statusGroup.description || "")}</textarea>
+        </label>
+        <label class="status-group-color-field">颜色
+          <span class="status-group-color-control">
+            <input id="statusGroupColor" type="color" value="${escapeAttr(color)}">
+            <span class="status-group-color-value">${escapeHtml(color)}</span>
+          </span>
+        </label>
+        <p class="form-error" id="statusGroupFormError"></p>
       </form>
     `;
   }
@@ -1184,6 +1231,10 @@
     const roleForm = document.getElementById("roleDetailsForm");
     if (roleForm) {
       bindRoleInspector(roleForm);
+    }
+    const statusGroupForm = document.getElementById("statusGroupDetailsForm");
+    if (statusGroupForm) {
+      bindStatusGroupInspector(statusGroupForm);
     }
     const edgeForm = document.getElementById("edgeDetailsForm");
     if (edgeForm) {
@@ -1555,28 +1606,62 @@
   }
 
   function bindDomainInspector(domainForm) {
+    bindInlineTitleEditor("domainPanelTitle", "domainName", () => commitDomainDetailsChange({ immediate: true }));
     domainForm.addEventListener("submit", (event) => {
       event.preventDefault();
       commitDomainDetailsChange({ immediate: true });
     });
-    domainForm.addEventListener("input", () => {
+    domainForm.addEventListener("input", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
       commitDomainDetailsChange();
     });
-    domainForm.addEventListener("change", () => {
+    domainForm.addEventListener("change", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
       commitDomainDetailsChange({ immediate: true });
     });
   }
 
   function bindRoleInspector(roleForm) {
+    bindInlineTitleEditor("rolePanelTitle", "roleName", () => commitRoleDetailsChange({ immediate: true }));
     roleForm.addEventListener("submit", (event) => {
       event.preventDefault();
       commitRoleDetailsChange({ immediate: true });
     });
-    roleForm.addEventListener("input", () => {
+    roleForm.addEventListener("input", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
       commitRoleDetailsChange();
     });
-    roleForm.addEventListener("change", () => {
+    roleForm.addEventListener("change", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
       commitRoleDetailsChange({ immediate: true });
+    });
+  }
+
+  function bindStatusGroupInspector(statusGroupForm) {
+    bindInlineTitleEditor("statusGroupPanelTitle", "statusGroupTitle", () => commitStatusGroupDetailsChange({ immediate: true }));
+    statusGroupForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      commitStatusGroupDetailsChange({ immediate: true });
+    });
+    statusGroupForm.addEventListener("input", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
+      commitStatusGroupDetailsChange();
+    });
+    statusGroupForm.addEventListener("change", (event) => {
+      if (event.target.closest(".inline-title-editor")) {
+        return;
+      }
+      commitStatusGroupDetailsChange({ immediate: true });
     });
   }
 
@@ -1611,6 +1696,7 @@
       return;
     }
     if (kind === "statusGroup") {
+      selectStatusGroup(id);
       return;
     }
     if (kind === "appSurface") {
@@ -1620,13 +1706,15 @@
     clearNodeSelectionState();
     selectedEdgeId = "";
     selectedAppSurfaceId = "";
+    selectedStatusGroupId = "";
     if (kind === "domain") {
       selectedDomainId = id;
       selectedRoleId = "";
       taxonomySelection = {
         appSurface: "",
         domain: id,
-        role: ""
+        role: "",
+        statusGroup: ""
       };
       vscode.postMessage({ type: "selectDomain", domainId: id });
     } else {
@@ -1635,7 +1723,8 @@
       taxonomySelection = {
         appSurface: "",
         domain: "",
-        role: id
+        role: id,
+        statusGroup: ""
       };
       vscode.postMessage({ type: "selectRole", roleId: id });
     }
@@ -1912,11 +2001,7 @@
       const item = createDefaultTaxonomyItem(flow, kind);
       const id = getTaxonomyId(kind, item);
       addTaxonomyItemLocally(flow, kind, item);
-      if (kind === "statusGroup") {
-        render();
-      } else {
-        selectTaxonomyItem(kind, id);
-      }
+      selectTaxonomyItem(kind, id);
       vscode.postMessage({ type: "updateTaxonomy", request: { kind, action, id, item } });
       return;
     }
@@ -1924,9 +2009,7 @@
       return;
     }
     if (action === "delete") {
-      if (kind !== "statusGroup") {
-        clearTaxonomySelection(kind, currentId);
-      }
+      clearTaxonomySelection(kind, currentId);
       removeTaxonomyItemLocally(flow, kind, currentId);
       vscode.postMessage({ type: "updateTaxonomy", request: { kind, action, id: currentId } });
       render();
@@ -1957,6 +2040,7 @@
       return {
         statusGroupId: makeClientId("status"),
         title: `新状态组 ${index}`,
+        description: "",
         color: randomStatusGroupColor(getStatusGroups(flow))
       };
     }
@@ -2042,6 +2126,9 @@
     }
     if (kind === "role" && selectedRoleId === id) {
       selectedRoleId = "";
+    }
+    if (kind === "statusGroup" && selectedStatusGroupId === id) {
+      selectedStatusGroupId = "";
     }
     persistUiState();
   }
@@ -2439,12 +2526,14 @@
     selectedEdgeId = "";
     selectedDomainId = "";
     selectedRoleId = "";
+    selectedStatusGroupId = "";
     if (kind === "appSurface") {
       clearNodeSelectionState();
       taxonomySelection = {
         appSurface: id,
         domain: "",
-        role: ""
+        role: "",
+        statusGroup: ""
       };
     } else {
       selectedAppSurfaceId = "";
@@ -2518,10 +2607,12 @@
         clearNodeSelectionState();
         selectedDomainId = "";
         selectedRoleId = "";
+        selectedStatusGroupId = "";
         taxonomySelection = {
           appSurface: id,
           domain: "",
-          role: ""
+          role: "",
+          statusGroup: ""
         };
         persistUiState();
         vscode.postMessage({ type: "saveAppSurfacePosition", appId: id, x: pos.x, y: pos.y });
@@ -2594,6 +2685,7 @@
     selectedAppSurfaceId = "";
     selectedDomainId = "";
     selectedRoleId = "";
+    selectedStatusGroupId = "";
     taxonomySelection = clearAllTaxonomySelections();
     connectingFrom = null;
     vscode.postMessage({ type: "clearSelection" });
@@ -2646,6 +2738,11 @@
     if (selectedRoleId) {
       event.preventDefault();
       deleteSelectedTaxonomy("role", selectedRoleId);
+      return;
+    }
+    if (selectedStatusGroupId) {
+      event.preventDefault();
+      deleteSelectedTaxonomy("statusGroup", selectedStatusGroupId);
     }
   }
 
@@ -2660,6 +2757,7 @@
     selectedAppSurfaceId = "";
     selectedDomainId = "";
     selectedRoleId = "";
+    selectedStatusGroupId = "";
     connectingFrom = null;
     vscode.postMessage({ type: "updateTaxonomy", request: { kind, action: "delete", id } });
     render();
@@ -2675,6 +2773,9 @@
     } else if (kind === "role") {
       clearTimeout(roleDetailsSaveTimer);
       roleDetailsSaveTimer = null;
+    } else if (kind === "statusGroup") {
+      clearTimeout(statusGroupDetailsSaveTimer);
+      statusGroupDetailsSaveTimer = null;
     }
   }
 
@@ -2817,9 +2918,13 @@
 
   function refreshDomainViews() {
     const title = document.getElementById("domainPanelTitle");
+    const titleInput = document.getElementById("domainName");
     const domain = (state.flow.domains || []).find((candidate) => candidate.domainId === selectedDomainId);
-    if (title && domain) {
+    if (title && domain && title.dataset.inlineEditing !== "true") {
       title.textContent = domain.name;
+    }
+    if (titleInput && domain) {
+      titleInput.value = domain.name;
     }
     refreshTaxonomyPanels();
     refreshCanvasAndNodeList();
@@ -2876,9 +2981,85 @@
 
   function refreshRoleViews() {
     const title = document.getElementById("rolePanelTitle");
+    const titleInput = document.getElementById("roleName");
     const role = (state.flow.roles || []).find((candidate) => candidate.roleId === selectedRoleId);
-    if (title && role) {
+    if (title && role && title.dataset.inlineEditing !== "true") {
       title.textContent = role.name;
+    }
+    if (titleInput && role) {
+      titleInput.value = role.name;
+    }
+    refreshTaxonomyPanels();
+    refreshCanvasAndNodeList();
+  }
+
+  function commitStatusGroupDetailsChange(options = {}) {
+    if (!selectedStatusGroupId) {
+      return;
+    }
+    const statusGroupId = selectedStatusGroupId;
+    const item = collectStatusGroupDetailsPatch();
+    applyStatusGroupDetailsLocally(statusGroupId, item);
+    refreshStatusGroupViews();
+    if (options.immediate) {
+      postStatusGroupDetails(statusGroupId, item);
+      return;
+    }
+    clearTimeout(statusGroupDetailsSaveTimer);
+    statusGroupDetailsSaveTimer = setTimeout(() => postStatusGroupDetails(statusGroupId, item), 250);
+  }
+
+  function collectStatusGroupDetailsPatch() {
+    return {
+      statusGroupId: selectedStatusGroupId,
+      title: document.getElementById("statusGroupTitle").value,
+      description: document.getElementById("statusGroupDescription").value,
+      color: normalizeStatusGroupColor(document.getElementById("statusGroupColor").value)
+    };
+  }
+
+  function postStatusGroupDetails(statusGroupId, item) {
+    clearTimeout(statusGroupDetailsSaveTimer);
+    statusGroupDetailsSaveTimer = null;
+    vscode.postMessage({
+      type: "updateTaxonomy",
+      request: {
+        kind: "statusGroup",
+        action: "update",
+        id: statusGroupId,
+        item
+      }
+    });
+  }
+
+  function applyStatusGroupDetailsLocally(statusGroupId, item) {
+    const statusGroup = getStatusGroup(state.flow, statusGroupId);
+    if (!statusGroup) {
+      return;
+    }
+    statusGroup.title = item.title.trim() || statusGroup.title;
+    statusGroup.description = item.description.trim();
+    statusGroup.color = normalizeStatusGroupColor(item.color || statusGroup.color);
+  }
+
+  function refreshStatusGroupViews() {
+    const title = document.getElementById("statusGroupPanelTitle");
+    const titleInput = document.getElementById("statusGroupTitle");
+    const colorInput = document.getElementById("statusGroupColor");
+    const colorValue = document.querySelector(".status-group-color-value");
+    const statusGroup = getStatusGroup(state.flow, selectedStatusGroupId);
+    if (title && statusGroup && title.dataset.inlineEditing !== "true") {
+      title.textContent = statusGroup.title;
+    }
+    if (titleInput && statusGroup) {
+      titleInput.value = statusGroup.title;
+    }
+    if (colorInput && statusGroup) {
+      const color = normalizeStatusGroupColor(statusGroup.color);
+      colorInput.value = color;
+      if (colorValue) {
+        colorValue.textContent = color;
+      }
     }
     refreshTaxonomyPanels();
     refreshCanvasAndNodeList();
@@ -3152,6 +3333,7 @@
     selectedAppSurfaceId = "";
     selectedDomainId = "";
     selectedRoleId = "";
+    selectedStatusGroupId = "";
     taxonomySelection = clearAllTaxonomySelections();
     if (selectedNodeId) {
       vscode.postMessage({ type: "selectNode", nodeId: selectedNodeId });
@@ -3213,6 +3395,7 @@
     selectedAppSurfaceId = "";
     selectedDomainId = "";
     selectedRoleId = "";
+    selectedStatusGroupId = "";
     taxonomySelection = clearAllTaxonomySelections();
     vscode.postMessage({ type: "selectEdge", edgeId });
     render();
@@ -3225,13 +3408,34 @@
     selectedEdgeId = "";
     selectedDomainId = "";
     selectedRoleId = "";
+    selectedStatusGroupId = "";
     taxonomySelection = {
       appSurface: appId,
       domain: "",
-      role: ""
+      role: "",
+      statusGroup: ""
     };
     persistUiState();
     vscode.postMessage({ type: "selectAppSurface", appId });
+    render();
+    requestAnimationFrame(() => focusCanvas());
+  }
+
+  function selectStatusGroup(statusGroupId) {
+    selectedStatusGroupId = statusGroupId;
+    clearNodeSelectionState();
+    selectedEdgeId = "";
+    selectedAppSurfaceId = "";
+    selectedDomainId = "";
+    selectedRoleId = "";
+    taxonomySelection = {
+      appSurface: "",
+      domain: "",
+      role: "",
+      statusGroup: statusGroupId
+    };
+    persistUiState();
+    vscode.postMessage({ type: "selectStatusGroup", statusGroupId });
     render();
     requestAnimationFrame(() => focusCanvas());
   }
@@ -3762,12 +3966,22 @@
     if (value === "popup" || value === "modal" || value === "dialog" || value === "弹窗") {
       return "popup";
     }
+    if (value === "component" || value === "components" || value === "组件") {
+      return "component";
+    }
+    if (value === "navigation" || value === "nav" || value === "menu" || value === "导航") {
+      return "navigation";
+    }
+    if (value === "skeleton" || value === "wireframe" || value === "layout" || value === "骨架") {
+      return "skeleton";
+    }
     return "page";
   }
 
   function normalizeEdgeTypeForSelect(type) {
     const group = edgeTypeGroup(type);
     if (group === "status") return "statusChange";
+    if (group === "nesting") return "nestedRelation";
     if (group === "auto") return "autoNavigate";
     if (group === "data") return "dataFlow";
     return "interaction";
@@ -3776,6 +3990,9 @@
   function edgeTypeGroup(type) {
     if (type === "statusChange") {
       return "status";
+    }
+    if (type === "nestedRelation") {
+      return "nesting";
     }
     if (type === "autoNavigate" || type === "navigate" || type === "branch") {
       return "auto";
@@ -3852,7 +4069,8 @@
     taxonomySelection = {
       appSurface: normalizeTaxonomySelection(flow, "appSurface", taxonomySelection.appSurface),
       domain: normalizeTaxonomySelection(flow, "domain", taxonomySelection.domain),
-      role: normalizeTaxonomySelection(flow, "role", taxonomySelection.role)
+      role: normalizeTaxonomySelection(flow, "role", taxonomySelection.role),
+      statusGroup: normalizeTaxonomySelection(flow, "statusGroup", taxonomySelection.statusGroup)
     };
     if (selectedAppSurfaceId && !(flow.appSurfaces || []).some((surface) => surface.appId === selectedAppSurfaceId)) {
       selectedAppSurfaceId = "";
@@ -3862,6 +4080,9 @@
     }
     if (selectedRoleId && !(flow.roles || []).some((role) => role.roleId === selectedRoleId)) {
       selectedRoleId = "";
+    }
+    if (selectedStatusGroupId && !getStatusGroup(flow, selectedStatusGroupId)) {
+      selectedStatusGroupId = "";
     }
   }
 
@@ -4171,7 +4392,8 @@
     return {
       appSurface: typeof value?.appSurface === "string" ? value.appSurface : "",
       domain: typeof value?.domain === "string" ? value.domain : "",
-      role: typeof value?.role === "string" ? value.role : ""
+      role: typeof value?.role === "string" ? value.role : "",
+      statusGroup: typeof value?.statusGroup === "string" ? value.statusGroup : ""
     };
   }
 
@@ -4254,6 +4476,7 @@
       selectedAppSurfaceId,
       selectedDomainId,
       selectedRoleId,
+      selectedStatusGroupId,
       nodeSearch,
       leftPanelCollapsed,
       productIssuesPanelOpen,

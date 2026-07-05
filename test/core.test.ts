@@ -20,6 +20,7 @@ import {
   updateManualEdgeDetails,
   updateManualNodeDetails
 } from "../src/core/flowEditing";
+import { applyTaxonomyRequest } from "../src/core/taxonomy";
 import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/core/taxonomyEditing";
 import {
   MINDFLOW_FILE_EXTENSION,
@@ -113,6 +114,46 @@ test("Manual node details can set and clear a status group", () => {
 
   updateManualNodeDetails(flow, node.nodeId, { statusGroupId: "" });
   assert.equal(node.statusGroupId, undefined);
+
+  const validation = validateProductFlow(flow);
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+});
+
+test("Taxonomy status group details can be created and updated", () => {
+  const flow = createEmptyProductFlow();
+
+  applyTaxonomyRequest(flow, {
+    kind: "statusGroup",
+    action: "create",
+    id: "status_review",
+    item: {
+      statusGroupId: "status_review",
+      title: "评审中",
+      description: "等待业务复核。",
+      color: "#33aa55"
+    }
+  });
+
+  let group = flow.statusGroups?.find((item) => item.statusGroupId === "status_review");
+  assert.equal(group?.title, "评审中");
+  assert.equal(group?.description, "等待业务复核。");
+  assert.equal(group?.color, "#33aa55");
+
+  applyTaxonomyRequest(flow, {
+    kind: "statusGroup",
+    action: "update",
+    id: "status_review",
+    item: {
+      title: "已复核",
+      description: "复核完成后进入下一阶段。",
+      color: "#3366aa"
+    }
+  });
+
+  group = flow.statusGroups?.find((item) => item.statusGroupId === "status_review");
+  assert.equal(group?.title, "已复核");
+  assert.equal(group?.description, "复核完成后进入下一阶段。");
+  assert.equal(group?.color, "#3366aa");
 
   const validation = validateProductFlow(flow);
   assert.equal(validation.valid, true, validation.errors.join("\n"));
@@ -472,6 +513,9 @@ test("Manual edge details update endpoints and new edge category types", () => {
 
   updateManualEdgeDetails(flow, edge.edgeId, { type: "statusChange" });
   assert.equal(updated?.type, "statusChange");
+
+  updateManualEdgeDetails(flow, edge.edgeId, { type: "nestedRelation" });
+  assert.equal(updated?.type, "nestedRelation");
 });
 
 test("Manual node feature group edits preserve parent-child hierarchy and derived actions", () => {

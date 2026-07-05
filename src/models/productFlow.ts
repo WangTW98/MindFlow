@@ -4,6 +4,7 @@ export type EdgeType =
   | "autoNavigate"
   | "dataFlow"
   | "statusChange"
+  | "nestedRelation"
   | "navigate"
   | "submit"
   | "approve"
@@ -52,6 +53,7 @@ export interface AppSurface {
 export interface ProductStatusGroup {
   statusGroupId: string;
   title: string;
+  description?: string;
   color: string;
 }
 
@@ -377,6 +379,9 @@ export function validateProductFlow(flow: unknown): ValidationResult {
       }
       requireString(group, "statusGroupId", errors, `statusGroups[${index}]`);
       requireString(group, "title", errors, `statusGroups[${index}]`);
+      if ("description" in group) {
+        requireString(group, "description", errors, `statusGroups[${index}]`);
+      }
       requireString(group, "color", errors, `statusGroups[${index}]`);
       if (typeof group.statusGroupId === "string") {
         if (statusGroupIds.has(group.statusGroupId)) {

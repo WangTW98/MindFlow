@@ -145,6 +145,7 @@ function applyStatusGroupRequest(flow: ProductFlow, request: TaxonomyRequest): v
   const next: ProductStatusGroup = {
     statusGroupId,
     title,
+    description: readString(item.description, ""),
     color: uniqueStatusGroupColor(requestedColor, flow.statusGroups, statusGroupId)
   };
   upsertById(flow.statusGroups, (item) => item.statusGroupId, next);

@@ -14,6 +14,7 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
   public static selectedAppSurfaceId: string | undefined;
   public static selectedDomainId: string | undefined;
   public static selectedRoleId: string | undefined;
+  public static selectedStatusGroupId: string | undefined;
 
   private static provider: FlowPanel | undefined;
 
@@ -234,6 +235,7 @@ class FlowEditorSession {
         FlowPanel.selectedAppSurfaceId = undefined;
         FlowPanel.selectedDomainId = undefined;
         FlowPanel.selectedRoleId = undefined;
+        FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "selectEdge":
         FlowPanel.selectedEdgeId = message.edgeId;
@@ -241,6 +243,7 @@ class FlowEditorSession {
         FlowPanel.selectedAppSurfaceId = undefined;
         FlowPanel.selectedDomainId = undefined;
         FlowPanel.selectedRoleId = undefined;
+        FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "selectAppSurface":
         FlowPanel.selectedAppSurfaceId = message.appId;
@@ -248,6 +251,7 @@ class FlowEditorSession {
         FlowPanel.selectedEdgeId = undefined;
         FlowPanel.selectedDomainId = undefined;
         FlowPanel.selectedRoleId = undefined;
+        FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "selectDomain":
         FlowPanel.selectedDomainId = message.domainId;
@@ -255,6 +259,7 @@ class FlowEditorSession {
         FlowPanel.selectedEdgeId = undefined;
         FlowPanel.selectedAppSurfaceId = undefined;
         FlowPanel.selectedRoleId = undefined;
+        FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "selectRole":
         FlowPanel.selectedRoleId = message.roleId;
@@ -262,6 +267,15 @@ class FlowEditorSession {
         FlowPanel.selectedEdgeId = undefined;
         FlowPanel.selectedAppSurfaceId = undefined;
         FlowPanel.selectedDomainId = undefined;
+        FlowPanel.selectedStatusGroupId = undefined;
+        break;
+      case "selectStatusGroup":
+        FlowPanel.selectedStatusGroupId = message.statusGroupId;
+        FlowPanel.selectedNodeId = undefined;
+        FlowPanel.selectedEdgeId = undefined;
+        FlowPanel.selectedAppSurfaceId = undefined;
+        FlowPanel.selectedDomainId = undefined;
+        FlowPanel.selectedRoleId = undefined;
         break;
       case "clearSelection":
         FlowPanel.selectedNodeId = undefined;
@@ -269,6 +283,7 @@ class FlowEditorSession {
         FlowPanel.selectedAppSurfaceId = undefined;
         FlowPanel.selectedDomainId = undefined;
         FlowPanel.selectedRoleId = undefined;
+        FlowPanel.selectedStatusGroupId = undefined;
         break;
       case "deleteNode":
         FlowPanel.selectedNodeId = message.nodeId;
@@ -276,6 +291,7 @@ class FlowEditorSession {
         FlowPanel.selectedAppSurfaceId = undefined;
         FlowPanel.selectedDomainId = undefined;
         FlowPanel.selectedRoleId = undefined;
+        FlowPanel.selectedStatusGroupId = undefined;
         await vscode.commands.executeCommand("mindflow.removeNode", message.nodeId, this.document.uri);
         break;
       case "saveNodePosition":
@@ -325,6 +341,8 @@ class FlowEditorSession {
             FlowPanel.selectedDomainId = undefined;
           } else if (message.request.kind === "role") {
             FlowPanel.selectedRoleId = undefined;
+          } else if (message.request.kind === "statusGroup") {
+            FlowPanel.selectedStatusGroupId = undefined;
           }
         }
         await vscode.commands.executeCommand("mindflow.updateTaxonomy", message.request, this.document.uri);
@@ -359,7 +377,8 @@ class FlowEditorSession {
       selectedEdgeId: FlowPanel.selectedEdgeId ?? null,
       selectedAppSurfaceId: FlowPanel.selectedAppSurfaceId ?? null,
       selectedDomainId: FlowPanel.selectedDomainId ?? null,
-      selectedRoleId: FlowPanel.selectedRoleId ?? null
+      selectedRoleId: FlowPanel.selectedRoleId ?? null,
+      selectedStatusGroupId: FlowPanel.selectedStatusGroupId ?? null
     })};
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
@@ -410,6 +429,7 @@ type WebviewMessage =
   | { type: "selectAppSurface"; appId: string }
   | { type: "selectDomain"; domainId: string }
   | { type: "selectRole"; roleId: string }
+  | { type: "selectStatusGroup"; statusGroupId: string }
   | { type: "clearSelection" }
   | { type: "deleteNode"; nodeId: string; nodeTitle?: string }
   | { type: "saveNodePosition"; nodeId: string; x: number; y: number }

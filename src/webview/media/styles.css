@@ -433,6 +433,10 @@ small,
   --edge-color: var(--vscode-charts-pink, #f472b6);
 }
 
+.edge.edge-type-nesting {
+  --edge-color: var(--vscode-charts-yellow, #facc15);
+}
+
 .edge-hitarea,
 .edge-path {
   fill: none;
@@ -1370,6 +1374,30 @@ small,
 .details-form {
   display: grid;
   gap: 12px;
+}
+
+.status-group-color-control {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.status-group-color-control input[type="color"] {
+  width: 44px;
+  height: 32px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.status-group-color-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
 }
 
 .edge-type-field,
