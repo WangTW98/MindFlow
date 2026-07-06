@@ -794,12 +794,14 @@
     <section class="feature-edit-group" data-group-index="${groupIndex}" data-group-id="${escapeAttr(group.groupId || makeClientId("group"))}">
       <div class="feature-edit-group-head" data-drop-kind="group" data-group-index="${groupIndex}">
         ${renderIconActionButton("drag-handle", "\u62D6\u62FD\u6392\u5E8F\u529F\u80FD\u5206\u7EC4", "grip-vertical", `data-drag-kind="group" data-group-index="${groupIndex}"`)}
-        <input class="group-name" value="${escapeAttr(group.name || "")}" placeholder="\u5206\u7EC4\u540D\u79F0">
         <input class="group-type" value="${escapeAttr(group.type || "section")}" placeholder="\u7C7B\u578B">
-        ${renderIconActionButton("add-feature-item", "\u65B0\u5EFA\u529F\u80FD\u9879", "plus", `data-group-index="${groupIndex}"`)}
         ${renderIconActionButton("delete-feature-group danger-text", "\u5220\u9664\u529F\u80FD\u5206\u7EC4", "trash-2", `data-group-index="${groupIndex}"`)}
       </div>
+      <input class="group-name" value="${escapeAttr(group.name || "")}" placeholder="\u5206\u7EC4\u540D\u79F0">
       <textarea class="group-description" rows="2" placeholder="\u5206\u7EC4\u8BF4\u660E">${escapeHtml(group.description || "")}</textarea>
+      <div class="feature-edit-items-head">
+        ${renderIconActionButton("add-feature-item", "\u65B0\u5EFA\u529F\u80FD\u9879", "plus", `data-group-index="${groupIndex}"`)}
+      </div>
       <div class="feature-edit-items" data-drop-kind="items" data-group-index="${groupIndex}">
         ${(group.items || []).map((item, itemIndex) => renderFeatureEditorItem(item, groupIndex, itemIndex)).join("")}
       </div>
@@ -811,10 +813,10 @@
     <div class="feature-edit-item" data-group-index="${groupIndex}" data-item-index="${itemIndex}" data-item-id="${escapeAttr(item.itemId || makeClientId("item"))}" data-item-required="${item.required ? "true" : "false"}">
       <div class="feature-edit-item-main">
         ${renderIconActionButton("drag-handle", "\u62D6\u62FD\u6392\u5E8F\u529F\u80FD\u9879", "grip-vertical", `data-drag-kind="item" data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
-        <input class="item-name" value="${escapeAttr(item.name || "")}" placeholder="\u529F\u80FD\u9879\u540D\u79F0">
+        <input class="item-type" value="${escapeAttr(item.type || "text")}" placeholder="\u7C7B\u578B">
         ${renderIconActionButton("delete-feature-item danger-text", "\u5220\u9664\u529F\u80FD\u9879", "trash-2", `data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
       </div>
-      <input class="item-type" value="${escapeAttr(item.type || "text")}" placeholder="\u7C7B\u578B">
+      <input class="item-name" value="${escapeAttr(item.name || "")}" placeholder="\u529F\u80FD\u9879\u540D\u79F0">
       <textarea class="item-description" rows="2" placeholder="\u529F\u80FD\u9879\u4ECB\u7ECD">${escapeHtml(item.description || "")}</textarea>
     </div>
   `;

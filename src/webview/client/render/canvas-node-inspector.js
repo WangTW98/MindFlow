@@ -133,12 +133,14 @@ function renderFeatureEditorGroups(groups) {
     <section class="feature-edit-group" data-group-index="${groupIndex}" data-group-id="${escapeAttr(group.groupId || makeClientId("group"))}">
       <div class="feature-edit-group-head" data-drop-kind="group" data-group-index="${groupIndex}">
         ${renderIconActionButton("drag-handle", "拖拽排序功能分组", "grip-vertical", `data-drag-kind="group" data-group-index="${groupIndex}"`)}
-        <input class="group-name" value="${escapeAttr(group.name || "")}" placeholder="分组名称">
         <input class="group-type" value="${escapeAttr(group.type || "section")}" placeholder="类型">
-        ${renderIconActionButton("add-feature-item", "新建功能项", "plus", `data-group-index="${groupIndex}"`)}
         ${renderIconActionButton("delete-feature-group danger-text", "删除功能分组", "trash-2", `data-group-index="${groupIndex}"`)}
       </div>
+      <input class="group-name" value="${escapeAttr(group.name || "")}" placeholder="分组名称">
       <textarea class="group-description" rows="2" placeholder="分组说明">${escapeHtml(group.description || "")}</textarea>
+      <div class="feature-edit-items-head">
+        ${renderIconActionButton("add-feature-item", "新建功能项", "plus", `data-group-index="${groupIndex}"`)}
+      </div>
       <div class="feature-edit-items" data-drop-kind="items" data-group-index="${groupIndex}">
         ${(group.items || []).map((item, itemIndex) => renderFeatureEditorItem(item, groupIndex, itemIndex)).join("")}
       </div>
@@ -151,10 +153,10 @@ function renderFeatureEditorItem(item, groupIndex, itemIndex) {
     <div class="feature-edit-item" data-group-index="${groupIndex}" data-item-index="${itemIndex}" data-item-id="${escapeAttr(item.itemId || makeClientId("item"))}" data-item-required="${item.required ? "true" : "false"}">
       <div class="feature-edit-item-main">
         ${renderIconActionButton("drag-handle", "拖拽排序功能项", "grip-vertical", `data-drag-kind="item" data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
-        <input class="item-name" value="${escapeAttr(item.name || "")}" placeholder="功能项名称">
+        <input class="item-type" value="${escapeAttr(item.type || "text")}" placeholder="类型">
         ${renderIconActionButton("delete-feature-item danger-text", "删除功能项", "trash-2", `data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
       </div>
-      <input class="item-type" value="${escapeAttr(item.type || "text")}" placeholder="类型">
+      <input class="item-name" value="${escapeAttr(item.name || "")}" placeholder="功能项名称">
       <textarea class="item-description" rows="2" placeholder="功能项介绍">${escapeHtml(item.description || "")}</textarea>
     </div>
   `;

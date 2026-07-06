@@ -89,9 +89,19 @@
 
 .feature-edit-group-head {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 68px auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px;
+}
+
+.feature-edit-group .group-name,
+.feature-edit-group .group-type {
+  min-width: 0;
+}
+
+.feature-edit-items-head {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .feature-edit-items {
