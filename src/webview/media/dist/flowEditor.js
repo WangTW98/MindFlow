@@ -800,6 +800,7 @@
       <input class="group-name" value="${escapeAttr(group.name || "")}" placeholder="\u5206\u7EC4\u540D\u79F0">
       <textarea class="group-description" rows="2" placeholder="\u5206\u7EC4\u8BF4\u660E">${escapeHtml(group.description || "")}</textarea>
       <div class="feature-edit-items-head">
+        <h4>\u529F\u80FD\u9879</h4>
         ${renderIconActionButton("add-feature-item", "\u65B0\u5EFA\u529F\u80FD\u9879", "plus", `data-group-index="${groupIndex}"`)}
       </div>
       <div class="feature-edit-items" data-drop-kind="items" data-group-index="${groupIndex}">

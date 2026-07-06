@@ -139,6 +139,7 @@ function renderFeatureEditorGroups(groups) {
       <input class="group-name" value="${escapeAttr(group.name || "")}" placeholder="分组名称">
       <textarea class="group-description" rows="2" placeholder="分组说明">${escapeHtml(group.description || "")}</textarea>
       <div class="feature-edit-items-head">
+        <h4>功能项</h4>
         ${renderIconActionButton("add-feature-item", "新建功能项", "plus", `data-group-index="${groupIndex}"`)}
       </div>
       <div class="feature-edit-items" data-drop-kind="items" data-group-index="${groupIndex}">
