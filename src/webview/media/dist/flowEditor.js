@@ -1140,15 +1140,16 @@
       const selectedRole = (flow.roles || []).find((role) => role.roleId === selectedRoleId) || null;
       const selectedStatusGroup = getStatusGroup(flow, selectedStatusGroupId);
       const visibleListNodes = activeNodes.filter((node) => matchesNodeSearch(flow, node, nodeSearch));
+      const sidebarTitle = rootNodeTitle(flow);
       app.innerHTML = `
     <main class="app-shell ${leftPanelCollapsed ? "left-collapsed" : ""} ${selectedProjectOverview || selectedNode || selectedEdge || selectedAppSurface || selectedDomain || selectedRole || selectedStatusGroup ? "" : "inspector-collapsed"}">
       <aside class="left-panel">
         <section class="node-sidebar">
           <header class="nodes-toolbar">
             <div class="nodes-toolbar-title">
-              <h2>\u8282\u70B9</h2>
-              <small class="nodes-count" aria-label="\u8282\u70B9\u603B\u6570">${activeNodes.length}</small>
+              <h2 class="nodes-root-title" title="${escapeAttr(sidebarTitle)}">${escapeHtml(sidebarTitle)}</h2>
             </div>
+            <small class="nodes-count" aria-label="\u8282\u70B9\u6570\u91CF: ${activeNodes.length}">\u8282\u70B9\u6570\u91CF: ${activeNodes.length}</small>
           </header>
           <div class="node-search">
             <input id="nodeSearch" value="${escapeAttr(nodeSearch)}" placeholder="\u5FEB\u901F\u68C0\u7D22\u8282\u70B9\u5361\u7247">
@@ -1183,6 +1184,18 @@
       applyCamera();
       persistUiState();
       scheduleDrawEdges();
+    }
+    function rootNodeTitle(flow) {
+      return String(flow.title || "\u9879\u76EE\u6982\u8FF0").trim() || "\u9879\u76EE\u6982\u8FF0";
+    }
+    function refreshNodeSidebarHeader(flow) {
+      const title = document.querySelector(".nodes-root-title");
+      if (!title) {
+        return;
+      }
+      const nextTitle = rootNodeTitle(flow);
+      title.textContent = nextTitle;
+      title.setAttribute("title", nextTitle);
     }
     function renderNodeListItem(flow, node) {
       const related = isNodeRelated(node);
@@ -2921,6 +2934,7 @@
       }
     }
     function refreshProjectOverviewViews() {
+      refreshNodeSidebarHeader(state.flow);
       const card = document.querySelector(".project-overview-card");
       if (card) {
         const replacement = document.createElement("div");

@@ -102,6 +102,7 @@ function applyProjectOverviewDetailsLocally(patch) {
 }
 
 function refreshProjectOverviewViews() {
+  refreshNodeSidebarHeader(state.flow);
   const card = document.querySelector(".project-overview-card");
   if (card) {
     const replacement = document.createElement("div");

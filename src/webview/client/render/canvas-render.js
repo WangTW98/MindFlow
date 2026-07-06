@@ -15,6 +15,7 @@ function render() {
   const selectedRole = (flow.roles || []).find((role) => role.roleId === selectedRoleId) || null;
   const selectedStatusGroup = getStatusGroup(flow, selectedStatusGroupId);
   const visibleListNodes = activeNodes.filter((node) => matchesNodeSearch(flow, node, nodeSearch));
+  const sidebarTitle = rootNodeTitle(flow);
 
   app.innerHTML = `
     <main class="app-shell ${leftPanelCollapsed ? "left-collapsed" : ""} ${selectedProjectOverview || selectedNode || selectedEdge || selectedAppSurface || selectedDomain || selectedRole || selectedStatusGroup ? "" : "inspector-collapsed"}">
@@ -22,9 +23,9 @@ function render() {
         <section class="node-sidebar">
           <header class="nodes-toolbar">
             <div class="nodes-toolbar-title">
-              <h2>节点</h2>
-              <small class="nodes-count" aria-label="节点总数">${activeNodes.length}</small>
+              <h2 class="nodes-root-title" title="${escapeAttr(sidebarTitle)}">${escapeHtml(sidebarTitle)}</h2>
             </div>
+            <small class="nodes-count" aria-label="节点数量: ${activeNodes.length}">节点数量: ${activeNodes.length}</small>
           </header>
           <div class="node-search">
             <input id="nodeSearch" value="${escapeAttr(nodeSearch)}" placeholder="快速检索节点卡片">
@@ -60,6 +61,20 @@ function render() {
   applyCamera();
   persistUiState();
   scheduleDrawEdges();
+}
+
+function rootNodeTitle(flow) {
+  return String(flow.title || "项目概述").trim() || "项目概述";
+}
+
+function refreshNodeSidebarHeader(flow) {
+  const title = document.querySelector(".nodes-root-title");
+  if (!title) {
+    return;
+  }
+  const nextTitle = rootNodeTitle(flow);
+  title.textContent = nextTitle;
+  title.setAttribute("title", nextTitle);
 }
 
 function renderNodeListItem(flow, node) {
