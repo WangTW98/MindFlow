@@ -6,8 +6,8 @@
 
 .tag-multi-select summary {
   display: grid;
-  gap: 6px;
-  padding: 7px 8px;
+  gap: 4px;
+  padding: 5px 6px;
   cursor: pointer;
   color: var(--input-fg);
 }
@@ -40,18 +40,18 @@
 
 .tag-options {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   max-height: 170px;
   overflow: auto;
-  padding: 0 8px 8px;
+  padding: 0 6px 6px;
 }
 
 .details-form .tag-option {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   min-width: 0;
-  padding: 3px 0;
+  padding: 2px 0;
 }
 
 .tag-option input {
@@ -63,52 +63,52 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .section-title h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .feature-editor,
 .feature-editor-section {
   display: grid;
-  gap: 10px;
+  gap: 7px;
 }
 
 .feature-edit-group {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 8px;
+  padding: 6px;
   background: var(--card);
   transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
 }
 
 .feature-edit-group-head {
   display: grid;
-  grid-template-columns: auto 1fr 86px auto auto;
+  grid-template-columns: auto minmax(0, 1fr) 68px auto auto;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .feature-edit-items {
   display: grid;
-  gap: 9px;
+  gap: 6px;
   min-height: 18px;
-  padding: 8px;
+  padding: 6px;
   border: 1px dashed color-mix(in srgb, var(--border), transparent 20%);
   border-radius: 4px;
 }
 
 .feature-edit-item {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   border: 1px solid color-mix(in srgb, var(--border), transparent 10%);
   border-radius: 5px;
-  padding: 8px;
+  padding: 6px;
   background: color-mix(in srgb, var(--card), var(--input) 34%);
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border-color 0.12s ease;
@@ -116,13 +116,18 @@
 
 .feature-edit-item-main {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 82px auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+}
+
+.feature-edit-item .item-name,
+.feature-edit-item .item-type {
+  min-width: 0;
 }
 
 .feature-edit-item .item-description {
-  min-height: 54px;
+  min-height: 44px;
   resize: vertical;
 }
 
@@ -175,5 +180,5 @@ select[multiple] {
 .button-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }

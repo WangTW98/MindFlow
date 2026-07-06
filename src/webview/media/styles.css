@@ -13,7 +13,8 @@
   --edge: var(--vscode-charts-blue);
   --inlet: var(--vscode-charts-blue);
   --outlet: var(--vscode-charts-orange);
-  --inspector-width: 380px;
+  --left-panel-width: 180px;
+  --inspector-width: 220px;
   --group-bg: color-mix(in srgb, var(--vscode-sideBar-background), var(--vscode-editor-background) 30%);
   --card-shadow: 0 10px 24px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
   --card-shadow-strong: 0 18px 38px rgba(0, 0, 0, 0.26), 0 4px 12px rgba(0, 0, 0, 0.14);

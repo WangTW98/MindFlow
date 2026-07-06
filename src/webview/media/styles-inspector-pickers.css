@@ -38,6 +38,19 @@
   cursor: pointer;
 }
 
+.inspector .edge-type-trigger,
+.inspector .edge-type-option,
+.inspector .page-type-trigger,
+.inspector .page-type-option,
+.inspector .app-surface-type-trigger,
+.inspector .app-surface-type-option,
+.inspector .status-group-trigger,
+.inspector .status-group-option {
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 6px;
+}
+
 .edge-type-trigger:hover,
 .edge-type-option:hover,
 .edge-type-option.selected,
@@ -72,6 +85,14 @@
   background: var(--bg);
   box-shadow: var(--card-shadow-strong);
   padding: 5px;
+}
+
+.inspector .edge-type-menu,
+.inspector .page-type-menu,
+.inspector .app-surface-type-menu,
+.inspector .status-group-menu,
+.inspector .endpoint-menu {
+  padding: 4px;
 }
 
 .edge-type-picker.open .edge-type-menu,
@@ -123,6 +144,15 @@
   min-height: 38px;
 }
 
+.inspector .page-type-trigger,
+.inspector .page-type-option,
+.inspector .app-surface-type-trigger,
+.inspector .app-surface-type-option,
+.inspector .status-group-trigger,
+.inspector .status-group-option {
+  min-height: 32px;
+}
+
 .page-type-icon,
 .app-surface-type-icon {
   display: inline-flex;
@@ -141,6 +171,18 @@
 .app-surface-type-icon .lucide-icon {
   width: 16px;
   height: 16px;
+}
+
+.inspector .page-type-icon,
+.inspector .app-surface-type-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.inspector .page-type-icon .lucide-icon,
+.inspector .app-surface-type-icon .lucide-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .page-type-copy,
@@ -189,11 +231,20 @@
   gap: 6px;
 }
 
+.inspector .endpoint-picker {
+  gap: 4px;
+}
+
 .endpoint-combobox {
   position: relative;
   display: grid;
   gap: 4px;
   margin-top: 5px;
+}
+
+.inspector .endpoint-combobox {
+  gap: 3px;
+  margin-top: 3px;
 }
 
 .endpoint-combobox-input {
@@ -256,6 +307,11 @@
   color: var(--fg);
   text-align: left;
   padding: 4px 7px;
+}
+
+.inspector .endpoint-option {
+  min-height: 22px;
+  padding: 3px 5px;
 }
 
 .endpoint-option.node-option {

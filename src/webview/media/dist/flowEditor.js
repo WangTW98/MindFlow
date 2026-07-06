@@ -812,9 +812,9 @@
       <div class="feature-edit-item-main">
         ${renderIconActionButton("drag-handle", "\u62D6\u62FD\u6392\u5E8F\u529F\u80FD\u9879", "grip-vertical", `data-drag-kind="item" data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
         <input class="item-name" value="${escapeAttr(item.name || "")}" placeholder="\u529F\u80FD\u9879\u540D\u79F0">
-        <input class="item-type" value="${escapeAttr(item.type || "text")}" placeholder="\u7C7B\u578B">
         ${renderIconActionButton("delete-feature-item danger-text", "\u5220\u9664\u529F\u80FD\u9879", "trash-2", `data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
       </div>
+      <input class="item-type" value="${escapeAttr(item.type || "text")}" placeholder="\u7C7B\u578B">
       <textarea class="item-description" rows="2" placeholder="\u529F\u80FD\u9879\u4ECB\u7ECD">${escapeHtml(item.description || "")}</textarea>
     </div>
   `;

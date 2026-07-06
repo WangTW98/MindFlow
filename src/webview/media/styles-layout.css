@@ -1,6 +1,6 @@
 .app-shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) var(--inspector-width);
+  grid-template-columns: var(--left-panel-width) minmax(0, 1fr) var(--inspector-width);
   width: 100%;
   height: 100vh;
   min-width: 0;
@@ -14,7 +14,7 @@
 }
 
 .app-shell.inspector-collapsed {
-  grid-template-columns: 240px minmax(0, 1fr) 0;
+  grid-template-columns: var(--left-panel-width) minmax(0, 1fr) 0;
 }
 
 .app-shell.left-collapsed.inspector-collapsed {
@@ -32,6 +32,7 @@
   flex-direction: column;
   min-width: 0;
   border-right: 1px solid var(--border);
+  font-size: 12px;
   overflow: hidden;
 }
 
@@ -54,8 +55,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 10px 8px 8px;
+  gap: 6px;
+  padding: 8px 6px 6px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -68,13 +69,13 @@
 
 .nodes-toolbar h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.25;
 }
 
 .nodes-count {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
 }
 
@@ -94,25 +95,29 @@ small,
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 6px;
+  padding: 4px;
 }
 
 .node-search {
-  padding: 8px;
+  padding: 6px;
   border-bottom: 1px solid var(--border);
+}
+
+.node-search input {
+  padding: 4px 6px;
 }
 
 .node-list-item {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: 14px minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   width: 100%;
-  min-height: 28px;
-  margin: 0 0 4px;
+  min-height: 24px;
+  margin: 0 0 3px;
   border: 1px solid transparent;
   border-radius: 4px;
-  padding: 4px 6px;
+  padding: 3px 5px;
   background: transparent;
   color: var(--fg);
   text-align: left;
@@ -122,14 +127,14 @@ small,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   color: var(--muted);
 }
 
 .node-list-icon .lucide-icon {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 .node-list-title {
@@ -137,7 +142,7 @@ small,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.25;
 }
 
@@ -264,6 +269,46 @@ small,
   height: 14px;
 }
 
+.inspector .managed-list {
+  gap: 5px;
+}
+
+.inspector .managed-list-head {
+  gap: 6px;
+}
+
+.inspector .managed-list-head h4 {
+  font-size: 11px;
+}
+
+.inspector .tiny-actions {
+  gap: 3px;
+}
+
+.inspector .managed-list-body {
+  gap: 3px;
+}
+
+.inspector .managed-list-item {
+  gap: 5px;
+  padding: 3px 4px;
+}
+
+.inspector .managed-list-row-action {
+  width: 22px;
+  height: 22px;
+}
+
+.inspector .managed-list-kind-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.inspector .managed-list-kind-icon .lucide-icon {
+  width: 12px;
+  height: 12px;
+}
+
 .embedded-taxonomy-panel {
   width: auto;
   max-height: none;
@@ -283,8 +328,21 @@ small,
   gap: 9px;
 }
 
+.inspector .embedded-taxonomy-panel {
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.inspector .project-overview-inspector-taxonomy {
+  gap: 6px;
+}
+
 .status-group-list {
   gap: 6px;
+}
+
+.inspector .status-group-list {
+  gap: 4px;
 }
 
 .status-group-list-item {
@@ -296,6 +354,11 @@ small,
   border: 1px solid transparent;
   border-radius: 4px;
   padding: 5px 6px;
+}
+
+.inspector .status-group-list-item {
+  gap: 5px;
+  padding: 3px 4px;
 }
 
 .status-group-list-item:hover {
@@ -318,6 +381,12 @@ small,
   border-radius: 3px;
   background: var(--status-group-color, transparent);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.inspector .status-group-color-square {
+  flex-basis: 12px;
+  width: 12px;
+  height: 12px;
 }
 
 .status-group-color-square.small {

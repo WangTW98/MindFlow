@@ -152,9 +152,9 @@ function renderFeatureEditorItem(item, groupIndex, itemIndex) {
       <div class="feature-edit-item-main">
         ${renderIconActionButton("drag-handle", "拖拽排序功能项", "grip-vertical", `data-drag-kind="item" data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
         <input class="item-name" value="${escapeAttr(item.name || "")}" placeholder="功能项名称">
-        <input class="item-type" value="${escapeAttr(item.type || "text")}" placeholder="类型">
         ${renderIconActionButton("delete-feature-item danger-text", "删除功能项", "trash-2", `data-group-index="${groupIndex}" data-item-index="${itemIndex}"`)}
       </div>
+      <input class="item-type" value="${escapeAttr(item.type || "text")}" placeholder="类型">
       <textarea class="item-description" rows="2" placeholder="功能项介绍">${escapeHtml(item.description || "")}</textarea>
     </div>
   `;

@@ -3,7 +3,9 @@
   height: 100vh;
   border-left: 1px solid var(--border);
   overflow: auto;
-  padding: 16px;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
@@ -21,13 +23,13 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
 }
 
 .inspector-actions {
   display: flex;
   flex: 0 0 auto;
-  gap: 6px;
+  gap: 4px;
 }
 
 .icon-button {
@@ -59,14 +61,21 @@
   border-color: var(--accent);
 }
 
-.feature-icon-button {
-  width: 26px;
-  height: 26px;
+.inspector .icon-button,
+.inspector .feature-icon-button {
+  width: 22px;
+  height: 22px;
+}
+
+.inspector .lucide-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .inspector h2 {
   margin: 0 0 4px;
-  font-size: 18px;
+  font-size: 15px;
+  line-height: 1.25;
 }
 
 .inspector h2.inline-title-editor {
@@ -100,19 +109,19 @@
 
 .details-form {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .status-group-color-control {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .status-group-color-control input[type="color"] {
-  width: 44px;
-  height: 32px;
+  width: 36px;
+  height: 26px;
   padding: 2px;
   cursor: pointer;
 }
@@ -124,9 +133,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--vscode-editor-font-family, monospace);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .field-label {
   color: var(--fg);
+}
+
+.inspector input,
+.inspector select,
+.inspector textarea,
+.inspector button:not(.icon-button) {
+  padding: 4px 6px;
+}
+
+.inspector textarea {
+  line-height: 1.35;
 }
