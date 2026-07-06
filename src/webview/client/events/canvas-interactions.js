@@ -35,6 +35,7 @@ function handleCanvasClick(event) {
   ) {
     return;
   }
+  closeAllTaxonomyPanels();
   clearSelection();
 }
 

@@ -17,6 +17,20 @@ function bindTaxonomyPanelToggles(root = document) {
   });
 }
 
+function closeAllTaxonomyPanels() {
+  if (!taxonomyPanelsOpen.appSurface && !taxonomyPanelsOpen.domain && !taxonomyPanelsOpen.role && !taxonomyPanelsOpen.statusGroup) {
+    return false;
+  }
+  taxonomyPanelsOpen = {
+    appSurface: false,
+    domain: false,
+    role: false,
+    statusGroup: false
+  };
+  persistUiState();
+  return true;
+}
+
 function bindTaxonomyControls(root = document) {
   root.querySelectorAll(".taxonomy-filter-checkbox").forEach((checkbox) => {
     checkbox.addEventListener("change", (event) => {

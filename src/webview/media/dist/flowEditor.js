@@ -1934,6 +1934,19 @@
         });
       });
     }
+    function closeAllTaxonomyPanels() {
+      if (!taxonomyPanelsOpen.appSurface && !taxonomyPanelsOpen.domain && !taxonomyPanelsOpen.role && !taxonomyPanelsOpen.statusGroup) {
+        return false;
+      }
+      taxonomyPanelsOpen = {
+        appSurface: false,
+        domain: false,
+        role: false,
+        statusGroup: false
+      };
+      persistUiState();
+      return true;
+    }
     function bindTaxonomyControls(root = document) {
       root.querySelectorAll(".taxonomy-filter-checkbox").forEach((checkbox) => {
         checkbox.addEventListener("change", (event) => {
@@ -2599,6 +2612,7 @@
       if (event.target.closest(".node-card") || event.target.closest(".project-overview-card") || event.target.closest(".app-surface-card") || event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") || event.target.closest("[data-edge-id]") || event.target.closest("button, input, textarea, select") || connectionDrag) {
         return;
       }
+      closeAllTaxonomyPanels();
       clearSelection();
     }
     function clearSelection() {
