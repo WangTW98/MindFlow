@@ -1,5 +1,5 @@
-import type { ProductFlow } from "../models/productFlow";
-import type { FlowSelectionPatch, FlowSelectionState } from "../core/editorSelection";
+import type { ProductFlow } from "../domain/product-flow";
+import type { FlowSelectionPatch, FlowSelectionState } from "../domain/selection";
 
 export interface MindFlowEditorSnapshot {
   uri: string;

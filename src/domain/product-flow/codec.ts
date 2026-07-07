@@ -1,8 +1,9 @@
-import { ensureProjectOverview } from "../core/projectOverview";
-import type { ProductFlow, ValidationResult } from "./productFlow";
-import { validateProductFlow } from "./productFlow";
+import { CURRENT_SCHEMA_VERSION } from "./constants";
+import { ensureProjectOverview } from "./projectOverview";
+import type { ProductFlow, ValidationResult } from "./types";
+import { validateProductFlow } from "./validation";
 
-export const CURRENT_PRODUCT_FLOW_SCHEMA_VERSION = "2.0";
+export const CURRENT_PRODUCT_FLOW_SCHEMA_VERSION = CURRENT_SCHEMA_VERSION;
 
 export interface ProductFlowParseResult {
   flow: ProductFlow;

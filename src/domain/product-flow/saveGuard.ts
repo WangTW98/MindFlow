@@ -1,4 +1,5 @@
-import { validateProductFlow, type ProductFlow } from "./productFlow";
+import type { ProductFlow } from "./types";
+import { validateProductFlow } from "./validation";
 
 export function assertValidProductFlowForSave(flow: ProductFlow): void {
   const validation = validateProductFlow(flow);

@@ -8,49 +8,6 @@ function collectTagMultiSelect(id) {
     .map((input) => input.value);
 }
 
-function readIdSelection(value, legacyValue) {
-  if (Array.isArray(value)) {
-    return uniqueStringIds(value);
-  }
-  return typeof legacyValue === "string" && legacyValue.trim() ? [legacyValue.trim()] : [];
-}
-
-function uniqueStringIds(value) {
-  return Array.from(new Set((value || []).filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim())));
-}
-
-function readTaxonomySelection(value) {
-  return {
-    appSurface: typeof value?.appSurface === "string" ? value.appSurface : "",
-    domain: typeof value?.domain === "string" ? value.domain : "",
-    role: typeof value?.role === "string" ? value.role : "",
-    statusGroup: typeof value?.statusGroup === "string" ? value.statusGroup : ""
-  };
-}
-
-function readTaxonomyPanelsOpen() {
-  const value = persisted.taxonomyPanelsOpen || {};
-  return {
-    appSurface: value.appSurface === true,
-    domain: value.domain === true,
-    role: value.role === true,
-    statusGroup: value.statusGroup === true
-  };
-}
-
-function readInspectorScrollState(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-  return Object.entries(value).reduce((result, [key, scrollTop]) => {
-    const normalized = Number(scrollTop);
-    if (typeof key === "string" && key && Number.isFinite(normalized) && normalized >= 0) {
-      result[key] = Math.round(normalized);
-    }
-    return result;
-  }, {});
-}
-
 function inspectorScrollKey(kind, id) {
   return `${kind}:${id || ""}`;
 }
@@ -161,24 +118,6 @@ function resetLayoutCaches() {
   projectOverviewPosition = null;
 }
 
-function readCommandStatus(value) {
-  if (!value || (value.kind !== "ok" && value.kind !== "error") || typeof value.message !== "string") {
-    return null;
-  }
-  const at = Number(value.at);
-  if (!Number.isFinite(at)) {
-    return null;
-  }
-  if (value.kind === "ok" && Date.now() - at > 3000) {
-    return null;
-  }
-  return {
-    kind: value.kind,
-    message: value.message,
-    at
-  };
-}
-
 function persistUiState() {
   vscode.setState({
     appFilters,
@@ -202,10 +141,6 @@ function persistUiState() {
     inspectorScrollState,
     commandStatus
   });
-}
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
 }
 
 function cssEscape(value) {

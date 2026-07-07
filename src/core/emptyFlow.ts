@@ -1,4 +1,4 @@
-import type { ProductFlow } from "../models/productFlow";
+import type { ProductFlow } from "../domain/product-flow";
 import { createDefaultProjectOverview } from "./projectOverview";
 import { makeFlowId, nowIso } from "../utils/id";
 

@@ -25,7 +25,7 @@ function render() {
             <div class="nodes-toolbar-title">
               <h2 class="nodes-root-title" title="${escapeAttr(sidebarTitle)}">${escapeHtml(sidebarTitle)}</h2>
             </div>
-            <small class="nodes-count" aria-label="节点数量: ${activeNodes.length}">节点数量: ${activeNodes.length}</small>
+            <small class="nodes-count" aria-label="节点: ${activeNodes.length}">节点: ${activeNodes.length}</small>
           </header>
           <div class="node-search">
             <input id="nodeSearch" value="${escapeAttr(nodeSearch)}" placeholder="快速检索节点卡片">

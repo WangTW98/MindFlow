@@ -3,9 +3,11 @@ import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import type { MindFlowEditorBridge } from "./bridge";
-import { MindFlowMcpProtocol } from "./protocol";
-import { MindFlowMcpToolHandlers } from "./tools";
+import type { MindFlowEditorBridge } from "../../mcp/bridge";
+import { MindFlowMcpProtocol } from "../../mcp/protocol";
+import { MindFlowMcpToolHandlers } from "../../mcp/tools";
+
+const MAX_MCP_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
 
 export interface MindFlowMcpSession {
   endpoint: string;
@@ -109,11 +111,12 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
       }
       writeJson(response, 200, result);
     } catch (error) {
-      writeJson(response, 400, {
+      const tooLarge = error instanceof RequestBodyTooLargeError;
+      writeJson(response, tooLarge ? 413 : 400, {
         jsonrpc: "2.0",
         id: null,
         error: {
-          code: -32700,
+          code: tooLarge ? -32600 : -32700,
           message: error instanceof Error ? error.message : String(error)
         }
       });
@@ -148,8 +151,25 @@ function isAuthorized(request: http.IncomingMessage, token: string): boolean {
 function readBody(request: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    request.on("data", (chunk) => chunks.push(chunk));
+    let totalBytes = 0;
+    let settled = false;
+    request.on("data", (chunk: Buffer) => {
+      if (settled) {
+        return;
+      }
+      totalBytes += chunk.length;
+      if (totalBytes > MAX_MCP_REQUEST_BODY_BYTES) {
+        settled = true;
+        reject(new RequestBodyTooLargeError(MAX_MCP_REQUEST_BODY_BYTES));
+        return;
+      }
+      chunks.push(chunk);
+    });
     request.on("end", () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       try {
         resolve(Buffer.concat(chunks).toString("utf8"));
       } catch (error) {
@@ -157,6 +177,12 @@ function readBody(request: http.IncomingMessage): Promise<string> {
       }
     });
   });
+}
+
+class RequestBodyTooLargeError extends Error {
+  public constructor(limitBytes: number) {
+    super(`MindFlow MCP request body exceeds ${limitBytes} bytes.`);
+  }
 }
 
 function writeJson(response: http.ServerResponse, statusCode: number, value: unknown): void {

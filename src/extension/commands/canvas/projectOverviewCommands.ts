@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { UpdateProjectOverviewInput } from "../../../core/projectOverview";
+import type { UpdateProjectOverviewInput } from "../../../domain/operations";
 import { isPlainObject, readFiniteCoordinates } from "../guards";
 import type { FlowUriArgument } from "../../flowContext";
 import { applyCanvasEdit, selectAndRevealFlow } from "./editSession";

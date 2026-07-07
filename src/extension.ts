@@ -6,9 +6,9 @@ import {
   rememberRecentFlow
 } from "./extension/flowContext";
 import { registerMindFlowCommands } from "./extension/mindFlowCommands";
-import { registerMindFlowMcp } from "./mcp/adapter";
-import { FlowPanel } from "./webview/FlowPanel";
-import { SidebarView } from "./webview/SidebarView";
+import { registerMindFlowMcp } from "./extension/mcp/adapter";
+import { FlowPanel } from "./extension/webviews/canvas/FlowPanel";
+import { SidebarView } from "./extension/webviews/sidebar/SidebarView";
 
 export function activate(context: vscode.ExtensionContext): void {
   const sidebarView = new SidebarView(context, getWorkspaceRoot);

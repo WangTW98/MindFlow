@@ -279,7 +279,7 @@ interface EndpointCodecHelpers {
 
 async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "webview", "client", "view", "canvas-endpoint-codec.js"),
+    path.join(process.cwd(), "src", "webview", "canvas", "selectors", "canvas-endpoint-codec.js"),
     "utf8"
   );
   const factory = new Function(

@@ -1,6 +1,6 @@
 import * as path from "node:path";
-import type { ProductFlow } from "../models/productFlow";
-import { serializeProductFlow } from "../models/productFlowCodec";
+import type { ProductFlow } from "../domain/product-flow";
+import { serializeProductFlow } from "../domain/product-flow/codec";
 import { slugify } from "../utils/id";
 
 export const MINDFLOW_LANGUAGE_ID = "mindflow";

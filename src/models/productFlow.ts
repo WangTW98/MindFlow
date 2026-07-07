@@ -1,1 +1,1 @@
-export * from "./productFlow/index";
+export * from "../domain/product-flow";

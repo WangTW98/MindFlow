@@ -1,4 +1,4 @@
-import { emptyFlowSelection, normalizeFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../core/editorSelection";
+import { emptyFlowSelection, normalizeFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../../domain/selection";
 import {
   applyFlowOperation,
   applyFlowOperations,
@@ -7,20 +7,40 @@ import {
   type UpdateEdgeDetailsInput,
   type UpdateNodeDetailsInput,
   type UpsertEdgeOperationInput
-} from "../core/flowOperations";
-import { PROJECT_OVERVIEW_NODE_ID } from "../core/projectOverview";
-import type { TaxonomyKind } from "../core/taxonomy";
-import { APP_SURFACE_TYPES, EDGE_TYPES, ENTITY_STATUSES, FLOW_ENDPOINT_KINDS, type EdgeType, type EntityStatus, type FeatureGroup, type FlowEdge, type FlowEndpoint, type PageNode, type ProductFlow } from "../models/productFlow";
-import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "./bridge";
-import { MINDFLOW_OPERATIONS_REFERENCE } from "./operationsReference";
-import { MINDFLOW_MCP_TOOLS } from "./toolSchemas";
+} from "../../domain/operations";
+import { PROJECT_OVERVIEW_NODE_ID } from "../../domain/operations";
+import type { TaxonomyKind } from "../../domain/operations";
+import { APP_SURFACE_TYPES, EDGE_TYPES, ENTITY_STATUSES, FLOW_ENDPOINT_KINDS, type EdgeType, type EntityStatus, type FeatureGroup, type FlowEdge, type FlowEndpoint, type PageNode, type ProductFlow } from "../../domain/product-flow";
+import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../bridge";
+import { MINDFLOW_OPERATIONS_REFERENCE } from "../operationsReference";
+import { MINDFLOW_MCP_TOOLS } from "../toolSchemas";
+import {
+  batchSelectionPatch,
+  buildHydratedSelection,
+  buildSelectionIssues,
+  operationPayload,
+  resultNodes,
+  snapshotToPayload
+} from "./payloads";
+import {
+  asRecord,
+  isRecord,
+  readOptionalBoolean,
+  readOptionalNumber,
+  readOptionalString,
+  readOptionalStringArray,
+  readRecords,
+  readStringArray,
+  readStringPatch,
+  requireString,
+  requireStringEither,
+  resolveId,
+  stripUndefined
+} from "./readers";
+import { createMcpToolRegistry, type McpToolInvoker, type McpToolResult } from "./registry";
 
 export const MCP_NODE_KINDS = ["layout", "navigation", "page", "popup", "component"] as const;
 export type McpNodeKind = typeof MCP_NODE_KINDS[number];
-
-export interface McpToolResult {
-  [key: string]: unknown;
-}
 
 interface IdMaps {
   nodes: Map<string, string>;
@@ -45,7 +65,43 @@ interface BatchEditResult {
 }
 
 export class MindFlowMcpToolHandlers {
-  public constructor(private readonly bridge: MindFlowEditorBridge) {}
+  private readonly toolRegistry: ReadonlyMap<string, McpToolInvoker>;
+
+  public constructor(private readonly bridge: MindFlowEditorBridge) {
+    this.toolRegistry = createMcpToolRegistry({
+      getEditorState: (input) => this.getEditorState(input),
+      getOpenEditors: () => this.getOpenEditors(),
+      getSelection: (input) => this.getSelection(input),
+      setSelection: (input) => this.setSelection(input),
+      clearSelection: (input) => this.clearSelection(input),
+      updateRoot: (input) => this.updateRoot(input),
+      moveRoot: (input) => this.moveRoot(input),
+      upsertAppSurface: (input) => this.upsertAppSurface(input),
+      removeAppSurface: (input) => this.removeAppSurface(input),
+      moveAppSurface: (input) => this.moveAppSurface(input),
+      upsertDomain: (input) => this.upsertTaxonomy(input, "domain"),
+      removeDomain: (input) => this.removeTaxonomy(input, "domain", ["domainId", "id"]),
+      upsertRole: (input) => this.upsertTaxonomy(input, "role"),
+      removeRole: (input) => this.removeTaxonomy(input, "role", ["roleId", "id"]),
+      upsertStatusGroup: (input) => this.upsertTaxonomy(input, "statusGroup"),
+      removeStatusGroup: (input) => this.removeTaxonomy(input, "statusGroup", ["statusGroupId", "id"]),
+      upsertLayoutNode: (input) => this.upsertTypedNode(input, "layout"),
+      upsertNavigationNode: (input) => this.upsertTypedNode(input, "navigation"),
+      upsertPageNode: (input) => this.upsertTypedNode(input, "page"),
+      upsertPopupNode: (input) => this.upsertTypedNode(input, "popup"),
+      upsertComponentNode: (input) => this.upsertTypedNode(input, "component"),
+      updateNode: (input) => this.updateNode(input),
+      moveNode: (input) => this.moveNode(input),
+      removeNode: (input) => this.removeNode(input),
+      upsertEdge: (input) => this.upsertEdge(input),
+      removeEdge: (input) => this.removeEdge(input),
+      batchGetNodes: (input) => this.batchGetNodes(input),
+      batchUpsertNodes: (input) => this.batchUpsertNodes(input),
+      batchUpdateNodes: (input) => this.batchUpdateNodes(input),
+      batchMoveNodes: (input) => this.batchMoveNodes(input),
+      batchRemoveNodes: (input) => this.batchRemoveNodes(input)
+    });
+  }
 
   public listTools(): typeof MINDFLOW_MCP_TOOLS {
     return MINDFLOW_MCP_TOOLS;
@@ -53,130 +109,11 @@ export class MindFlowMcpToolHandlers {
 
   public async callTool(name: string, args: unknown): Promise<McpToolResult> {
     const input = asRecord(args);
-    switch (name) {
-      case "mindflow_get_editor_state":
-      case "mindflow_get_active_flow":
-        return this.getEditorState(input);
-      case "mindflow_get_open_editors":
-      case "mindflow_get_open_flows":
-        return this.getOpenEditors();
-      case "mindflow_get_selection":
-        return this.getSelection(input);
-      case "mindflow_set_selection":
-        return this.setSelection(input);
-      case "mindflow_clear_selection":
-        return this.clearSelection(input);
-      case "mindflow_update_root":
-      case "mindflow_update_project":
-        return this.editFlow(input, () => ({
-          operations: [{
-            type: "project.update",
-            patch: {
-              title: readOptionalString(input, "title"),
-              summary: readOptionalString(input, "summary"),
-              goal: readStringPatch(input, "goal")
-            }
-          }]
-        }));
-      case "mindflow_move_root":
-        return this.editFlow(input, () => ({
-          operations: [{ type: "project.move", ...readRequiredPosition(input) }]
-        }));
-      case "mindflow_upsert_app_surface":
-        return this.editFlow(input, () => ({
-          operations: [taxonomyUpsertOperation(input, "appSurface")]
-        }));
-      case "mindflow_remove_app_surface":
-        return this.editFlow(input, () => ({
-          operations: [{ type: "taxonomy.remove", kind: "appSurface", id: requireStringEither(input, ["appId", "id"]) }]
-        }));
-      case "mindflow_move_app_surface":
-        return this.editFlow(input, () => {
-          const position = readRequiredPosition(input);
-          return {
-            operations: [{ type: "appSurface.move", appId: requireStringEither(input, ["appId", "id"]), x: position.x, y: position.y }]
-          };
-        });
-      case "mindflow_upsert_domain":
-        return this.upsertTaxonomy(input, "domain");
-      case "mindflow_remove_domain":
-        return this.removeTaxonomy(input, "domain", ["domainId", "id"]);
-      case "mindflow_upsert_role":
-        return this.upsertTaxonomy(input, "role");
-      case "mindflow_remove_role":
-        return this.removeTaxonomy(input, "role", ["roleId", "id"]);
-      case "mindflow_upsert_status_group":
-        return this.upsertTaxonomy(input, "statusGroup");
-      case "mindflow_remove_status_group":
-        return this.removeTaxonomy(input, "statusGroup", ["statusGroupId", "id"]);
-      case "mindflow_upsert_layout_node":
-        return this.upsertTypedNode(input, "layout");
-      case "mindflow_upsert_navigation_node":
-        return this.upsertTypedNode(input, "navigation");
-      case "mindflow_upsert_page_node":
-      case "mindflow_upsert_node":
-        return this.upsertTypedNode(input, "page");
-      case "mindflow_upsert_popup_node":
-        return this.upsertTypedNode(input, "popup");
-      case "mindflow_upsert_component_node":
-        return this.upsertTypedNode(input, "component");
-      case "mindflow_update_node":
-        return this.editFlow(input, () => ({
-          operations: [{ type: "node.update", nodeId: requireStringEither(input, ["nodeId", "id"]), patch: stripUndefined(readNodeDetailsPatch(input)) }]
-        }));
-      case "mindflow_move_node":
-        return this.editFlow(input, () => {
-          const position = readRequiredPosition(input);
-          return {
-            operations: [{ type: "node.move", nodeId: requireStringEither(input, ["nodeId", "id"]), x: position.x, y: position.y }]
-          };
-        });
-      case "mindflow_remove_node":
-        return this.editFlow(input, () => ({
-          operations: [{ type: "node.remove", nodeId: requireStringEither(input, ["nodeId", "id"]) }]
-        }));
-      case "mindflow_upsert_edge":
-        return this.editFlow(input, (flow) => ({
-          operations: [{ type: "edge.upsert", input: readUpsertEdgeInput(input, flow) }]
-        }));
-      case "mindflow_remove_edge":
-        return this.editFlow(input, () => ({
-          operations: [{ type: "edge.remove", edgeId: requireStringEither(input, ["edgeId", "id"]) }]
-        }));
-      case "mindflow_batch_get_nodes":
-        return this.batchGetNodes(input);
-      case "mindflow_batch_upsert_nodes":
-        return this.batchEditNodes(input, (flow, items) => ({
-          operations: items.flatMap((item) => nodeUpsertOperations(flow, item, readNodeKind(item))),
-          result: (results) => ({ nodes: resultNodes(results) }),
-          selection: (results) => batchSelectionPatch(resultNodes(results), true)
-        }));
-      case "mindflow_batch_update_nodes":
-        return this.batchEditNodes(input, (_flow, items) => ({
-          operations: items.map((item) => ({ type: "node.update", nodeId: requireStringEither(item, ["nodeId", "id"]), patch: stripUndefined(readNodeDetailsPatch(item)) })),
-          result: (results) => ({ nodes: resultNodes(results) }),
-          selection: (results) => batchSelectionPatch(resultNodes(results), true)
-        }));
-      case "mindflow_batch_move_nodes":
-        return this.batchEditNodes(input, (_flow, items) => ({
-          operations: items.map((item) => {
-            const position = readRequiredPosition(item);
-            return { type: "node.move", nodeId: requireStringEither(item, ["nodeId", "id"]), x: position.x, y: position.y };
-          }),
-          result: (results) => ({ nodes: resultNodes(results) }),
-          selection: (results) => batchSelectionPatch(resultNodes(results), true)
-        }));
-      case "mindflow_batch_remove_nodes":
-        return this.batchEditNodes(input, (_flow, items) => ({
-          operations: items.map((item) => ({ type: "node.remove", nodeId: requireStringEither(item, ["nodeId", "id"]) })),
-          result: (results) => ({
-            removedNodeIds: results.flatMap((result) => result.type === "node.remove" ? [result.removedNodeId] : []),
-            removedEdgeIds: Array.from(new Set(results.flatMap((result) => result.type === "node.remove" ? result.removedEdgeIds : [])))
-          })
-        }));
-      default:
-        throw new Error(`Unknown MindFlow MCP tool: ${name}`);
+    const invoke = this.toolRegistry.get(name);
+    if (!invoke) {
+      throw new Error(`Unknown MindFlow MCP tool: ${name}`);
     }
+    return invoke(input);
   }
 
   public readOperationsReference(): string {
@@ -233,6 +170,46 @@ export class MindFlowMcpToolHandlers {
     };
   }
 
+  private async updateRoot(input: Record<string, unknown>): Promise<McpToolResult> {
+    return this.editFlow(input, () => ({
+      operations: [{
+        type: "project.update",
+        patch: {
+          title: readOptionalString(input, "title"),
+          summary: readOptionalString(input, "summary"),
+          goal: readStringPatch(input, "goal")
+        }
+      }]
+    }));
+  }
+
+  private async moveRoot(input: Record<string, unknown>): Promise<McpToolResult> {
+    return this.editFlow(input, () => ({
+      operations: [{ type: "project.move", ...readRequiredPosition(input) }]
+    }));
+  }
+
+  private async upsertAppSurface(input: Record<string, unknown>): Promise<McpToolResult> {
+    return this.editFlow(input, () => ({
+      operations: [taxonomyUpsertOperation(input, "appSurface")]
+    }));
+  }
+
+  private async removeAppSurface(input: Record<string, unknown>): Promise<McpToolResult> {
+    return this.editFlow(input, () => ({
+      operations: [{ type: "taxonomy.remove", kind: "appSurface", id: requireStringEither(input, ["appId", "id"]) }]
+    }));
+  }
+
+  private async moveAppSurface(input: Record<string, unknown>): Promise<McpToolResult> {
+    return this.editFlow(input, () => {
+      const position = readRequiredPosition(input);
+      return {
+        operations: [{ type: "appSurface.move", appId: requireStringEither(input, ["appId", "id"]), x: position.x, y: position.y }]
+      };
+    });
+  }
+
   private async upsertTaxonomy(input: Record<string, unknown>, kind: TaxonomyKind): Promise<McpToolResult> {
     return this.editFlow(input, () => ({
       operations: [taxonomyUpsertOperation(input, kind)]
@@ -253,6 +230,76 @@ export class MindFlowMcpToolHandlers {
         const node = nodes[nodes.length - 1];
         return { node, kind };
       }
+    }));
+  }
+
+  private async updateNode(input: Record<string, unknown>): Promise<McpToolResult> {
+    return this.editFlow(input, () => ({
+      operations: [{ type: "node.update", nodeId: requireStringEither(input, ["nodeId", "id"]), patch: stripUndefined(readNodeDetailsPatch(input)) }]
+    }));
+  }
+
+  private async moveNode(input: Record<string, unknown>): Promise<McpToolResult> {
+    return this.editFlow(input, () => {
+      const position = readRequiredPosition(input);
+      return {
+        operations: [{ type: "node.move", nodeId: requireStringEither(input, ["nodeId", "id"]), x: position.x, y: position.y }]
+      };
+    });
+  }
+
+  private async removeNode(input: Record<string, unknown>): Promise<McpToolResult> {
+    return this.editFlow(input, () => ({
+      operations: [{ type: "node.remove", nodeId: requireStringEither(input, ["nodeId", "id"]) }]
+    }));
+  }
+
+  private async upsertEdge(input: Record<string, unknown>): Promise<McpToolResult> {
+    return this.editFlow(input, (flow) => ({
+      operations: [{ type: "edge.upsert", input: readUpsertEdgeInput(input, flow) }]
+    }));
+  }
+
+  private async removeEdge(input: Record<string, unknown>): Promise<McpToolResult> {
+    return this.editFlow(input, () => ({
+      operations: [{ type: "edge.remove", edgeId: requireStringEither(input, ["edgeId", "id"]) }]
+    }));
+  }
+
+  private async batchUpsertNodes(input: Record<string, unknown>): Promise<BatchEditResult> {
+    return this.batchEditNodes(input, (flow, items) => ({
+      operations: items.flatMap((item) => nodeUpsertOperations(flow, item, readNodeKind(item))),
+      result: (results) => ({ nodes: resultNodes(results) }),
+      selection: (results) => batchSelectionPatch(resultNodes(results), true)
+    }));
+  }
+
+  private async batchUpdateNodes(input: Record<string, unknown>): Promise<BatchEditResult> {
+    return this.batchEditNodes(input, (_flow, items) => ({
+      operations: items.map((item) => ({ type: "node.update", nodeId: requireStringEither(item, ["nodeId", "id"]), patch: stripUndefined(readNodeDetailsPatch(item)) })),
+      result: (results) => ({ nodes: resultNodes(results) }),
+      selection: (results) => batchSelectionPatch(resultNodes(results), true)
+    }));
+  }
+
+  private async batchMoveNodes(input: Record<string, unknown>): Promise<BatchEditResult> {
+    return this.batchEditNodes(input, (_flow, items) => ({
+      operations: items.map((item) => {
+        const position = readRequiredPosition(item);
+        return { type: "node.move", nodeId: requireStringEither(item, ["nodeId", "id"]), x: position.x, y: position.y };
+      }),
+      result: (results) => ({ nodes: resultNodes(results) }),
+      selection: (results) => batchSelectionPatch(resultNodes(results), true)
+    }));
+  }
+
+  private async batchRemoveNodes(input: Record<string, unknown>): Promise<BatchEditResult> {
+    return this.batchEditNodes(input, (_flow, items) => ({
+      operations: items.map((item) => ({ type: "node.remove", nodeId: requireStringEither(item, ["nodeId", "id"]) })),
+      result: (results) => ({
+        removedNodeIds: results.flatMap((result) => result.type === "node.remove" ? [result.removedNodeId] : []),
+        removedEdgeIds: Array.from(new Set(results.flatMap((result) => result.type === "node.remove" ? result.removedEdgeIds : [])))
+      })
     }));
   }
 
@@ -453,51 +500,6 @@ function readMcpEdgeType(input: Record<string, unknown>, fallback?: EdgeType): E
   return fallback ?? "interaction";
 }
 
-function buildHydratedSelection(snapshot: MindFlowEditorSnapshot): Record<string, unknown> {
-  const flow = snapshot.flow;
-  const selection = normalizeFlowSelection(snapshot.selection);
-  return {
-    selectedRoot: selection.selectedProjectOverview ? rootPayload(flow) : undefined,
-    selectedNodes: selection.selectedNodeIds.map((nodeId) => flow.nodes.find((node) => node.nodeId === nodeId)).filter((node): node is PageNode => Boolean(node)),
-    selectedNode: selection.selectedNodeId ? flow.nodes.find((node) => node.nodeId === selection.selectedNodeId) : undefined,
-    selectedEdge: selection.selectedEdgeId ? flow.edges.find((edge) => edge.edgeId === selection.selectedEdgeId) : undefined,
-    selectedAppSurface: selection.selectedAppSurfaceId ? flow.appSurfaces?.find((surface) => surface.appId === selection.selectedAppSurfaceId) : undefined,
-    selectedDomain: selection.selectedDomainId ? flow.domains.find((domain) => domain.domainId === selection.selectedDomainId) : undefined,
-    selectedRole: selection.selectedRoleId ? flow.roles.find((role) => role.roleId === selection.selectedRoleId) : undefined,
-    selectedStatusGroup: selection.selectedStatusGroupId ? flow.statusGroups?.find((group) => group.statusGroupId === selection.selectedStatusGroupId) : undefined
-  };
-}
-
-function buildSelectionIssues(snapshot: MindFlowEditorSnapshot): Array<Record<string, string>> {
-  const flow = snapshot.flow;
-  const selection = normalizeFlowSelection(snapshot.selection);
-  const issues: Array<Record<string, string>> = [];
-  for (const nodeId of selection.selectedNodeIds) {
-    if (!flow.nodes.some((node) => node.nodeId === nodeId)) {
-      issues.push(selectionIssue("selectedNodeIds", nodeId, "Selected node is missing."));
-    }
-  }
-  if (selection.selectedNodeId && !flow.nodes.some((node) => node.nodeId === selection.selectedNodeId)) {
-    issues.push(selectionIssue("selectedNodeId", selection.selectedNodeId, "Selected node is missing."));
-  }
-  if (selection.selectedEdgeId && !flow.edges.some((edge) => edge.edgeId === selection.selectedEdgeId)) {
-    issues.push(selectionIssue("selectedEdgeId", selection.selectedEdgeId, "Selected edge is missing."));
-  }
-  if (selection.selectedAppSurfaceId && !flow.appSurfaces?.some((surface) => surface.appId === selection.selectedAppSurfaceId)) {
-    issues.push(selectionIssue("selectedAppSurfaceId", selection.selectedAppSurfaceId, "Selected app surface is missing."));
-  }
-  if (selection.selectedDomainId && !flow.domains.some((domain) => domain.domainId === selection.selectedDomainId)) {
-    issues.push(selectionIssue("selectedDomainId", selection.selectedDomainId, "Selected domain is missing."));
-  }
-  if (selection.selectedRoleId && !flow.roles.some((role) => role.roleId === selection.selectedRoleId)) {
-    issues.push(selectionIssue("selectedRoleId", selection.selectedRoleId, "Selected role is missing."));
-  }
-  if (selection.selectedStatusGroupId && !flow.statusGroups?.some((group) => group.statusGroupId === selection.selectedStatusGroupId)) {
-    issues.push(selectionIssue("selectedStatusGroupId", selection.selectedStatusGroupId, "Selected status group is missing."));
-  }
-  return issues;
-}
-
 function readSelectionPatch(input: Record<string, unknown>): FlowSelectionPatch {
   return {
     selectedProjectOverview: readOptionalBoolean(input, "selectedProjectOverview"),
@@ -508,72 +510,6 @@ function readSelectionPatch(input: Record<string, unknown>): FlowSelectionPatch 
     selectedDomainId: readStringPatch(input, "selectedDomainId"),
     selectedRoleId: readStringPatch(input, "selectedRoleId"),
     selectedStatusGroupId: readStringPatch(input, "selectedStatusGroupId")
-  };
-}
-
-function operationPayload(result: FlowOperationResult): McpToolResult {
-  switch (result.type) {
-    case "project.update":
-    case "project.move":
-      return { root: result.root };
-    case "taxonomy.upsert":
-      return { taxonomy: result.taxonomy };
-    case "taxonomy.remove":
-      return { taxonomy: result.taxonomy, removedId: result.removedId };
-    case "appSurface.move":
-      return { appSurface: result.appSurface };
-    case "node.create":
-    case "node.update":
-    case "node.move":
-      return { node: result.node };
-    case "node.remove":
-      return { removedNodeId: result.removedNodeId, removedEdgeIds: result.removedEdgeIds };
-    case "node.createConnected":
-      return { node: result.node, edge: result.edge };
-    case "edge.upsert":
-      return { edge: result.edge, mode: result.mode };
-    case "edge.update":
-      return { edge: result.edge };
-    case "edge.remove":
-      return { removedEdgeId: result.removedEdgeId };
-  }
-}
-
-function resultNodes(results: readonly FlowOperationResult[]): PageNode[] {
-  return results.flatMap((result) =>
-    result.type === "node.create" || result.type === "node.update" || result.type === "node.move" || result.type === "node.createConnected"
-      ? [result.node]
-      : []
-  );
-}
-
-function batchSelectionPatch(nodes: PageNode[], selectResultNodes: boolean): FlowSelectionPatch | undefined {
-  if (!selectResultNodes) {
-    return undefined;
-  }
-  const selectedNodeIds = nodes.map((node) => node.nodeId);
-  return selectedNodeIds.length > 0
-    ? { selectedProjectOverview: false, selectedNodeId: selectedNodeIds[selectedNodeIds.length - 1], selectedNodeIds }
-    : undefined;
-}
-
-function rootPayload(flow: ProductFlow): Record<string, unknown> {
-  return {
-    nodeId: PROJECT_OVERVIEW_NODE_ID,
-    title: flow.title,
-    projectOverview: flow.projectOverview
-  };
-}
-
-function snapshotToPayload(snapshot: MindFlowEditorSnapshot): Record<string, unknown> {
-  return {
-    uri: snapshot.uri,
-    path: snapshot.path,
-    displayName: snapshot.displayName,
-    active: snapshot.active,
-    dirty: snapshot.dirty,
-    revision: snapshot.flow.revision,
-    title: snapshot.flow.title
   };
 }
 
@@ -710,76 +646,6 @@ function requiredResult(result: FlowOperationResult | undefined): FlowOperationR
     throw new Error("MindFlow operation produced no result.");
   }
   return result;
-}
-
-function selectionIssue(field: string, id: string, message: string): Record<string, string> {
-  return { field, id, message };
-}
-
-function stripUndefined<T extends object>(value: T): T {
-  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
-}
-
-function requireString(record: Record<string, unknown>, key: string): string {
-  const value = readOptionalString(record, key);
-  if (!value) {
-    throw new Error(`Missing required string field: ${key}`);
-  }
-  return value;
-}
-
-function requireStringEither(record: Record<string, unknown>, keys: string[]): string {
-  for (const key of keys) {
-    const value = readOptionalString(record, key);
-    if (value) {
-      return value;
-    }
-  }
-  throw new Error(`Missing required string field: ${keys.join(" or ")}`);
-}
-
-function readOptionalString(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function readStringPatch(record: Record<string, unknown>, key: string): string | undefined {
-  return key in record && typeof record[key] === "string" ? record[key].trim() : undefined;
-}
-
-function readOptionalStringArray(record: Record<string, unknown>, key: string): string[] | undefined {
-  return Array.isArray(record[key]) ? readStringArray(record[key]) : undefined;
-}
-
-function readStringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
-    : [];
-}
-
-function readOptionalNumber(record: Record<string, unknown>, key: string): number | undefined {
-  const value = record[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function readOptionalBoolean(record: Record<string, unknown>, key: string): boolean | undefined {
-  return typeof record[key] === "boolean" ? record[key] : undefined;
-}
-
-function readRecords(value: unknown): Record<string, unknown>[] {
-  return Array.isArray(value) ? value.filter(isRecord) : [];
-}
-
-function resolveId(value: string, map: Map<string, string>): string {
-  return map.get(value) ?? value;
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return isRecord(value) ? value : {};
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isEdgeTypeValue(value: string): value is EdgeType {

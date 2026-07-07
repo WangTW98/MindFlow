@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { UpdateNodeDetailsInput } from "../../../core/flowOperations";
+import type { UpdateNodeDetailsInput } from "../../../domain/operations";
 import { hasOptionalFiniteCoordinates, isPlainObject, readFiniteCoordinates } from "../guards";
 import type { FlowUriArgument } from "../../flowContext";
 import { applyCanvasEdit, selectAndRevealFlow } from "./editSession";

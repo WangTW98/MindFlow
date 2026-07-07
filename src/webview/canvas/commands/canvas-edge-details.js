@@ -111,40 +111,6 @@ function reconcilePendingEdgeDetailsSaves() {
   });
 }
 
-function readPendingEdgeDetailsSaves(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  const now = Date.now();
-  return value.filter((entry) =>
-    entry &&
-    typeof entry.edgeId === "string" &&
-    isUsableEdgeDetailsPatch(entry.patch) &&
-    Number.isFinite(Number(entry.savedAt)) &&
-    now - Number(entry.savedAt) <= PENDING_EDGE_DETAILS_TTL_MS
-  ).map((entry) => ({
-    edgeId: entry.edgeId,
-    revision: Number(entry.revision) || 0,
-    savedAt: Number(entry.savedAt),
-    patch: entry.patch
-  }));
-}
-
-function isUsableEdgeDetailsPatch(patch) {
-  return Boolean(
-    patch &&
-    patch.from &&
-    patch.to &&
-    typeof patch.from.kind === "string" &&
-    typeof patch.from.nodeId === "string" &&
-    typeof patch.to.kind === "string" &&
-    typeof patch.to.nodeId === "string" &&
-    typeof patch.trigger === "string" &&
-    typeof patch.type === "string" &&
-    typeof patch.condition === "string"
-  );
-}
-
 function edgeDetailsPatchMatches(edge, patch) {
   const from = edge.from || { kind: "node", nodeId: edge.fromNodeId };
   const to = edge.to || { kind: "node", nodeId: edge.toNodeId };

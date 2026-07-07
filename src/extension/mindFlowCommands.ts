@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
-import type { EdgeType, FlowEndpoint } from "../models/productFlow";
-import type { UpdateEdgeDetailsInput, UpdateNodeDetailsInput } from "../core/flowEditing";
-import type { UpdateProjectOverviewInput } from "../core/projectOverview";
-import type { TaxonomyRequest } from "../core/taxonomy";
-import type { SidebarView } from "../webview/SidebarView";
+import type { EdgeType, FlowEndpoint } from "../domain/product-flow";
+import type { UpdateEdgeDetailsInput, UpdateNodeDetailsInput } from "../domain/operations";
+import type { UpdateProjectOverviewInput } from "../domain/operations";
+import type { TaxonomyRequest } from "../domain/operations";
+import type { SidebarView } from "./webviews/sidebar/SidebarView";
 import { isMindFlowDocument, rememberRecentFlow, type FlowUriArgument } from "./flowContext";
 import { createEdge, createConnectedNodeAt, createNodeAt, deleteNode, disconnectEdge, saveProjectOverviewPosition, updateAppSurfacePosition, updateEdgeDetails, updateNodeDetails, updateNodePosition, updateProjectOverviewDetails, type CreateConnectedNodeRequest } from "./commands/canvasCommands";
 import { newFlow, openFlow, saveFlowAs, validateFlowJson } from "./commands/fileCommands";

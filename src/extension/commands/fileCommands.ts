@@ -2,10 +2,10 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { createEmptyProductFlow } from "../../core/emptyFlow";
 import { createUntitledMindFlowDocumentOptions } from "../../core/untitledMindFlowDocument";
-import { validateProductFlow } from "../../models/productFlow";
+import { validateProductFlow } from "../../domain/product-flow";
 import { FlowRepository } from "../../storage/flowRepository";
-import { FlowPanel } from "../../webview/FlowPanel";
-import type { SidebarView } from "../../webview/SidebarView";
+import { FlowPanel } from "../webviews/canvas/FlowPanel";
+import type { SidebarView } from "../webviews/sidebar/SidebarView";
 import { createUntitledMindFlowUri, ensureMindFlowExtension, flowDisplayName, getDefaultSaveUri, loadCurrentFlow, loadMindFlowFile, pickMindFlowFile, rememberRecentFlow, rememberUntitledFlow, resolveInputFlowPath, showError, type FlowUriArgument } from "../flowContext";
 
 export async function newFlow(): Promise<void> {

@@ -1,4 +1,4 @@
-import { APP_SURFACE_TYPES, EDGE_TYPES, ENTITY_STATUSES, FLOW_ENDPOINT_KINDS } from "../models/productFlow";
+import { APP_SURFACE_TYPES, EDGE_TYPES, ENTITY_STATUSES, FLOW_ENDPOINT_KINDS } from "../domain/product-flow";
 
 export interface McpToolDefinition {
   name: string;

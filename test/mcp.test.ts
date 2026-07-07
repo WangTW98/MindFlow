@@ -6,6 +6,8 @@ import type { ProductFlow } from "../src/models/productFlow";
 import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../src/mcp/bridge";
 import { MINDFLOW_OPERATIONS_REFERENCE } from "../src/mcp/operationsReference";
 import { MindFlowMcpToolHandlers } from "../src/mcp/tools";
+import { listMcpToolRegistryNames } from "../src/mcp/tools/registry";
+import { MINDFLOW_MCP_TOOLS } from "../src/mcp/toolSchemas";
 import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/core/editorSelection";
 
 test("MindFlow MCP tools are operation-only and omit removed generation workflow", () => {
@@ -20,6 +22,18 @@ test("MindFlow MCP tools are operation-only and omit removed generation workflow
   assert.equal(removedPhrases.test(text), false);
   assert.ok(MINDFLOW_OPERATIONS_REFERENCE.includes("MCP tools never write .mindflow files directly"));
   assert.equal(removedPhrases.test(MINDFLOW_OPERATIONS_REFERENCE), false);
+});
+
+test("MindFlow MCP tool schema names match registered handlers", () => {
+  const schemaNames = MINDFLOW_MCP_TOOLS.map((tool) => tool.name).sort();
+  const registryNames = listMcpToolRegistryNames();
+
+  for (const name of schemaNames) {
+    assert.ok(registryNames.includes(name), `${name} must have a registered handler`);
+  }
+  for (const alias of ["mindflow_get_active_flow", "mindflow_get_open_flows", "mindflow_update_project", "mindflow_upsert_node"]) {
+    assert.ok(registryNames.includes(alias), `${alias} compatibility alias must remain registered`);
+  }
 });
 
 test("MindFlow MCP editor state returns complete selection and hydrated selected entities", async () => {

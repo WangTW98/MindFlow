@@ -2,10 +2,10 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
-import { FLOW_CLIENT_SOURCE_FILES } from "../src/webview/client/manifest.mjs";
+import { FLOW_CLIENT_SOURCE_FILES } from "../src/webview/canvas/manifest.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const clientRoot = path.join(root, "src", "webview", "client");
+const clientRoot = path.join(root, "src", "webview", "canvas");
 const outputDir = path.join(root, "src", "webview", "media", "dist");
 const tempDir = path.join(root, "out", ".webview");
 const tempInput = path.join(tempDir, "flowEditor.input.js");

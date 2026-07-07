@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
-import type { ProductFlow } from "../../../models/productFlow";
-import { FlowPanel } from "../../../webview/FlowPanel";
+import type { ProductFlow } from "../../../domain/product-flow";
 import { editCurrentFlowDocument, showError, type FlowUriArgument } from "../../flowContext";
-import type { FlowSelectionPatch } from "../../../core/editorSelection";
-import { applyFlowOperation, type FlowOperation, type FlowOperationResult } from "../../../core/flowOperations";
+import { FlowPanel } from "../../webviews/canvas/FlowPanel";
+import type { FlowSelectionPatch } from "../../../domain/selection";
+import { applyFlowOperation, type FlowOperation, type FlowOperationResult } from "../../../domain/operations";
 
 export interface CanvasEditOptions<TResult> {
   sourceUri?: FlowUriArgument;

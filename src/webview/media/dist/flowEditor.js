@@ -91,10 +91,6 @@
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value));
     }
-    const vscode = acquireVsCodeApi();
-    const state = window.__MINDFLOW_STATE__;
-    const app = requireElementById("app");
-    const persisted = vscode.getState() || {};
     const CARD_WIDTH = 300;
     const CARD_MIN_HEIGHT = 230;
     const PROJECT_OVERVIEW_NODE_ID = "projectOverview";
@@ -161,6 +157,13 @@
     const APP_SURFACE_SOURCE_X = -360;
     const APP_SURFACE_SOURCE_Y = 0;
     const APP_SURFACE_SOURCE_GAP = 240;
+    const vscode = acquireVsCodeApi();
+    const state = window.__MINDFLOW_STATE__;
+    const app = requireElementById("app");
+    const persisted = vscode.getState() || {};
+    window.addEventListener("message", (event) => {
+      handleHostMessage(event.data);
+    });
     let selectedNodeIds = readIdSelection(persisted.selectedNodeIds || state.selectedNodeIds, state.selectedNodeId || persisted.selectedNodeId);
     let selectedNodeId = selectedNodeIds.includes(persisted.selectedNodeId) ? persisted.selectedNodeId : selectedNodeIds.includes(state.selectedNodeId) ? state.selectedNodeId : selectedNodeIds[0] || state.selectedNodeId || persisted.selectedNodeId || "";
     if (selectedNodeIds.length === 0 && selectedNodeId) {
@@ -215,9 +218,6 @@
     let projectOverviewPosition = null;
     let commandStatus = readCommandStatus(persisted.commandStatus);
     let commandStatusTimer = null;
-    window.addEventListener("message", (event) => {
-      handleHostMessage(event.data);
-    });
     function postWebviewMessage(message) {
       vscode.postMessage(message);
     }
@@ -1149,7 +1149,7 @@
             <div class="nodes-toolbar-title">
               <h2 class="nodes-root-title" title="${escapeAttr(sidebarTitle)}">${escapeHtml(sidebarTitle)}</h2>
             </div>
-            <small class="nodes-count" aria-label="\u8282\u70B9\u6570\u91CF: ${activeNodes.length}">\u8282\u70B9\u6570\u91CF: ${activeNodes.length}</small>
+            <small class="nodes-count" aria-label="\u8282\u70B9: ${activeNodes.length}">\u8282\u70B9: ${activeNodes.length}</small>
           </header>
           <div class="node-search">
             <input id="nodeSearch" value="${escapeAttr(nodeSearch)}" placeholder="\u5FEB\u901F\u68C0\u7D22\u8282\u70B9\u5361\u7247">
@@ -3383,25 +3383,6 @@
         return true;
       });
     }
-    function readPendingEdgeDetailsSaves(value) {
-      if (!Array.isArray(value)) {
-        return [];
-      }
-      const now = Date.now();
-      return value.filter(
-        (entry) => entry && typeof entry.edgeId === "string" && isUsableEdgeDetailsPatch(entry.patch) && Number.isFinite(Number(entry.savedAt)) && now - Number(entry.savedAt) <= PENDING_EDGE_DETAILS_TTL_MS
-      ).map((entry) => ({
-        edgeId: entry.edgeId,
-        revision: Number(entry.revision) || 0,
-        savedAt: Number(entry.savedAt),
-        patch: entry.patch
-      }));
-    }
-    function isUsableEdgeDetailsPatch(patch) {
-      return Boolean(
-        patch && patch.from && patch.to && typeof patch.from.kind === "string" && typeof patch.from.nodeId === "string" && typeof patch.to.kind === "string" && typeof patch.to.nodeId === "string" && typeof patch.trigger === "string" && typeof patch.type === "string" && typeof patch.condition === "string"
-      );
-    }
     function edgeDetailsPatchMatches(edge, patch) {
       const from = edge.from || { kind: "node", nodeId: edge.fromNodeId };
       const to = edge.to || { kind: "node", nodeId: edge.toNodeId };
@@ -4383,44 +4364,6 @@
     function collectTagMultiSelect(id) {
       return Array.from(document.querySelectorAll(`#${cssEscape(id)} input[type="checkbox"]:checked`)).map((input) => input.value);
     }
-    function readIdSelection(value, legacyValue) {
-      if (Array.isArray(value)) {
-        return uniqueStringIds(value);
-      }
-      return typeof legacyValue === "string" && legacyValue.trim() ? [legacyValue.trim()] : [];
-    }
-    function uniqueStringIds(value) {
-      return Array.from(new Set((value || []).filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim())));
-    }
-    function readTaxonomySelection(value) {
-      return {
-        appSurface: typeof value?.appSurface === "string" ? value.appSurface : "",
-        domain: typeof value?.domain === "string" ? value.domain : "",
-        role: typeof value?.role === "string" ? value.role : "",
-        statusGroup: typeof value?.statusGroup === "string" ? value.statusGroup : ""
-      };
-    }
-    function readTaxonomyPanelsOpen() {
-      const value = persisted.taxonomyPanelsOpen || {};
-      return {
-        appSurface: value.appSurface === true,
-        domain: value.domain === true,
-        role: value.role === true,
-        statusGroup: value.statusGroup === true
-      };
-    }
-    function readInspectorScrollState(value) {
-      if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return {};
-      }
-      return Object.entries(value).reduce((result, [key, scrollTop]) => {
-        const normalized = Number(scrollTop);
-        if (typeof key === "string" && key && Number.isFinite(normalized) && normalized >= 0) {
-          result[key] = Math.round(normalized);
-        }
-        return result;
-      }, {});
-    }
     function inspectorScrollKey(kind, id) {
       return `${kind}:${id || ""}`;
     }
@@ -4522,23 +4465,6 @@
       appSurfacePositions.clear();
       projectOverviewPosition = null;
     }
-    function readCommandStatus(value) {
-      if (!value || value.kind !== "ok" && value.kind !== "error" || typeof value.message !== "string") {
-        return null;
-      }
-      const at = Number(value.at);
-      if (!Number.isFinite(at)) {
-        return null;
-      }
-      if (value.kind === "ok" && Date.now() - at > 3e3) {
-        return null;
-      }
-      return {
-        kind: value.kind,
-        message: value.message,
-        at
-      };
-    }
     function persistUiState() {
       vscode.setState({
         appFilters,
@@ -4562,9 +4488,6 @@
         inspectorScrollState,
         commandStatus
       });
-    }
-    function clamp(value, min, max) {
-      return Math.min(max, Math.max(min, value));
     }
     function cssEscape(value) {
       if (window.CSS && typeof window.CSS.escape === "function") {

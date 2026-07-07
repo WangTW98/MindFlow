@@ -1,4 +1,4 @@
-import type { FlowEdge, FlowEndpoint, PageNode, ProductFlow } from "../models/productFlow";
+import type { FlowEdge, FlowEndpoint, PageNode, ProductFlow } from "../domain/product-flow";
 import { nowIso } from "../utils/id";
 
 const NODE_START_X = 0;

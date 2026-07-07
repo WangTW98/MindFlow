@@ -4,4 +4,4 @@ export {
   normalizeFlowSelection,
   type FlowSelectionPatch,
   type FlowSelectionState
-} from "../core/editorSelection";
+} from "../domain/selection";

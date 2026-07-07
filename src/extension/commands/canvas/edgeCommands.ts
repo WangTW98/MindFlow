@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import type { EdgeType, FlowEndpoint } from "../../../models/productFlow";
-import type { UpdateEdgeDetailsInput } from "../../../core/flowOperations";
+import type { EdgeType, FlowEndpoint } from "../../../domain/product-flow";
+import type { UpdateEdgeDetailsInput } from "../../../domain/operations";
 import { isPlainObject } from "../guards";
 import type { FlowUriArgument } from "../../flowContext";
 import { applyCanvasEdit, selectAndRevealFlow } from "./editSession";

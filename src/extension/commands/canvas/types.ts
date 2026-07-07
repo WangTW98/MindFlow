@@ -1,1 +1,1 @@
-export type { CreateConnectedNodeOperationInput as CreateConnectedNodeRequest } from "../../../core/flowOperations";
+export type { CreateConnectedNodeOperationInput as CreateConnectedNodeRequest } from "../../../domain/operations";
