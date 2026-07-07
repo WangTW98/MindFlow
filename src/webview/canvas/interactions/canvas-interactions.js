@@ -3,7 +3,7 @@ function handleContextMenu(event) {
   if (!canvas || !canvas.contains(event.target)) {
     return;
   }
-  if (event.target.closest(".project-overview-card") || event.target.closest(".node-card") || event.target.closest(".app-surface-card") || event.target.closest("[data-edge-id]")) {
+  if (event.target.closest(".project-overview-card") || event.target.closest(".node-card") || event.target.closest(".app-surface-card") || event.target.closest(".selection-relations-panel") || event.target.closest("[data-edge-id]")) {
     return;
   }
   event.preventDefault();
@@ -29,6 +29,7 @@ function handleCanvasClick(event) {
     event.target.closest(".project-overview-card") ||
     event.target.closest(".app-surface-card") ||
     event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") ||
+    event.target.closest(".selection-relations-panel") ||
     event.target.closest("[data-edge-id]") ||
     event.target.closest("button, input, textarea, select") ||
     connectionDrag

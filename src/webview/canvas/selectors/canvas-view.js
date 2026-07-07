@@ -3,6 +3,7 @@ function refreshCanvasAndNodeList() {
   seedProjectOverviewPosition(flow);
   seedNodePositions(flow);
   seedAppSurfacePositions(flow);
+  autoLayoutApplyPreviewState(flow);
   normalizeFilters();
   const activeNodes = flow.nodes.filter((node) => node.status !== "removed");
   const visibleListNodes = activeNodes.filter((node) => matchesNodeSearch(flow, node, nodeSearch));
@@ -21,6 +22,7 @@ function refreshCanvasAndNodeList() {
       bindCanvasElements(nodeList);
     }
     positionCards();
+    refreshSelectionRelationsPanel();
     scheduleDrawEdges();
   }
 }
@@ -47,7 +49,7 @@ function selectNode(nodeId, center, options = {}) {
   requestAnimationFrame(() => {
     focusCanvas();
     if (center && selectedNodeIds.includes(nodeId)) {
-      centerNode(nodeId);
+      centerCard("node", nodeId);
     }
   });
 }
@@ -165,10 +167,10 @@ function focusCanvas() {
   document.getElementById("canvas")?.focus({ preventScroll: true });
 }
 
-function centerNode(nodeId) {
+function centerCard(kind, id) {
   const canvas = document.getElementById("canvas");
-  const card = document.querySelector(`.node-card[data-node-id="${cssEscape(nodeId)}"]`);
-  const pos = nodePositions.get(nodeId);
+  const card = getCardElement(kind, id);
+  const pos = getCardPosition(kind, id);
   if (!canvas || !card || !pos) {
     return;
   }
@@ -176,4 +178,18 @@ function centerNode(nodeId) {
   camera.y = canvas.clientHeight / 2 - (pos.y + card.offsetHeight / 2) * zoom;
   applyCamera();
   scheduleDrawEdges();
+}
+
+function centerNode(nodeId) {
+  centerCard("node", nodeId);
+}
+
+function getCardElement(kind, id) {
+  if (kind === "projectOverview") {
+    return document.querySelector(".project-overview-card");
+  }
+  if (kind === "appSurface") {
+    return document.querySelector(`.app-surface-card[data-app-surface-id="${cssEscape(id)}"]`);
+  }
+  return document.querySelector(`.node-card[data-node-id="${cssEscape(id)}"]`);
 }

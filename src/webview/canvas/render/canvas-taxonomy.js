@@ -5,6 +5,7 @@ function renderFloatingTaxonomyControls() {
   return `
     <div class="floating-taxonomy-controls" aria-label="应用端、业务域、角色、状态组面板">
       ${renderIconButton(panelButtonId, panelButtonLabel, panelButtonIcon, "floating-icon")}
+      ${renderIconButton("autoLayoutCanvas", "自动排版", "layout-dashboard", "floating-icon")}
       ${renderTaxonomyToggleButton("appSurface", "应用端", "monitor-smartphone")}
       ${renderTaxonomyToggleButton("domain", "业务域", "network")}
       ${renderTaxonomyToggleButton("role", "角色", "users")}

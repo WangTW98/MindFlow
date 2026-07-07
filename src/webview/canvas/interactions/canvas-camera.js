@@ -89,7 +89,7 @@ function applyCamera() {
 }
 
 function shouldLetPanelHandleWheel(target) {
-  return Boolean(target?.closest?.(".floating-taxonomy-controls, .floating-taxonomy-panels"));
+  return Boolean(target?.closest?.(".floating-taxonomy-controls, .floating-taxonomy-panels, .selection-relations-panel"));
 }
 
 function handleWheel(event) {

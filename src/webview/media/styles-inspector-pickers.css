@@ -4,6 +4,8 @@
 .status-group-field {
   display: grid;
   gap: 5px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .edge-type-picker,
@@ -13,6 +15,8 @@
   position: relative;
   display: grid;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .edge-type-trigger,
@@ -28,6 +32,8 @@
   align-items: start;
   gap: 8px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 42px;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -78,6 +84,8 @@
   z-index: 9;
   display: none;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
   max-height: 280px;
   overflow: auto;
   border: 1px solid var(--border);
@@ -134,6 +142,7 @@
 .edge-type-copy small {
   line-height: 1.35;
   white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .page-type-trigger,
@@ -229,6 +238,8 @@
 .endpoint-picker {
   display: grid;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .inspector .endpoint-picker {
@@ -239,6 +250,8 @@
   position: relative;
   display: grid;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
   margin-top: 5px;
 }
 
@@ -248,7 +261,11 @@
 }
 
 .endpoint-combobox-input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding-right: 26px;
+  text-overflow: ellipsis;
 }
 
 .endpoint-menu {
@@ -258,6 +275,8 @@
   right: 0;
   z-index: 8;
   display: none;
+  min-width: 0;
+  max-width: 100%;
   max-height: 260px;
   overflow: auto;
   border: 1px solid var(--border);
@@ -276,6 +295,8 @@
 .endpoint-cascade-group {
   display: grid;
   gap: 2px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .endpoint-cascade-node[hidden],
@@ -291,14 +312,18 @@
 .endpoint-cascade-children {
   display: grid;
   gap: 2px;
-  margin-left: 10px;
-  padding-left: 8px;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: 6px;
+  padding-left: 6px;
   border-left: 1px solid color-mix(in srgb, var(--border), transparent 18%);
 }
 
 .endpoint-option {
   display: flex;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 26px;
   align-items: center;
   justify-content: flex-start;
@@ -307,6 +332,7 @@
   color: var(--fg);
   text-align: left;
   padding: 4px 7px;
+  overflow-wrap: anywhere;
 }
 
 .inspector .endpoint-option {

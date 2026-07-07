@@ -3,6 +3,7 @@ function render() {
   seedProjectOverviewPosition(flow);
   seedNodePositions(flow);
   seedAppSurfacePositions(flow);
+  autoLayoutApplyPreviewState(flow);
   normalizeFilters();
 
   const activeNodes = flow.nodes.filter((node) => node.status !== "removed");
@@ -45,6 +46,7 @@ function render() {
           ${renderAppSurfaceSourceCards(flow)}
           ${activeNodes.map((node) => renderNodeCard(flow, node)).join("")}
         </div>
+        ${renderSelectionRelationsPanel(flow, selectedNode, selectedEdge)}
         <div class="zoom-pill">${Math.round(zoom * 100)}%</div>
         ${renderCommandStatus()}
       </section>

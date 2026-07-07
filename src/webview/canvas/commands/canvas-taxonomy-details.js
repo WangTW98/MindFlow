@@ -303,6 +303,7 @@ function refreshAppSurfaceViews() {
     applyStatusGroupColorSwatches(world);
     bindCanvasElements(world);
     positionCards();
+    refreshSelectionRelationsPanel();
     scheduleDrawEdges();
   }
 }

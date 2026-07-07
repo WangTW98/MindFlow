@@ -52,6 +52,7 @@ let edgeDetailsSaveTimer = null;
 let edgeDetailsSaveRevision = 0;
 let pendingEdgeDetailsSaves = readPendingEdgeDetailsSaves(persisted.pendingEdgeDetailsSaves);
 let inspectorScrollState = readInspectorScrollState(persisted.inspectorScrollState);
+let autoLayoutPreviewState = autoLayoutNormalizePersistedPreviewState(persisted.autoLayoutPreviewState);
 let framePending = false;
 const nodePositions = new Map();
 const appSurfacePositions = new Map();

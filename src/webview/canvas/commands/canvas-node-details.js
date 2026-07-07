@@ -112,6 +112,7 @@ function refreshProjectOverviewViews() {
       card.replaceWith(nextCard);
       bindCanvasElements(nextCard);
       positionCards();
+      refreshSelectionRelationsPanel();
       scheduleDrawEdges();
     }
   }

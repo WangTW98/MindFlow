@@ -90,6 +90,348 @@ test("Webview endpoint codec falls back when encoded values are malformed", asyn
   assert.deepEqual(parseEndpointValue("", undefined), { kind: "projectOverview", nodeId: "projectOverview" });
 });
 
+test("Selection relation panel resolves feature endpoints to owning node cards", async () => {
+  const { getSelectionRelationGroups } = await loadSelectionRelationHelpers();
+  const flow = createEmptyProductFlow("关系列表功能项端点测试");
+  const source = createManualNode(flow, {
+    title: "来源节点卡片",
+    featureGroups: [{
+      groupId: "group_actions",
+      name: "操作区",
+      type: "section",
+      description: "主要操作。",
+      items: [{ itemId: "item_submit", name: "提交按钮", type: "button", description: "提交。" }]
+    }]
+  });
+  const target = createManualNode(flow, { title: "目标节点卡片" });
+  const edge = createManualEdge(flow, {
+    from: { kind: "featureItem", nodeId: source.nodeId, groupId: "group_actions", itemId: "item_submit" },
+    to: { kind: "node", nodeId: target.nodeId },
+    trigger: "提交",
+    type: "interaction"
+  });
+
+  const groups = getSelectionRelationGroups(flow, null, edge);
+
+  assert.deepEqual(groups?.from, [{ kind: "node", id: source.nodeId, title: "来源节点卡片" }]);
+  assert.deepEqual(groups?.to, [{ kind: "node", id: target.nodeId, title: "目标节点卡片" }]);
+});
+
+test("Selection relation panel shows app surface card titles for entry edges", async () => {
+  const { getSelectionRelationGroups } = await loadSelectionRelationHelpers();
+  const flow = createEmptyProductFlow("关系列表应用端入口测试");
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "后台。",
+    domainIds: [],
+    roleIds: []
+  }];
+  const target = createManualNode(flow, { title: "后台工作台", appSurfaceIds: ["app_admin"] });
+  const edge = createManualEdge(flow, {
+    from: { kind: "appSurface", nodeId: "app_admin", appId: "app_admin" },
+    to: { kind: "node", nodeId: target.nodeId },
+    trigger: "进入后台",
+    type: "interaction"
+  });
+
+  const groups = getSelectionRelationGroups(flow, null, edge);
+
+  assert.deepEqual(groups?.from, [{ kind: "appSurface", id: "app_admin", title: "管理后台" }]);
+  assert.deepEqual(groups?.to, [{ kind: "node", id: target.nodeId, title: "后台工作台" }]);
+});
+
+test("Selection relation panel filters removed relations and deduplicates node cards", async () => {
+  const { getSelectionRelationGroups } = await loadSelectionRelationHelpers();
+  const flow = createEmptyProductFlow("关系列表单节点测试");
+  const selected = createManualNode(flow, { title: "当前节点" });
+  const source = createManualNode(flow, { title: "来源节点" });
+  const duplicateSource = createManualNode(flow, { title: "重复来源节点" });
+  const target = createManualNode(flow, { title: "目标节点" });
+  const removedSource = createManualNode(flow, { title: "已移除来源" });
+  const removedTarget = createManualNode(flow, { title: "已移除目标" });
+
+  createManualEdge(flow, { from: { kind: "node", nodeId: source.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "来源一", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: source.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "来源重复", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: duplicateSource.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "第二来源", type: "interaction" }).status = "removed";
+  createManualEdge(flow, { from: { kind: "node", nodeId: removedSource.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "已移除来源", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: selected.nodeId }, to: { kind: "node", nodeId: target.nodeId }, trigger: "目标一", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "featureGroup", nodeId: selected.nodeId, groupId: selected.featureGroups![0]!.groupId }, to: { kind: "node", nodeId: target.nodeId }, trigger: "目标重复", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: selected.nodeId }, to: { kind: "node", nodeId: removedTarget.nodeId }, trigger: "已移除目标", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: selected.nodeId }, to: { kind: "node", nodeId: duplicateSource.nodeId }, trigger: "已移除出边", type: "interaction" }).status = "removed";
+  removedSource.status = "removed";
+  removedTarget.status = "removed";
+
+  const groups = getSelectionRelationGroups(flow, selected, null);
+
+  assert.deepEqual(groups?.from, [{ kind: "node", id: source.nodeId, title: "来源节点" }]);
+  assert.deepEqual(groups?.to, [{ kind: "node", id: target.nodeId, title: "目标节点" }]);
+});
+
+test("Canvas auto layout previews hierarchy, lanes, spacing, and collision-free positions", async () => {
+  const { autoLayoutComputePreview, autoLayoutEstimateLabelWidth } = await loadAutoLayoutHelpers();
+  const flow = createEmptyProductFlow("自动排版测试");
+  flow.appSurfaces = [
+    {
+      appId: "app_admin",
+      name: "管理后台",
+      type: "admin",
+      description: "后台",
+      domainIds: [],
+      roleIds: []
+    },
+    {
+      appId: "app_supplier",
+      name: "供应商端",
+      type: "web",
+      description: "供应商门户",
+      domainIds: [],
+      roleIds: []
+    }
+  ];
+  const skeleton = createManualNode(flow, { title: "后台骨架", pageType: "skeleton", appSurfaceIds: ["app_admin"] });
+  const navigation = createManualNode(flow, { title: "后台导航", pageType: "navigation", appSurfaceIds: ["app_admin"] });
+  const pageA = createManualNode(flow, { title: "采购列表", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const pageB = createManualNode(flow, { title: "采购详情", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const popup = createManualNode(flow, { title: "确认弹窗", pageType: "popup", appSurfaceIds: ["app_admin"] });
+  const component = createManualNode(flow, { title: "报价组件", pageType: "component", appSurfaceIds: ["app_supplier", "app_admin"] });
+  const shared = createManualNode(flow, { title: "共享未知节点", pageType: "unknown", appSurfaceIds: [] });
+  const longTrigger = "这是一个非常长的连线标题用于验证自动排版会保留足够横向展示空间";
+  createManualEdge(flow, { from: { kind: "node", nodeId: skeleton.nodeId }, to: { kind: "node", nodeId: navigation.nodeId }, trigger: "进入导航", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: navigation.nodeId }, to: { kind: "node", nodeId: pageA.nodeId }, trigger: longTrigger, type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: pageA.nodeId }, to: { kind: "node", nodeId: popup.nodeId }, trigger: "打开确认", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: pageA.nodeId }, to: { kind: "node", nodeId: pageB.nodeId }, trigger: "查看详情", type: "interaction" });
+
+  const layout = autoLayoutComputePreview(flow);
+
+  assert.ok(layout.projectOverviewPosition.x < layout.appSurfacePositions.app_admin!.x);
+  assert.ok(layout.appSurfacePositions.app_admin!.x < layout.nodePositions[skeleton.nodeId]!.x);
+  assert.ok(layout.nodePositions[skeleton.nodeId]!.x < layout.nodePositions[navigation.nodeId]!.x);
+  assert.ok(layout.nodePositions[navigation.nodeId]!.x < layout.nodePositions[pageA.nodeId]!.x);
+  assert.ok(layout.nodePositions[pageA.nodeId]!.x < layout.nodePositions[popup.nodeId]!.x);
+  assert.equal(layout.nodePositions[component.nodeId]!.x, layout.nodePositions[popup.nodeId]!.x);
+  assert.equal(layout.nodePositions[shared.nodeId]!.x, layout.nodePositions[pageA.nodeId]!.x);
+  assert.ok(layout.nodePositions[pageB.nodeId]!.x > layout.nodePositions[pageA.nodeId]!.x);
+  assert.equal(layout.nodeLaneIds[component.nodeId], "app_supplier");
+  assert.equal(layout.nodeLaneIds[shared.nodeId], "__shared");
+  assert.ok(Math.abs(layout.nodePositions[pageA.nodeId]!.y - layout.nodePositions[pageB.nodeId]!.y) >= 340);
+  assert.ok(Math.abs(layout.appSurfacePositions.app_admin!.y - layout.appSurfacePositions.app_supplier!.y) >= 340);
+  assert.ok(layout.columnGap >= 340 + autoLayoutEstimateLabelWidth(longTrigger) + 96);
+  assertNoAutoLayoutOverlap(layout.items);
+});
+
+test("Canvas auto layout handles cyclic same-lane flows with stable ordering", async () => {
+  const { autoLayoutComputePreview } = await loadAutoLayoutHelpers();
+  const flow = createEmptyProductFlow("环形流程自动排版测试");
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "后台",
+    domainIds: [],
+    roleIds: []
+  }];
+  const first = createManualNode(flow, { title: "A 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const second = createManualNode(flow, { title: "B 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const third = createManualNode(flow, { title: "C 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  createManualEdge(flow, { from: { kind: "node", nodeId: first.nodeId }, to: { kind: "node", nodeId: second.nodeId }, trigger: "A 到 B", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: second.nodeId }, to: { kind: "node", nodeId: third.nodeId }, trigger: "B 到 C", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: third.nodeId }, to: { kind: "node", nodeId: first.nodeId }, trigger: "C 到 A", type: "interaction" });
+
+  const layout = autoLayoutComputePreview(flow);
+
+  assert.ok(layout.nodePositions[first.nodeId]!.y < layout.nodePositions[second.nodeId]!.y);
+  assert.ok(layout.nodePositions[second.nodeId]!.y < layout.nodePositions[third.nodeId]!.y);
+  assertNoAutoLayoutOverlap(layout.items);
+});
+
+test("Canvas auto layout splits crowded same-level nodes using measured card heights", async () => {
+  const { autoLayoutComputePreview, autoLayoutEstimateLabelWidth } = await loadAutoLayoutHelpers();
+  const flow = createEmptyProductFlow("密集同级节点自动排版测试");
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "后台",
+    domainIds: [],
+    roleIds: []
+  }];
+  const pages = Array.from({ length: 32 }, (_, index) => createManualNode(flow, {
+    title: `页面 ${index + 1}`,
+    pageType: "page",
+    appSurfaceIds: ["app_admin"]
+  }));
+  const popup = createManualNode(flow, { title: "密集节点确认弹窗", pageType: "popup", appSurfaceIds: ["app_admin"] });
+  const longTrigger = "这是一个非常长的跨层连线标题，用于验证分栏后的页面层不会挤入弹窗组件层";
+  createManualEdge(flow, {
+    from: { kind: "node", nodeId: pages[0]!.nodeId },
+    to: { kind: "node", nodeId: popup.nodeId },
+    trigger: longTrigger,
+    type: "interaction"
+  });
+  const measurements = {
+    projectOverview: { width: 360, height: 300 },
+    appSurfaces: {
+      app_admin: { width: 320, height: 190 }
+    },
+    nodes: Object.fromEntries([
+      ...pages.map((node) => [node.nodeId, { width: 320, height: 420 }]),
+      [popup.nodeId, { width: 320, height: 360 }]
+    ])
+  };
+
+  const layout = autoLayoutComputePreview(flow, measurements);
+  const pageItems = layout.items.filter((item) => item.kind === "node" && item.layer === 4);
+  const popupItem = layout.items.find((item) => item.id === popup.nodeId);
+  assert.equal(pageItems.length, pages.length);
+  assert.ok(popupItem);
+  assertNoAutoLayoutOverlap(layout.items);
+  assert.ok(Math.max(...pageItems.map((item) => item.x)) - Math.min(...pageItems.map((item) => item.x)) >= 320 + 160);
+  const firstColumnItems = pageItems.filter((item) => item.x - Math.min(...pageItems.map((page) => page.x)) < 100).sort((left, right) => left.y - right.y);
+  for (let index = 1; index < firstColumnItems.length; index += 1) {
+    assert.ok(firstColumnItems[index]!.y - firstColumnItems[index - 1]!.y >= 420 + 110);
+  }
+  const pageRight = Math.max(...pageItems.map((item) => item.x + item.width));
+  assert.ok(popupItem.x - pageRight >= autoLayoutEstimateLabelWidth(longTrigger) + 90);
+});
+
+test("Canvas auto layout preview state restores, invalidates, and updates dragged positions", async () => {
+  const {
+    autoLayoutComputePreview,
+    autoLayoutCreatePreviewState,
+    autoLayoutPreviewPositionsForFlow,
+    autoLayoutPreviewStateWithPosition
+  } = await loadAutoLayoutHelpers();
+  const flow = createEmptyProductFlow("自动排版预览状态测试");
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "后台",
+    domainIds: [],
+    roleIds: []
+  }];
+  const page = createManualNode(flow, { title: "页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const layout = autoLayoutComputePreview(flow);
+  const previewState = autoLayoutCreatePreviewState(flow, layout);
+
+  const restored = autoLayoutPreviewPositionsForFlow(flow, previewState);
+  assert.deepEqual(restored?.nodePositions[page.nodeId], layout.nodePositions[page.nodeId]);
+
+  const movedState = autoLayoutPreviewStateWithPosition(previewState, "node", page.nodeId, { x: 1234.4, y: 567.6 });
+  const restoredAfterDrag = autoLayoutPreviewPositionsForFlow(flow, movedState);
+  assert.deepEqual(restoredAfterDrag?.nodePositions[page.nodeId], { x: 1234, y: 568 });
+
+  createManualNode(flow, { title: "新增节点", pageType: "page", appSurfaceIds: ["app_admin"] });
+  assert.equal(autoLayoutPreviewPositionsForFlow(flow, movedState), null);
+});
+
+test("Canvas auto layout keeps preview state and recomputes order after edge endpoints change", async () => {
+  const {
+    autoLayoutComputePreview,
+    autoLayoutCreatePreviewState,
+    autoLayoutPreviewPositionsForFlow
+  } = await loadAutoLayoutHelpers();
+  const flow = createEmptyProductFlow("自动排版连线调整测试");
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "后台",
+    domainIds: [],
+    roleIds: []
+  }];
+  const first = createManualNode(flow, { title: "A 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const second = createManualNode(flow, { title: "B 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const edge = createManualEdge(flow, {
+    from: { kind: "node", nodeId: first.nodeId },
+    to: { kind: "node", nodeId: second.nodeId },
+    trigger: "A 到 B",
+    type: "interaction"
+  });
+  const initialLayout = autoLayoutComputePreview(flow);
+  const previewState = autoLayoutCreatePreviewState(flow, initialLayout);
+
+  updateManualEdgeDetails(flow, edge.edgeId, {
+    from: { kind: "node", nodeId: second.nodeId },
+    to: { kind: "node", nodeId: first.nodeId }
+  });
+  const restored = autoLayoutPreviewPositionsForFlow(flow, previewState);
+  const layout = autoLayoutComputePreview(flow);
+
+  assert.deepEqual(restored?.nodePositions[first.nodeId], initialLayout.nodePositions[first.nodeId]);
+  assert.deepEqual(restored?.nodePositions[second.nodeId], initialLayout.nodePositions[second.nodeId]);
+  assert.ok(layout.nodePositions[second.nodeId]!.y < layout.nodePositions[first.nodeId]!.y);
+  assertNoAutoLayoutOverlap(layout.items);
+});
+
+test("Canvas auto layout breaks cycles by preserving higher-priority edge types", async () => {
+  const { autoLayoutComputePreview } = await loadAutoLayoutHelpers();
+  const flow = createEmptyProductFlow("自动排版连线优先级测试");
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "后台",
+    domainIds: [],
+    roleIds: []
+  }];
+  const first = createManualNode(flow, { title: "A 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const second = createManualNode(flow, { title: "B 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  createManualEdge(flow, {
+    from: { kind: "node", nodeId: first.nodeId },
+    to: { kind: "node", nodeId: second.nodeId },
+    trigger: "数据同步",
+    type: "dataFlow"
+  });
+  createManualEdge(flow, {
+    from: { kind: "node", nodeId: second.nodeId },
+    to: { kind: "node", nodeId: first.nodeId },
+    trigger: "嵌套结构",
+    type: "nestedRelation"
+  });
+
+  const layout = autoLayoutComputePreview(flow);
+
+  assert.ok(layout.nodePositions[second.nodeId]!.y < layout.nodePositions[first.nodeId]!.y);
+  assertNoAutoLayoutOverlap(layout.items);
+});
+
+test("Canvas auto layout aligns detail nodes to highest-priority incoming parent", async () => {
+  const { autoLayoutComputePreview } = await loadAutoLayoutHelpers();
+  const flow = createEmptyProductFlow("自动排版详情节点父级测试");
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "后台",
+    domainIds: [],
+    roleIds: []
+  }];
+  const dataParent = createManualNode(flow, { title: "数据父页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const nestedParent = createManualNode(flow, { title: "嵌套父页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const detail = createManualNode(flow, { title: "确认弹窗", pageType: "popup", appSurfaceIds: ["app_admin"] });
+  createManualEdge(flow, {
+    from: { kind: "node", nodeId: dataParent.nodeId },
+    to: { kind: "node", nodeId: detail.nodeId },
+    trigger: "数据同步",
+    type: "dataFlow"
+  });
+  createManualEdge(flow, {
+    from: { kind: "node", nodeId: nestedParent.nodeId },
+    to: { kind: "node", nodeId: detail.nodeId },
+    trigger: "打开弹窗",
+    type: "nestedRelation"
+  });
+
+  const layout = autoLayoutComputePreview(flow);
+
+  assert.ok(layout.nodePositions[dataParent.nodeId]!.y !== layout.nodePositions[nestedParent.nodeId]!.y);
+  assert.equal(layout.nodePositions[detail.nodeId]!.y, layout.nodePositions[nestedParent.nodeId]!.y);
+  assertNoAutoLayoutOverlap(layout.items);
+});
+
 test("Webview message parser rejects malformed messages before command dispatch", () => {
   assert.equal(parseWebviewMessage(null), undefined);
   assert.equal(parseWebviewMessage({ type: "saveNodePosition", nodeId: "node_a", x: Number.NaN, y: 20 }), undefined);
@@ -277,6 +619,54 @@ interface EndpointCodecHelpers {
   endpointKey(endpoint: Record<string, unknown>): string;
 }
 
+interface SelectionRelationItem {
+  kind: string;
+  id: string;
+  title: string;
+}
+
+interface SelectionRelationGroups {
+  from: SelectionRelationItem[];
+  to: SelectionRelationItem[];
+}
+
+interface SelectionRelationHelpers {
+  getSelectionRelationGroups(flow: unknown, selectedNode: unknown, selectedEdge: unknown): SelectionRelationGroups | null;
+}
+
+interface AutoLayoutPosition {
+  x: number;
+  y: number;
+}
+
+interface AutoLayoutItem {
+  id: string;
+  kind: string;
+  layer: number;
+  laneId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface AutoLayoutResult {
+  projectOverviewPosition: AutoLayoutPosition;
+  appSurfacePositions: Record<string, AutoLayoutPosition>;
+  nodePositions: Record<string, AutoLayoutPosition>;
+  nodeLaneIds: Record<string, string>;
+  items: AutoLayoutItem[];
+  columnGap: number;
+}
+
+interface AutoLayoutHelpers {
+  autoLayoutComputePreview(flow: unknown, measurements?: unknown): AutoLayoutResult;
+  autoLayoutCreatePreviewState(flow: unknown, layout: AutoLayoutResult): unknown;
+  autoLayoutPreviewPositionsForFlow(flow: unknown, previewState: unknown): AutoLayoutResult | null;
+  autoLayoutPreviewStateWithPosition(previewState: unknown, kind: string, id: string, position: AutoLayoutPosition): unknown;
+  autoLayoutEstimateLabelWidth(value: unknown): number;
+}
+
 async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
   const source = await fs.readFile(
     path.join(process.cwd(), "src", "webview", "canvas", "selectors", "canvas-endpoint-codec.js"),
@@ -288,4 +678,42 @@ async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
     `${source}\nreturn { encodeEndpoint, endpointFromButton, parseEndpointValue, endpointKey };`
   ) as (projectOverviewNodeId: string, getFeatureGroups: (node: unknown) => unknown[]) => EndpointCodecHelpers;
   return factory("projectOverview", () => []);
+}
+
+async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers> {
+  const source = await fs.readFile(
+    path.join(process.cwd(), "src", "webview", "canvas", "render", "canvas-selection-relations.js"),
+    "utf8"
+  );
+  const factory = new Function(
+    "PROJECT_OVERVIEW_NODE_ID",
+    `${source}\nreturn { getSelectionRelationGroups };`
+  ) as (projectOverviewNodeId: string) => SelectionRelationHelpers;
+  return factory("projectOverview");
+}
+
+async function loadAutoLayoutHelpers(): Promise<AutoLayoutHelpers> {
+  const source = await fs.readFile(
+    path.join(process.cwd(), "src", "webview", "canvas", "selectors", "canvas-auto-layout.js"),
+    "utf8"
+  );
+  const factory = new Function(`${source}\nreturn { autoLayoutComputePreview, autoLayoutCreatePreviewState, autoLayoutPreviewPositionsForFlow, autoLayoutPreviewStateWithPosition, autoLayoutEstimateLabelWidth };`) as () => AutoLayoutHelpers;
+  return factory();
+}
+
+function assertNoAutoLayoutOverlap(items: AutoLayoutItem[]): void {
+  const margin = 44;
+  for (let index = 0; index < items.length; index += 1) {
+    const left = items[index];
+    assert.ok(left);
+    for (let otherIndex = index + 1; otherIndex < items.length; otherIndex += 1) {
+      const right = items[otherIndex];
+      assert.ok(right);
+      const overlaps = left.x - margin < right.x + right.width + margin &&
+        left.x + left.width + margin > right.x - margin &&
+        left.y - margin < right.y + right.height + margin &&
+        left.y + left.height + margin > right.y - margin;
+      assert.equal(overlaps, false, `${left.id} should not overlap ${right.id}`);
+    }
+  }
 }

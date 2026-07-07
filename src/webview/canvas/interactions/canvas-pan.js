@@ -6,6 +6,7 @@ function startPan(event) {
     event.target.closest(".node-card") ||
     event.target.closest(".app-surface-card") ||
     event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") ||
+    event.target.closest(".selection-relations-panel") ||
     event.target.closest("button, input, textarea, select") ||
     event.target.closest("[data-edge-id]")
   ) {

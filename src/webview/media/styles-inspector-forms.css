@@ -1,4 +1,6 @@
 .tag-multi-select {
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--input);
@@ -7,6 +9,8 @@
 .tag-multi-select summary {
   display: grid;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
   padding: 5px 6px;
   cursor: pointer;
   color: var(--input-fg);
@@ -16,16 +20,20 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .selected-tag,
 .muted-tag {
   display: inline-flex;
   min-width: 0;
+  max-width: 100%;
   border-radius: 3px;
   padding: 2px 5px;
   font-size: 11px;
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .selected-tag {
@@ -41,6 +49,8 @@
 .tag-options {
   display: grid;
   gap: 3px;
+  min-width: 0;
+  max-width: 100%;
   max-height: 170px;
   overflow: auto;
   padding: 0 6px 6px;
@@ -51,7 +61,13 @@
   align-items: center;
   gap: 5px;
   min-width: 0;
+  max-width: 100%;
   padding: 2px 0;
+}
+
+.details-form .tag-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .tag-option input {

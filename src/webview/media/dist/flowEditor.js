@@ -99,7 +99,7 @@
     const PROJECT_OVERVIEW_DEFAULT_Y = 0;
     const CARD_DRAG_THRESHOLD_PX = 4;
     const CARD_CLICK_SUPPRESS_MS = 100;
-    const MIN_ZOOM = 0.2;
+    const MIN_ZOOM = 0.05;
     const MAX_ZOOM = 2.6;
     const EDGE_TYPE_OPTIONS = [
       {
@@ -212,6 +212,7 @@
     let edgeDetailsSaveRevision = 0;
     let pendingEdgeDetailsSaves = readPendingEdgeDetailsSaves(persisted.pendingEdgeDetailsSaves);
     let inspectorScrollState = readInspectorScrollState(persisted.inspectorScrollState);
+    let autoLayoutPreviewState = autoLayoutNormalizePersistedPreviewState(persisted.autoLayoutPreviewState);
     let framePending = false;
     const nodePositions = /* @__PURE__ */ new Map();
     const appSurfacePositions = /* @__PURE__ */ new Map();
@@ -232,6 +233,7 @@
         globe: '<circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path>',
         "globe-2": '<path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"></path><path d="M7 3.34V5a3 3 0 0 0 3 3 2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17"></path><path d="M11 21.95V18a2 2 0 0 0-2-2 2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"></path><circle cx="12" cy="12" r="10"></circle>',
         "grip-vertical": '<circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle>',
+        "layout-dashboard": '<rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect>',
         "layout-template": '<rect width="18" height="7" x="3" y="3" rx="1"></rect><rect width="9" height="7" x="3" y="14" rx="1"></rect><rect width="5" height="7" x="16" y="14" rx="1"></rect>',
         monitor: '<rect width="20" height="14" x="2" y="3" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path>',
         "monitor-smartphone": '<path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"></path><path d="M10 19v-4"></path><path d="M7 19h5"></path><rect width="6" height="10" x="16" y="12" rx="2"></rect>',
@@ -385,6 +387,7 @@
       return `
     <div class="floating-taxonomy-controls" aria-label="\u5E94\u7528\u7AEF\u3001\u4E1A\u52A1\u57DF\u3001\u89D2\u8272\u3001\u72B6\u6001\u7EC4\u9762\u677F">
       ${renderIconButton(panelButtonId, panelButtonLabel, panelButtonIcon, "floating-icon")}
+      ${renderIconButton("autoLayoutCanvas", "\u81EA\u52A8\u6392\u7248", "layout-dashboard", "floating-icon")}
       ${renderTaxonomyToggleButton("appSurface", "\u5E94\u7528\u7AEF", "monitor-smartphone")}
       ${renderTaxonomyToggleButton("domain", "\u4E1A\u52A1\u57DF", "network")}
       ${renderTaxonomyToggleButton("role", "\u89D2\u8272", "users")}
@@ -1126,11 +1129,196 @@
     </button>
   `;
     }
+    function renderSelectionRelationsPanel(flow, selectedNode, selectedEdge) {
+      const groups = getSelectionRelationGroups(flow, selectedNode, selectedEdge);
+      if (!groups) {
+        return "";
+      }
+      return `
+    <aside class="selection-relations-panel" aria-label="\u9009\u4E2D\u5173\u7CFB">
+      ${renderSelectionRelationGroup("From", groups.from, "\u65E0\u6765\u6E90")}
+      ${renderSelectionRelationGroup("To", groups.to, "\u65E0\u76EE\u6807")}
+    </aside>
+  `;
+    }
+    function renderSelectionRelationGroup(label, items, emptyText) {
+      return `
+    <section class="selection-relations-group">
+      <h3>${escapeHtml(label)}</h3>
+      ${items.length > 0 ? `<ul class="selection-relations-list">${items.map((item) => renderSelectionRelationItem(item)).join("")}</ul>` : `<p class="selection-relations-empty">${escapeHtml(emptyText)}</p>`}
+    </section>
+  `;
+    }
+    function renderSelectionRelationItem(item) {
+      return `
+    <li>
+      <button type="button"
+        class="selection-relation-item"
+        data-relation-card-kind="${escapeAttr(item.kind)}"
+        data-relation-card-id="${escapeAttr(item.id)}"
+        title="${escapeAttr(item.title)}">
+        <span>${escapeHtml(item.title)}</span>
+      </button>
+    </li>
+  `;
+    }
+    function getSelectionRelationGroups(flow, selectedNode, selectedEdge) {
+      if (selectedEdge && selectedEdge.status === "active") {
+        return getSelectionRelationsForEdge(flow, selectedEdge);
+      }
+      if (selectedNode && selectedNode.status !== "removed") {
+        return getSelectionRelationsForNode(flow, selectedNode.nodeId);
+      }
+      return null;
+    }
+    function getSelectionRelationsForEdge(flow, edge) {
+      return {
+        from: uniqueSelectionRelationCards([
+          relationCardFromEndpoint(flow, relationEndpointForEdge(edge, "from"))
+        ]),
+        to: uniqueSelectionRelationCards([
+          relationCardFromEndpoint(flow, relationEndpointForEdge(edge, "to"))
+        ])
+      };
+    }
+    function getSelectionRelationsForNode(flow, nodeId) {
+      const from = [];
+      const to = [];
+      const seenFrom = /* @__PURE__ */ new Set();
+      const seenTo = /* @__PURE__ */ new Set();
+      for (const edge of flow.edges || []) {
+        if (edge.status !== "active") {
+          continue;
+        }
+        const fromEndpoint = relationEndpointForEdge(edge, "from");
+        const toEndpoint = relationEndpointForEdge(edge, "to");
+        if (relationEndpointBelongsToNode(toEndpoint, nodeId)) {
+          appendUniqueSelectionRelationCard(from, seenFrom, relationCardFromEndpoint(flow, fromEndpoint));
+        }
+        if (relationEndpointBelongsToNode(fromEndpoint, nodeId)) {
+          appendUniqueSelectionRelationCard(to, seenTo, relationCardFromEndpoint(flow, toEndpoint));
+        }
+      }
+      return { from, to };
+    }
+    function relationEndpointForEdge(edge, direction) {
+      const endpoint = direction === "from" ? edge.from : edge.to;
+      const fallbackNodeId = direction === "from" ? edge.fromNodeId : edge.toNodeId;
+      return endpoint || { kind: "node", nodeId: fallbackNodeId || "" };
+    }
+    function relationEndpointBelongsToNode(endpoint, nodeId) {
+      return Boolean(endpoint && endpoint.kind !== "projectOverview" && endpoint.kind !== "appSurface" && endpoint.nodeId === nodeId);
+    }
+    function relationCardFromEndpoint(flow, endpoint) {
+      if (!endpoint) {
+        return null;
+      }
+      if (endpoint.kind === "projectOverview") {
+        return {
+          kind: "projectOverview",
+          id: PROJECT_OVERVIEW_NODE_ID,
+          title: relationProjectOverviewTitle(flow)
+        };
+      }
+      if (endpoint.kind === "appSurface") {
+        const appId = relationEndpointEntityId(endpoint);
+        const surface = (flow.appSurfaces || []).find((item) => item.appId === appId);
+        if (!appId && !surface) {
+          return null;
+        }
+        return {
+          kind: "appSurface",
+          id: appId,
+          title: String(surface?.name || appId || "\u5E94\u7528\u7AEF\u5361\u7247")
+        };
+      }
+      const nodeId = endpoint.nodeId || "";
+      const node = (flow.nodes || []).find((item) => item.nodeId === nodeId && item.status !== "removed");
+      if (!node) {
+        return null;
+      }
+      return {
+        kind: "node",
+        id: node.nodeId,
+        title: String(node.title || node.nodeId)
+      };
+    }
+    function uniqueSelectionRelationCards(cards) {
+      const result = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const card of cards) {
+        appendUniqueSelectionRelationCard(result, seen, card);
+      }
+      return result;
+    }
+    function appendUniqueSelectionRelationCard(result, seen, card) {
+      if (!card || !card.kind || !card.id) {
+        return;
+      }
+      const key = `${card.kind}:${card.id}`;
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      result.push(card);
+    }
+    function relationEndpointEntityId(endpoint) {
+      if (endpoint.kind === "projectOverview") {
+        return PROJECT_OVERVIEW_NODE_ID;
+      }
+      return endpoint.kind === "appSurface" ? endpoint.appId || endpoint.nodeId || "" : endpoint.nodeId || "";
+    }
+    function relationProjectOverviewTitle(flow) {
+      return String(flow.title || "\u9879\u76EE\u6982\u8FF0").trim() || "\u9879\u76EE\u6982\u8FF0";
+    }
+    function bindSelectionRelations(root = document) {
+      const panel = root.matches?.(".selection-relations-panel") ? root : root.querySelector?.(".selection-relations-panel");
+      if (!panel) {
+        return;
+      }
+      panel.querySelectorAll("[data-relation-card-kind][data-relation-card-id]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          centerCard(button.dataset.relationCardKind, button.dataset.relationCardId);
+          focusCanvas();
+        });
+      });
+    }
+    function refreshSelectionRelationsPanel() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas) {
+        return;
+      }
+      const existing = canvas.querySelector(".selection-relations-panel");
+      const activeNodes = state.flow.nodes.filter((node) => node.status !== "removed");
+      const selectedNode = selectedNodeIds.length === 1 ? activeNodes.find((node) => node.nodeId === selectedNodeIds[0]) || null : null;
+      const selectedEdge = state.flow.edges.find((edge) => edge.edgeId === selectedEdgeId && edge.status === "active") || null;
+      const html = renderSelectionRelationsPanel(state.flow, selectedNode, selectedEdge).trim();
+      if (!html) {
+        existing?.remove();
+        return;
+      }
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = html;
+      const nextPanel = wrapper.firstElementChild;
+      if (!nextPanel) {
+        existing?.remove();
+        return;
+      }
+      if (existing) {
+        existing.replaceWith(nextPanel);
+      } else {
+        canvas.appendChild(nextPanel);
+      }
+      bindSelectionRelations(nextPanel);
+    }
     function render() {
       const flow = state.flow;
       seedProjectOverviewPosition(flow);
       seedNodePositions(flow);
       seedAppSurfacePositions(flow);
+      autoLayoutApplyPreviewState(flow);
       normalizeFilters();
       const activeNodes = flow.nodes.filter((node) => node.status !== "removed");
       const selectedNode = selectedNodeIds.length === 1 ? activeNodes.find((node) => node.nodeId === selectedNodeIds[0]) || null : null;
@@ -1169,6 +1357,7 @@
           ${renderAppSurfaceSourceCards(flow)}
           ${activeNodes.map((node) => renderNodeCard(flow, node)).join("")}
         </div>
+        ${renderSelectionRelationsPanel(flow, selectedNode, selectedEdge)}
         <div class="zoom-pill">${Math.round(zoom * 100)}%</div>
         ${renderCommandStatus()}
       </section>
@@ -1337,7 +1526,7 @@
       persistUiState();
     }
     function shouldLetPanelHandleWheel(target) {
-      return Boolean(target?.closest?.(".floating-taxonomy-controls, .floating-taxonomy-panels"));
+      return Boolean(target?.closest?.(".floating-taxonomy-controls, .floating-taxonomy-panels, .selection-relations-panel"));
     }
     function handleWheel(event) {
       if (shouldLetPanelHandleWheel(event.target)) {
@@ -1365,7 +1554,7 @@
       scheduleDrawEdges();
     }
     function startPan(event) {
-      if (connectionDrag || event.button !== 0 && event.button !== 1 || event.target.closest(".project-overview-card") || event.target.closest(".node-card") || event.target.closest(".app-surface-card") || event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") || event.target.closest("button, input, textarea, select") || event.target.closest("[data-edge-id]")) {
+      if (connectionDrag || event.button !== 0 && event.button !== 1 || event.target.closest(".project-overview-card") || event.target.closest(".node-card") || event.target.closest(".app-surface-card") || event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") || event.target.closest(".selection-relations-panel") || event.target.closest("button, input, textarea, select") || event.target.closest("[data-edge-id]")) {
         return;
       }
       const canvas = document.getElementById("canvas");
@@ -1714,6 +1903,7 @@
       }
       dragState = null;
       if (moved && pos) {
+        autoLayoutUpdatePreviewPosition(kind, id, pos);
         selectedEdgeId = "";
         if (kind === "appSurface") {
           selectedProjectOverview = false;
@@ -2602,7 +2792,7 @@
       if (!canvas || !canvas.contains(event.target)) {
         return;
       }
-      if (event.target.closest(".project-overview-card") || event.target.closest(".node-card") || event.target.closest(".app-surface-card") || event.target.closest("[data-edge-id]")) {
+      if (event.target.closest(".project-overview-card") || event.target.closest(".node-card") || event.target.closest(".app-surface-card") || event.target.closest(".selection-relations-panel") || event.target.closest("[data-edge-id]")) {
         return;
       }
       event.preventDefault();
@@ -2622,7 +2812,7 @@
         suppressNextCanvasClick = false;
         return;
       }
-      if (event.target.closest(".node-card") || event.target.closest(".project-overview-card") || event.target.closest(".app-surface-card") || event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") || event.target.closest("[data-edge-id]") || event.target.closest("button, input, textarea, select") || connectionDrag) {
+      if (event.target.closest(".node-card") || event.target.closest(".project-overview-card") || event.target.closest(".app-surface-card") || event.target.closest(".floating-taxonomy-controls, .floating-taxonomy-panels") || event.target.closest(".selection-relations-panel") || event.target.closest("[data-edge-id]") || event.target.closest("button, input, textarea, select") || connectionDrag) {
         return;
       }
       closeAllTaxonomyPanels();
@@ -2728,6 +2918,7 @@
         leftPanelCollapsed = false;
         render();
       });
+      bindAction("autoLayoutCanvas", autoLayoutApplyCanvasPreview);
       if (nodeSearchInput) {
         nodeSearchInput.addEventListener("compositionstart", () => {
           nodeSearchComposing = true;
@@ -2762,6 +2953,7 @@
       applyEdgeTypeColorSwatches(document);
       applyStatusGroupColorSwatches(document);
       bindCanvasElements();
+      bindSelectionRelations();
       canvas.addEventListener("wheel", handleWheel, { passive: false });
       canvas.addEventListener("pointerdown", startPan);
       canvas.addEventListener("pointermove", movePan);
@@ -2944,6 +3136,7 @@
           card.replaceWith(nextCard);
           bindCanvasElements(nextCard);
           positionCards();
+          refreshSelectionRelationsPanel();
           scheduleDrawEdges();
         }
       }
@@ -3259,6 +3452,7 @@
         applyStatusGroupColorSwatches(world);
         bindCanvasElements(world);
         positionCards();
+        refreshSelectionRelationsPanel();
         scheduleDrawEdges();
       }
     }
@@ -3284,6 +3478,7 @@
       const patch = collectEdgeDetailsPatch();
       const saveRevision = ++edgeDetailsSaveRevision;
       applyEdgeDetailsLocally(edgeId, patch);
+      refreshSelectionRelationsPanel();
       scheduleDrawEdges();
       if (options.localOnly) {
         clearTimeout(edgeDetailsSaveTimer);
@@ -3973,11 +4168,712 @@
         y: point.y * zoom + camera.y
       };
     }
+    const AUTO_LAYOUT_SHARED_LANE_ID = "__shared";
+    const AUTO_LAYOUT_ROOT_WIDTH = 340;
+    const AUTO_LAYOUT_ROOT_HEIGHT = 260;
+    const AUTO_LAYOUT_APP_WIDTH = 300;
+    const AUTO_LAYOUT_APP_HEIGHT = 160;
+    const AUTO_LAYOUT_NODE_WIDTH = 300;
+    const AUTO_LAYOUT_NODE_HEIGHT = 230;
+    const AUTO_LAYOUT_MIN_COLUMN_GAP = 520;
+    const AUTO_LAYOUT_ROW_GAP = 340;
+    const AUTO_LAYOUT_LANE_GAP = 220;
+    const AUTO_LAYOUT_RECT_MARGIN = 44;
+    const AUTO_LAYOUT_FIT_PADDING = 72;
+    const AUTO_LAYOUT_ROW_SAFETY_GAP = 110;
+    const AUTO_LAYOUT_SUBCOLUMN_GAP = 160;
+    const AUTO_LAYOUT_MAX_ROWS_PER_SUBCOLUMN = 8;
+    const AUTO_LAYOUT_ROW_X_STAGGER = 36;
+    const AUTO_LAYOUT_MAX_ROW_X_STAGGER = AUTO_LAYOUT_ROW_X_STAGGER * 2;
+    const AUTO_LAYOUT_LAYER_Y_OFFSETS = {
+      2: -22,
+      3: 18,
+      4: -12,
+      5: 26
+    };
+    const AUTO_LAYOUT_EDGE_TYPE_PRIORITIES = {
+      nestedRelation: 0,
+      interaction: 1,
+      autoNavigate: 2,
+      statusChange: 3,
+      dataFlow: 4
+    };
+    const AUTO_LAYOUT_UNCONNECTED_PRIORITY = Number.POSITIVE_INFINITY;
+    function autoLayoutComputePreview(flow, measurements = {}) {
+      const activeNodes = (Array.isArray(flow?.nodes) ? flow.nodes : []).filter((node) => node.status !== "removed");
+      const activeEdges = (Array.isArray(flow?.edges) ? flow.edges : []).filter((edge) => edge.status === "active");
+      const appSurfaces = Array.isArray(flow?.appSurfaces) ? flow.appSurfaces : [];
+      const estimatedMaxEdgeLabelWidth = activeEdges.reduce((maxWidth, edge) => {
+        return Math.max(maxWidth, autoLayoutEstimateLabelWidth(edge.trigger || edge.action || ""));
+      }, 0);
+      const context = autoLayoutCreateContext(appSurfaces, activeNodes);
+      const projectOverviewSize = autoLayoutMeasuredSize(measurements.projectOverview, AUTO_LAYOUT_ROOT_WIDTH, AUTO_LAYOUT_ROOT_HEIGHT);
+      const lanePlans = context.lanes.map((lane) => autoLayoutCreateLanePlan(lane, activeEdges, context.nodeOriginalIndex, measurements));
+      const maxLayerWidthSpan = lanePlans.reduce((maxWidth, plan) => {
+        const layerWidth = Array.from(plan.layerLayouts.values()).reduce((maxLayerWidth, layout) => Math.max(maxLayerWidth, layout.widthSpan), 0);
+        return Math.max(maxWidth, plan.appSize?.width || 0, layerWidth);
+      }, projectOverviewSize.width);
+      const columnGap = Math.max(AUTO_LAYOUT_MIN_COLUMN_GAP, maxLayerWidthSpan + estimatedMaxEdgeLabelWidth + 96);
+      const itemRects = [];
+      const nodePositions2 = {};
+      const appSurfacePositions2 = {};
+      const nodeLaneIds = {};
+      const laneSummaries = [];
+      let nextLaneY = 0;
+      for (const plan of lanePlans) {
+        const lane = plan.lane;
+        const laneRectStart = itemRects.length;
+        const laneHeight = plan.laneHeight;
+        const laneTop = nextLaneY;
+        if (lane.surface) {
+          const appY = Math.round(laneTop + (laneHeight - plan.appSize.height) / 2);
+          const appPosition = autoLayoutPlaceRect(itemRects, {
+            id: lane.surface.appId,
+            kind: "appSurface",
+            laneId: lane.id,
+            layer: 1,
+            x: columnGap,
+            y: appY,
+            width: plan.appSize.width,
+            height: plan.appSize.height
+          });
+          appSurfacePositions2[lane.surface.appId] = { x: appPosition.x, y: appPosition.y };
+        }
+        for (const layer of [2, 3, 4]) {
+          const layout = plan.layerLayouts.get(layer);
+          autoLayoutPlaceLayerNodes(layout.nodes, layout, layer, lane, laneTop, laneHeight, columnGap, itemRects, nodePositions2, nodeLaneIds);
+        }
+        const detailLayout = plan.layerLayouts.get(5);
+        autoLayoutPlaceDetailNodes(detailLayout.nodes, detailLayout, lane, laneTop, laneHeight, columnGap, itemRects, nodePositions2, nodeLaneIds, activeEdges);
+        const laneBounds2 = autoLayoutBoundsForItems(itemRects.slice(laneRectStart));
+        if (laneBounds2) {
+          laneSummaries.push({
+            id: lane.id,
+            kind: lane.kind,
+            top: laneBounds2.minY,
+            bottom: laneBounds2.maxY,
+            nodeCount: lane.nodes.length
+          });
+          nextLaneY = laneBounds2.maxY + AUTO_LAYOUT_LANE_GAP;
+        } else {
+          nextLaneY += laneHeight + AUTO_LAYOUT_LANE_GAP;
+        }
+      }
+      const laneBounds = autoLayoutBoundsForItems(itemRects);
+      const rootCenterY = laneBounds ? (laneBounds.minY + laneBounds.maxY) / 2 : 0;
+      const projectOverviewPosition2 = {
+        x: 0,
+        y: Math.round(rootCenterY - projectOverviewSize.height / 2)
+      };
+      itemRects.push({
+        id: "projectOverview",
+        kind: "projectOverview",
+        laneId: "root",
+        layer: 0,
+        x: projectOverviewPosition2.x,
+        y: projectOverviewPosition2.y,
+        width: projectOverviewSize.width,
+        height: projectOverviewSize.height
+      });
+      return {
+        projectOverviewPosition: projectOverviewPosition2,
+        appSurfacePositions: appSurfacePositions2,
+        nodePositions: nodePositions2,
+        nodeLaneIds,
+        lanes: laneSummaries,
+        items: itemRects,
+        bounds: autoLayoutExpandBounds(autoLayoutBoundsForItems(itemRects), AUTO_LAYOUT_FIT_PADDING),
+        columnGap,
+        rowGap: AUTO_LAYOUT_ROW_GAP,
+        estimatedMaxEdgeLabelWidth
+      };
+    }
+    function autoLayoutApplyCanvasPreview() {
+      const layout = autoLayoutComputePreview(state.flow, autoLayoutCollectMeasurements());
+      autoLayoutPreviewState = autoLayoutCreatePreviewState(state.flow, layout);
+      autoLayoutApplyPreviewState(state.flow);
+      positionCards();
+      autoLayoutFitCanvasPreview(layout.bounds);
+      scheduleDrawEdges();
+      setCommandStatus(true, "\u5DF2\u81EA\u52A8\u6392\u7248\u5F53\u524D\u753B\u5E03\uFF08\u9884\u89C8\uFF0C\u672A\u4FDD\u5B58\uFF09");
+      updateCommandStatusElement();
+    }
+    function autoLayoutCollectMeasurements() {
+      const measurements = {
+        projectOverview: autoLayoutMeasureElement(document.querySelector(".project-overview-card"), AUTO_LAYOUT_ROOT_WIDTH, AUTO_LAYOUT_ROOT_HEIGHT),
+        appSurfaces: {},
+        nodes: {}
+      };
+      document.querySelectorAll(".app-surface-card[data-app-surface-id]").forEach((card) => {
+        measurements.appSurfaces[card.dataset.appSurfaceId] = autoLayoutMeasureElement(card, AUTO_LAYOUT_APP_WIDTH, AUTO_LAYOUT_APP_HEIGHT);
+      });
+      document.querySelectorAll(".node-card[data-node-id]").forEach((card) => {
+        measurements.nodes[card.dataset.nodeId] = autoLayoutMeasureElement(card, AUTO_LAYOUT_NODE_WIDTH, AUTO_LAYOUT_NODE_HEIGHT);
+      });
+      return measurements;
+    }
+    function autoLayoutMeasureElement(element, fallbackWidth, fallbackHeight) {
+      if (!element) {
+        return { width: fallbackWidth, height: fallbackHeight };
+      }
+      const rect = element.getBoundingClientRect?.();
+      return {
+        width: Math.max(fallbackWidth, Math.ceil(Number(element.offsetWidth) || Number(rect?.width) || fallbackWidth)),
+        height: Math.max(fallbackHeight, Math.ceil(Number(element.offsetHeight) || Number(rect?.height) || fallbackHeight))
+      };
+    }
+    function autoLayoutFitCanvasPreview(bounds) {
+      const canvas = document.getElementById("canvas");
+      if (!canvas || !bounds) {
+        return;
+      }
+      const width = Math.max(1, bounds.maxX - bounds.minX);
+      const height = Math.max(1, bounds.maxY - bounds.minY);
+      const fitWidth = Math.max(1, canvas.clientWidth - AUTO_LAYOUT_FIT_PADDING * 2);
+      const fitHeight = Math.max(1, canvas.clientHeight - AUTO_LAYOUT_FIT_PADDING * 2);
+      zoom = clamp(Math.min(1, fitWidth / width, fitHeight / height), MIN_ZOOM, MAX_ZOOM);
+      camera = {
+        x: Math.round((canvas.clientWidth - width * zoom) / 2 - bounds.minX * zoom),
+        y: Math.round((canvas.clientHeight - height * zoom) / 2 - bounds.minY * zoom)
+      };
+      applyCamera();
+    }
+    function autoLayoutApplyPreviewState(flow) {
+      const positions = autoLayoutPreviewPositionsForFlow(flow, autoLayoutPreviewState);
+      if (!positions) {
+        if (autoLayoutPreviewState) {
+          autoLayoutPreviewState = null;
+        }
+        return false;
+      }
+      projectOverviewPosition = positions.projectOverviewPosition;
+      appSurfacePositions.clear();
+      for (const [appId, position] of Object.entries(positions.appSurfacePositions)) {
+        appSurfacePositions.set(appId, position);
+      }
+      nodePositions.clear();
+      for (const [nodeId, position] of Object.entries(positions.nodePositions)) {
+        nodePositions.set(nodeId, position);
+      }
+      return true;
+    }
+    function autoLayoutCreatePreviewState(flow, layout) {
+      return {
+        signature: autoLayoutFlowSignature(flow),
+        entitySignature: autoLayoutEntitySignature(flow),
+        projectOverviewPosition: autoLayoutCopyPosition(layout.projectOverviewPosition),
+        appSurfacePositions: autoLayoutCopyPositionRecord(layout.appSurfacePositions),
+        nodePositions: autoLayoutCopyPositionRecord(layout.nodePositions)
+      };
+    }
+    function autoLayoutPreviewPositionsForFlow(flow, previewState) {
+      const normalized = autoLayoutNormalizePersistedPreviewState(previewState);
+      if (!normalized || !autoLayoutPreviewStateMatchesFlow(normalized, flow)) {
+        return null;
+      }
+      const activeNodeIds = (Array.isArray(flow?.nodes) ? flow.nodes : []).filter((node) => node.status !== "removed").map((node) => node.nodeId);
+      const appIds = (Array.isArray(flow?.appSurfaces) ? flow.appSurfaces : []).map((surface) => surface.appId);
+      if (!activeNodeIds.every((nodeId) => normalized.nodePositions[nodeId]) || !appIds.every((appId) => normalized.appSurfacePositions[appId])) {
+        return null;
+      }
+      return normalized;
+    }
+    function autoLayoutUpdatePreviewPosition(kind, id, position) {
+      if (!autoLayoutPreviewState || !position) {
+        return;
+      }
+      const nextState = autoLayoutPreviewStateWithPosition(autoLayoutPreviewState, kind, id, position);
+      if (!nextState || !autoLayoutPreviewStateMatchesFlow(nextState, state.flow)) {
+        autoLayoutPreviewState = null;
+        persistUiState();
+        return;
+      }
+      autoLayoutPreviewState = nextState;
+      persistUiState();
+    }
+    function autoLayoutPreviewStateWithPosition(previewState, kind, id, position) {
+      const normalized = autoLayoutNormalizePersistedPreviewState(previewState);
+      const nextPosition = autoLayoutCopyPosition(position);
+      if (!normalized || !nextPosition) {
+        return null;
+      }
+      if (kind === "projectOverview") {
+        return {
+          ...normalized,
+          projectOverviewPosition: nextPosition
+        };
+      } else if (kind === "appSurface") {
+        normalized.appSurfacePositions[id] = nextPosition;
+      } else {
+        normalized.nodePositions[id] = nextPosition;
+      }
+      return normalized;
+    }
+    function autoLayoutNormalizePersistedPreviewState(value) {
+      if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.signature !== "string") {
+        return null;
+      }
+      const projectOverviewPosition2 = autoLayoutCopyPosition(value.projectOverviewPosition);
+      if (!projectOverviewPosition2) {
+        return null;
+      }
+      return {
+        signature: value.signature,
+        entitySignature: typeof value.entitySignature === "string" ? value.entitySignature : "",
+        projectOverviewPosition: projectOverviewPosition2,
+        appSurfacePositions: autoLayoutReadPositionRecord(value.appSurfacePositions),
+        nodePositions: autoLayoutReadPositionRecord(value.nodePositions)
+      };
+    }
+    function autoLayoutEntitySignature(flow) {
+      const appIds = (Array.isArray(flow?.appSurfaces) ? flow.appSurfaces : []).map((surface) => surface.appId).filter((id) => typeof id === "string" && id).sort();
+      const nodeIds = (Array.isArray(flow?.nodes) ? flow.nodes : []).filter((node) => node.status !== "removed").map((node) => node.nodeId).filter((id) => typeof id === "string" && id).sort();
+      return `apps:${appIds.join("|")};nodes:${nodeIds.join("|")}`;
+    }
+    function autoLayoutFlowSignature(flow) {
+      const edgeSignatures = (Array.isArray(flow?.edges) ? flow.edges : []).filter((edge) => edge.status === "active").map((edge) => autoLayoutEdgeSignature(edge)).sort();
+      return `${autoLayoutEntitySignature(flow)};edges:${edgeSignatures.join("|")}`;
+    }
+    function autoLayoutPreviewStateMatchesFlow(previewState, flow) {
+      const entitySignature = autoLayoutEntitySignature(flow);
+      return previewState.signature === autoLayoutFlowSignature(flow) || previewState.entitySignature === entitySignature || autoLayoutPreviewEntitySignature(previewState.signature) === entitySignature;
+    }
+    function autoLayoutPreviewEntitySignature(signature) {
+      const value = String(signature || "");
+      const edgeIndex = value.indexOf(";edges:");
+      return edgeIndex >= 0 ? value.slice(0, edgeIndex) : value;
+    }
+    function autoLayoutReadPositionRecord(value) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return {};
+      }
+      return Object.entries(value).reduce((record, [id, position]) => {
+        const normalized = autoLayoutCopyPosition(position);
+        if (id && normalized) {
+          record[id] = normalized;
+        }
+        return record;
+      }, {});
+    }
+    function autoLayoutCopyPositionRecord(value) {
+      return autoLayoutReadPositionRecord(value);
+    }
+    function autoLayoutCopyPosition(value) {
+      const x = Number(value?.x);
+      const y = Number(value?.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return null;
+      }
+      return {
+        x: Math.round(x),
+        y: Math.round(y)
+      };
+    }
+    function autoLayoutCreateContext(appSurfaces, activeNodes) {
+      const laneById = /* @__PURE__ */ new Map();
+      const lanes = appSurfaces.map((surface) => {
+        const lane = { id: surface.appId, kind: "appSurface", surface, nodes: [] };
+        laneById.set(surface.appId, lane);
+        return lane;
+      });
+      const sharedLane = { id: AUTO_LAYOUT_SHARED_LANE_ID, kind: "shared", surface: null, nodes: [] };
+      const nodeOriginalIndex = /* @__PURE__ */ new Map();
+      activeNodes.forEach((node, index) => {
+        nodeOriginalIndex.set(node.nodeId, index);
+        const lane = autoLayoutResolveNodeLane(node, laneById, sharedLane);
+        lane.nodes.push(node);
+      });
+      if (sharedLane.nodes.length > 0 || lanes.length === 0 && activeNodes.length > 0) {
+        lanes.push(sharedLane);
+      }
+      return { lanes, nodeOriginalIndex };
+    }
+    function autoLayoutResolveNodeLane(node, laneById, sharedLane) {
+      const ids = Array.isArray(node.appSurfaceIds) ? node.appSurfaceIds : [];
+      for (const appId of ids) {
+        const lane = laneById.get(appId);
+        if (lane) {
+          return lane;
+        }
+      }
+      return sharedLane;
+    }
+    function autoLayoutCreateLanePlan(lane, activeEdges, nodeOriginalIndex, measurements) {
+      const orderedNodes = autoLayoutOrderLaneNodes(lane.nodes, activeEdges, nodeOriginalIndex);
+      const nodesByLayer = autoLayoutGroupNodesByLayer(orderedNodes);
+      const layerLayouts = /* @__PURE__ */ new Map();
+      for (const layer of [2, 3, 4, 5]) {
+        const nodes = nodesByLayer.get(layer) || [];
+        layerLayouts.set(layer, autoLayoutCreateLayerLayout(nodes, measurements));
+      }
+      const appSize = lane.surface ? autoLayoutMeasuredSize(measurements.appSurfaces?.[lane.surface.appId], AUTO_LAYOUT_APP_WIDTH, AUTO_LAYOUT_APP_HEIGHT) : null;
+      const laneHeight = Math.max(
+        appSize?.height || 0,
+        ...Array.from(layerLayouts.values()).map((layout) => layout.heightSpan),
+        AUTO_LAYOUT_NODE_HEIGHT
+      );
+      return {
+        lane,
+        appSize,
+        layerLayouts,
+        laneHeight
+      };
+    }
+    function autoLayoutCreateLayerLayout(nodes, measurements) {
+      const sizes = /* @__PURE__ */ new Map();
+      let maxWidth = AUTO_LAYOUT_NODE_WIDTH;
+      let maxHeight = AUTO_LAYOUT_NODE_HEIGHT;
+      for (const node of nodes) {
+        const size = autoLayoutMeasuredSize(measurements.nodes?.[node.nodeId], AUTO_LAYOUT_NODE_WIDTH, AUTO_LAYOUT_NODE_HEIGHT);
+        sizes.set(node.nodeId, size);
+        maxWidth = Math.max(maxWidth, size.width);
+        maxHeight = Math.max(maxHeight, size.height);
+      }
+      const maxRows = Math.max(1, Math.min(AUTO_LAYOUT_MAX_ROWS_PER_SUBCOLUMN, nodes.length || 1));
+      const columnCount = Math.max(1, Math.ceil(nodes.length / maxRows));
+      const rowCount = Math.max(1, Math.min(nodes.length || 1, maxRows));
+      const rowStep = Math.max(AUTO_LAYOUT_ROW_GAP, maxHeight + AUTO_LAYOUT_ROW_SAFETY_GAP);
+      const columnStep = maxWidth + AUTO_LAYOUT_SUBCOLUMN_GAP;
+      return {
+        nodes,
+        sizes,
+        maxRows,
+        rowCount,
+        columnCount,
+        rowStep,
+        columnStep,
+        maxWidth,
+        maxHeight,
+        widthSpan: (columnCount - 1) * columnStep + maxWidth + AUTO_LAYOUT_MAX_ROW_X_STAGGER,
+        heightSpan: (rowCount - 1) * rowStep + maxHeight
+      };
+    }
+    function autoLayoutMeasuredSize(value, fallbackWidth, fallbackHeight) {
+      const width = Number(value?.width);
+      const height = Number(value?.height);
+      return {
+        width: Math.max(fallbackWidth, Number.isFinite(width) ? Math.ceil(width) : fallbackWidth),
+        height: Math.max(fallbackHeight, Number.isFinite(height) ? Math.ceil(height) : fallbackHeight)
+      };
+    }
+    function autoLayoutOrderLaneNodes(nodes, activeEdges, nodeOriginalIndex) {
+      const nodeIds = new Set(nodes.map((node) => node.nodeId));
+      const byId = new Map(nodes.map((node) => [node.nodeId, node]));
+      const outgoing = new Map(nodes.map((node) => [node.nodeId, []]));
+      const indegree = new Map(nodes.map((node) => [node.nodeId, 0]));
+      const incomingPriority = new Map(nodes.map((node) => [node.nodeId, AUTO_LAYOUT_UNCONNECTED_PRIORITY]));
+      const graphEdges = autoLayoutBuildLaneGraphEdges(nodeIds, activeEdges, nodeOriginalIndex);
+      for (const edge of graphEdges) {
+        outgoing.get(edge.fromId)?.push(edge);
+        indegree.set(edge.toId, (indegree.get(edge.toId) || 0) + 1);
+        incomingPriority.set(edge.toId, Math.min(incomingPriority.get(edge.toId) ?? AUTO_LAYOUT_UNCONNECTED_PRIORITY, edge.priority));
+      }
+      for (const edges of outgoing.values()) {
+        edges.sort((left, right) => autoLayoutCompareGraphEdges(left, right, nodeOriginalIndex));
+      }
+      const ordered = [];
+      const ready = nodes.filter((node) => (indegree.get(node.nodeId) || 0) === 0).sort((left, right) => autoLayoutCompareReadyNodes(left, right, incomingPriority, nodeOriginalIndex));
+      const seen = /* @__PURE__ */ new Set();
+      while (ready.length > 0) {
+        const node = ready.shift();
+        if (!node || seen.has(node.nodeId)) {
+          continue;
+        }
+        ordered.push(node);
+        seen.add(node.nodeId);
+        for (const edge of outgoing.get(node.nodeId) || []) {
+          const nextIndegree = (indegree.get(edge.toId) || 0) - 1;
+          indegree.set(edge.toId, nextIndegree);
+          if (nextIndegree === 0) {
+            const targetNode = byId.get(edge.toId);
+            if (targetNode && !seen.has(edge.toId)) {
+              ready.push(targetNode);
+              ready.sort((left, right) => autoLayoutCompareReadyNodes(left, right, incomingPriority, nodeOriginalIndex));
+            }
+          }
+        }
+      }
+      const remaining = nodes.filter((node) => !seen.has(node.nodeId)).sort((left, right) => autoLayoutCompareNodes(left, right, nodeOriginalIndex));
+      return [...ordered, ...remaining];
+    }
+    function autoLayoutBuildLaneGraphEdges(nodeIds, activeEdges, nodeOriginalIndex) {
+      const strongestByPair = /* @__PURE__ */ new Map();
+      activeEdges.forEach((edge, index) => {
+        const fromId = autoLayoutEdgeNodeId(edge.from, edge.fromNodeId);
+        const toId = autoLayoutEdgeNodeId(edge.to, edge.toNodeId);
+        if (!fromId || !toId || fromId === toId || !nodeIds.has(fromId) || !nodeIds.has(toId)) {
+          return;
+        }
+        const graphEdge = {
+          fromId,
+          toId,
+          priority: autoLayoutEdgePriority(edge.type),
+          index
+        };
+        const key = `${fromId}\0${toId}`;
+        const existing = strongestByPair.get(key);
+        if (!existing || autoLayoutCompareGraphEdges(graphEdge, existing, nodeOriginalIndex) < 0) {
+          strongestByPair.set(key, graphEdge);
+        }
+      });
+      const candidates = Array.from(strongestByPair.values()).sort((left, right) => autoLayoutCompareGraphEdges(left, right, nodeOriginalIndex));
+      const kept = [];
+      const outgoing = new Map(Array.from(nodeIds, (nodeId) => [nodeId, []]));
+      for (const edge of candidates) {
+        if (autoLayoutGraphHasPath(outgoing, edge.toId, edge.fromId)) {
+          continue;
+        }
+        outgoing.get(edge.fromId)?.push(edge.toId);
+        kept.push(edge);
+      }
+      return kept.sort((left, right) => autoLayoutCompareGraphEdges(left, right, nodeOriginalIndex));
+    }
+    function autoLayoutGraphHasPath(outgoing, startId, targetId) {
+      if (startId === targetId) {
+        return true;
+      }
+      const stack = [startId];
+      const seen = /* @__PURE__ */ new Set();
+      while (stack.length > 0) {
+        const nodeId = stack.pop();
+        if (!nodeId || seen.has(nodeId)) {
+          continue;
+        }
+        seen.add(nodeId);
+        for (const nextId of outgoing.get(nodeId) || []) {
+          if (nextId === targetId) {
+            return true;
+          }
+          stack.push(nextId);
+        }
+      }
+      return false;
+    }
+    function autoLayoutCompareGraphEdges(left, right, nodeOriginalIndex) {
+      return left.priority - right.priority || autoLayoutCompareNodeIds(left.fromId, right.fromId, nodeOriginalIndex) || autoLayoutCompareNodeIds(left.toId, right.toId, nodeOriginalIndex) || left.index - right.index;
+    }
+    function autoLayoutCompareNodeIds(leftId, rightId, nodeOriginalIndex) {
+      return (nodeOriginalIndex.get(leftId) ?? 0) - (nodeOriginalIndex.get(rightId) ?? 0) || String(leftId || "").localeCompare(String(rightId || ""));
+    }
+    function autoLayoutCompareReadyNodes(left, right, incomingPriority, nodeOriginalIndex) {
+      const priorityDiff = (incomingPriority.get(left.nodeId) ?? AUTO_LAYOUT_UNCONNECTED_PRIORITY) - (incomingPriority.get(right.nodeId) ?? AUTO_LAYOUT_UNCONNECTED_PRIORITY);
+      return priorityDiff || autoLayoutCompareNodes(left, right, nodeOriginalIndex);
+    }
+    function autoLayoutGroupNodesByLayer(nodes) {
+      const groups = /* @__PURE__ */ new Map([
+        [2, []],
+        [3, []],
+        [4, []],
+        [5, []]
+      ]);
+      for (const node of nodes) {
+        groups.get(autoLayoutNodeLayer(node)).push(node);
+      }
+      return groups;
+    }
+    function autoLayoutPlaceLayerNodes(nodes, layout, layer, lane, laneTop, laneHeight, columnGap, itemRects, nodePositions2, nodeLaneIds) {
+      const startY = autoLayoutLayerStartY(laneTop, laneHeight, layout, layer);
+      nodes.forEach((node, index) => {
+        const row = index % layout.maxRows;
+        const column = Math.floor(index / layout.maxRows);
+        const size = layout.sizes.get(node.nodeId) || { width: AUTO_LAYOUT_NODE_WIDTH, height: AUTO_LAYOUT_NODE_HEIGHT };
+        const position = autoLayoutPlaceRect(itemRects, {
+          id: node.nodeId,
+          kind: "node",
+          laneId: lane.id,
+          layer,
+          x: autoLayoutLayerX(layer, columnGap, layout, column, row),
+          y: Math.round(startY + row * layout.rowStep),
+          width: size.width,
+          height: size.height
+        });
+        nodePositions2[node.nodeId] = { x: position.x, y: position.y };
+        nodeLaneIds[node.nodeId] = lane.id;
+      });
+    }
+    function autoLayoutPlaceDetailNodes(nodes, layout, lane, laneTop, laneHeight, columnGap, itemRects, nodePositions2, nodeLaneIds, activeEdges) {
+      const fallbackStartY = autoLayoutLayerStartY(laneTop, laneHeight, layout, 5);
+      const sorted = [...nodes].sort((left, right) => {
+        const leftParentY = autoLayoutIncomingParentY(left.nodeId, nodePositions2, activeEdges);
+        const rightParentY = autoLayoutIncomingParentY(right.nodeId, nodePositions2, activeEdges);
+        if (leftParentY !== rightParentY) {
+          return leftParentY - rightParentY;
+        }
+        return 0;
+      });
+      sorted.forEach((node, index) => {
+        const parentY = autoLayoutIncomingParentY(node.nodeId, nodePositions2, activeEdges);
+        const row = index % layout.maxRows;
+        const column = Math.floor(index / layout.maxRows);
+        const size = layout.sizes.get(node.nodeId) || { width: AUTO_LAYOUT_NODE_WIDTH, height: AUTO_LAYOUT_NODE_HEIGHT };
+        const desiredY = Number.isFinite(parentY) ? parentY : Math.round(fallbackStartY + row * layout.rowStep);
+        const position = autoLayoutPlaceRect(itemRects, {
+          id: node.nodeId,
+          kind: "node",
+          laneId: lane.id,
+          layer: 5,
+          x: autoLayoutLayerX(5, columnGap, layout, column, row),
+          y: desiredY,
+          width: size.width,
+          height: size.height
+        });
+        nodePositions2[node.nodeId] = { x: position.x, y: position.y };
+        nodeLaneIds[node.nodeId] = lane.id;
+      });
+    }
+    function autoLayoutPlaceRect(itemRects, rect) {
+      const placed = { ...rect, x: Math.round(rect.x), y: Math.round(rect.y) };
+      let attempts = 0;
+      while (autoLayoutHasRectCollision(placed, itemRects) && attempts < 1e3) {
+        placed.y += Math.max(AUTO_LAYOUT_ROW_GAP, placed.height + AUTO_LAYOUT_RECT_MARGIN * 2);
+        attempts += 1;
+      }
+      itemRects.push(placed);
+      return { x: placed.x, y: placed.y };
+    }
+    function autoLayoutHasRectCollision(rect, itemRects) {
+      return itemRects.some((item) => {
+        return rect.x - AUTO_LAYOUT_RECT_MARGIN < item.x + item.width + AUTO_LAYOUT_RECT_MARGIN && rect.x + rect.width + AUTO_LAYOUT_RECT_MARGIN > item.x - AUTO_LAYOUT_RECT_MARGIN && rect.y - AUTO_LAYOUT_RECT_MARGIN < item.y + item.height + AUTO_LAYOUT_RECT_MARGIN && rect.y + rect.height + AUTO_LAYOUT_RECT_MARGIN > item.y - AUTO_LAYOUT_RECT_MARGIN;
+      });
+    }
+    function autoLayoutLayerStartY(laneTop, laneHeight, layout, layer) {
+      if (!layout || layout.nodes.length === 0) {
+        return laneTop + laneHeight / 2;
+      }
+      const offset = AUTO_LAYOUT_LAYER_Y_OFFSETS[layer] || 0;
+      return laneTop + (laneHeight - layout.heightSpan) / 2 + offset;
+    }
+    function autoLayoutLayerX(layer, columnGap, layout, column, row) {
+      return layer * columnGap + column * layout.columnStep + row % 3 * AUTO_LAYOUT_ROW_X_STAGGER;
+    }
+    function autoLayoutIncomingParentY(nodeId, nodePositions2, activeEdges) {
+      const parentYs = [];
+      let bestPriority = AUTO_LAYOUT_UNCONNECTED_PRIORITY;
+      for (const edge of activeEdges) {
+        const toId = autoLayoutEdgeNodeId(edge.to, edge.toNodeId);
+        if (toId !== nodeId) {
+          continue;
+        }
+        const fromId = autoLayoutEdgeNodeId(edge.from, edge.fromNodeId);
+        const position = fromId ? nodePositions2[fromId] : void 0;
+        if (position && Number.isFinite(position.y)) {
+          const priority = autoLayoutEdgePriority(edge.type);
+          if (priority > bestPriority) {
+            continue;
+          }
+          if (priority < bestPriority) {
+            parentYs.length = 0;
+            bestPriority = priority;
+          }
+          parentYs.push(position.y);
+        }
+      }
+      return parentYs.length > 0 ? Math.round(parentYs.reduce((sum, y) => sum + y, 0) / parentYs.length) : Number.POSITIVE_INFINITY;
+    }
+    function autoLayoutNodeLayer(node) {
+      if (node.pageType === "skeleton") {
+        return 2;
+      }
+      if (node.pageType === "navigation") {
+        return 3;
+      }
+      if (node.pageType === "popup" || node.pageType === "component") {
+        return 5;
+      }
+      return 4;
+    }
+    function autoLayoutEdgeNodeId(endpoint, fallbackNodeId) {
+      if (endpoint && endpoint.kind !== "appSurface" && endpoint.kind !== "projectOverview" && typeof endpoint.nodeId === "string") {
+        return endpoint.nodeId;
+      }
+      return typeof fallbackNodeId === "string" ? fallbackNodeId : "";
+    }
+    function autoLayoutEdgeSignature(edge) {
+      return JSON.stringify([
+        typeof edge.edgeId === "string" ? edge.edgeId : "",
+        autoLayoutEndpointSignature(edge.from, edge.fromNodeId),
+        autoLayoutEndpointSignature(edge.to, edge.toNodeId),
+        autoLayoutEdgePriority(edge.type),
+        String(edge.trigger || edge.action || "")
+      ]);
+    }
+    function autoLayoutEndpointSignature(endpoint, fallbackNodeId) {
+      if (endpoint && typeof endpoint === "object" && !Array.isArray(endpoint)) {
+        return [
+          typeof endpoint.kind === "string" ? endpoint.kind : "",
+          typeof endpoint.nodeId === "string" ? endpoint.nodeId : "",
+          typeof endpoint.appId === "string" ? endpoint.appId : "",
+          typeof endpoint.groupId === "string" ? endpoint.groupId : "",
+          typeof endpoint.itemId === "string" ? endpoint.itemId : ""
+        ];
+      }
+      return ["fallback", typeof fallbackNodeId === "string" ? fallbackNodeId : "", "", "", ""];
+    }
+    function autoLayoutEdgePriority(type) {
+      return AUTO_LAYOUT_EDGE_TYPE_PRIORITIES[autoLayoutNormalizeEdgeType(type)] ?? AUTO_LAYOUT_EDGE_TYPE_PRIORITIES.interaction;
+    }
+    function autoLayoutNormalizeEdgeType(type) {
+      if (type === "nestedRelation") {
+        return "nestedRelation";
+      }
+      if (type === "statusChange") {
+        return "statusChange";
+      }
+      if (type === "autoNavigate" || type === "navigate" || type === "branch") {
+        return "autoNavigate";
+      }
+      if (type === "dataFlow" || type === "system") {
+        return "dataFlow";
+      }
+      return "interaction";
+    }
+    function autoLayoutCompareNodes(left, right, nodeOriginalIndex) {
+      const indexDiff = (nodeOriginalIndex.get(left.nodeId) ?? 0) - (nodeOriginalIndex.get(right.nodeId) ?? 0);
+      return indexDiff || String(left.title || "").localeCompare(String(right.title || "")) || left.nodeId.localeCompare(right.nodeId);
+    }
+    function autoLayoutEstimateLabelWidth(value) {
+      return Array.from(String(value || "")).reduce((width, character) => {
+        return width + (character.charCodeAt(0) > 255 ? 11 : 6);
+      }, 16);
+    }
+    function autoLayoutBoundsForItems(items) {
+      if (!items || items.length === 0) {
+        return null;
+      }
+      return items.reduce((bounds, item) => ({
+        minX: Math.min(bounds.minX, item.x),
+        minY: Math.min(bounds.minY, item.y),
+        maxX: Math.max(bounds.maxX, item.x + item.width),
+        maxY: Math.max(bounds.maxY, item.y + item.height)
+      }), {
+        minX: Number.POSITIVE_INFINITY,
+        minY: Number.POSITIVE_INFINITY,
+        maxX: Number.NEGATIVE_INFINITY,
+        maxY: Number.NEGATIVE_INFINITY
+      });
+    }
+    function autoLayoutExpandBounds(bounds, padding) {
+      if (!bounds) {
+        return {
+          minX: -padding,
+          minY: -padding,
+          maxX: padding,
+          maxY: padding
+        };
+      }
+      return {
+        minX: bounds.minX - padding,
+        minY: bounds.minY - padding,
+        maxX: bounds.maxX + padding,
+        maxY: bounds.maxY + padding
+      };
+    }
     function refreshCanvasAndNodeList() {
       const flow = state.flow;
       seedProjectOverviewPosition(flow);
       seedNodePositions(flow);
       seedAppSurfacePositions(flow);
+      autoLayoutApplyPreviewState(flow);
       normalizeFilters();
       const activeNodes = flow.nodes.filter((node) => node.status !== "removed");
       const visibleListNodes = activeNodes.filter((node) => matchesNodeSearch(flow, node, nodeSearch));
@@ -3996,6 +4892,7 @@
           bindCanvasElements(nodeList);
         }
         positionCards();
+        refreshSelectionRelationsPanel();
         scheduleDrawEdges();
       }
     }
@@ -4021,7 +4918,7 @@
       requestAnimationFrame(() => {
         focusCanvas();
         if (center && selectedNodeIds.includes(nodeId)) {
-          centerNode(nodeId);
+          centerCard("node", nodeId);
         }
       });
     }
@@ -4125,10 +5022,10 @@
     function focusCanvas() {
       document.getElementById("canvas")?.focus({ preventScroll: true });
     }
-    function centerNode(nodeId) {
+    function centerCard(kind, id) {
       const canvas = document.getElementById("canvas");
-      const card = document.querySelector(`.node-card[data-node-id="${cssEscape(nodeId)}"]`);
-      const pos = nodePositions.get(nodeId);
+      const card = getCardElement(kind, id);
+      const pos = getCardPosition(kind, id);
       if (!canvas || !card || !pos) {
         return;
       }
@@ -4136,6 +5033,18 @@
       camera.y = canvas.clientHeight / 2 - (pos.y + card.offsetHeight / 2) * zoom;
       applyCamera();
       scheduleDrawEdges();
+    }
+    function centerNode(nodeId) {
+      centerCard("node", nodeId);
+    }
+    function getCardElement(kind, id) {
+      if (kind === "projectOverview") {
+        return document.querySelector(".project-overview-card");
+      }
+      if (kind === "appSurface") {
+        return document.querySelector(`.app-surface-card[data-app-surface-id="${cssEscape(id)}"]`);
+      }
+      return document.querySelector(`.node-card[data-node-id="${cssEscape(id)}"]`);
     }
     function getFeatureGroups(node) {
       if (Array.isArray(node.featureGroups) && node.featureGroups.length > 0) {
@@ -4470,6 +5379,7 @@
         appFilters,
         domainFilters,
         roleFilters,
+        autoLayoutPreviewState,
         taxonomyPanelsOpen,
         taxonomySelection,
         selectedProjectOverview,

@@ -6,6 +6,7 @@ function submitEdgeDetails(options = {}) {
   const patch = collectEdgeDetailsPatch();
   const saveRevision = ++edgeDetailsSaveRevision;
   applyEdgeDetailsLocally(edgeId, patch);
+  refreshSelectionRelationsPanel();
   scheduleDrawEdges();
   if (options.localOnly) {
     clearTimeout(edgeDetailsSaveTimer);

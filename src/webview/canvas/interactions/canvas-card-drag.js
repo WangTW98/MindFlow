@@ -124,6 +124,7 @@ function endCardDrag(event) {
   }
   dragState = null;
   if (moved && pos) {
+    autoLayoutUpdatePreviewPosition(kind, id, pos);
     selectedEdgeId = "";
     if (kind === "appSurface") {
       selectedProjectOverview = false;

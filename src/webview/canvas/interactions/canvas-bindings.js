@@ -12,6 +12,7 @@ function bindEvents() {
     leftPanelCollapsed = false;
     render();
   });
+  bindAction("autoLayoutCanvas", autoLayoutApplyCanvasPreview);
   if (nodeSearchInput) {
     nodeSearchInput.addEventListener("compositionstart", () => {
       nodeSearchComposing = true;
@@ -48,6 +49,7 @@ function bindEvents() {
   applyStatusGroupColorSwatches(document);
 
   bindCanvasElements();
+  bindSelectionRelations();
 
   canvas.addEventListener("wheel", handleWheel, { passive: false });
   canvas.addEventListener("pointerdown", startPan);

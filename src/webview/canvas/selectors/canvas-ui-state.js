@@ -123,6 +123,7 @@ function persistUiState() {
     appFilters,
     domainFilters,
     roleFilters,
+    autoLayoutPreviewState,
     taxonomyPanelsOpen,
     taxonomySelection,
     selectedProjectOverview,
