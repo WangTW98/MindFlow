@@ -1,4 +1,5 @@
 export { createEdge, disconnectEdge, updateEdgeDetails } from "./canvas/edgeCommands";
+export { applyAutoLayoutPositions } from "./canvas/layoutCommands";
 export {
   createConnectedNodeAt,
   createNodeAt,

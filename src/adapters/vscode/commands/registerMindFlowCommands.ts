@@ -6,7 +6,7 @@ import type { TaxonomyRequest } from "../../../application/flow-operations";
 import type { SidebarView } from "../sidebar/SidebarView";
 import { isMindFlowDocument, type FlowUriArgument } from "../documents/flowUri";
 import { rememberRecentFlow } from "../state/recentFlowState";
-import { createEdge, createConnectedNodeAt, createNodeAt, deleteNode, disconnectEdge, saveProjectOverviewPosition, updateAppSurfacePosition, updateEdgeDetails, updateNodeDetails, updateNodePosition, updateProjectOverviewDetails, type CreateConnectedNodeRequest } from "./canvasCommands";
+import { applyAutoLayoutPositions, createEdge, createConnectedNodeAt, createNodeAt, deleteNode, disconnectEdge, saveProjectOverviewPosition, updateAppSurfacePosition, updateEdgeDetails, updateNodeDetails, updateNodePosition, updateProjectOverviewDetails, type CreateConnectedNodeRequest } from "./canvasCommands";
 import { newFlow, openFlow, saveFlowAs, validateFlowJson } from "./fileCommands";
 import { updateTaxonomy } from "./taxonomyCommands";
 
@@ -32,6 +32,9 @@ export function registerMindFlowCommands(
     ),
     vscode.commands.registerCommand("mindflow.updateProjectOverviewPosition", (x?: number, y?: number, flowUri?: FlowUriArgument) =>
       saveProjectOverviewPosition(x, y, flowUri)
+    ),
+    vscode.commands.registerCommand("mindflow.applyAutoLayoutPositions", (projectOverviewPosition?: unknown, appSurfacePositions?: unknown, nodePositions?: unknown, flowUri?: FlowUriArgument) =>
+      applyAutoLayoutPositions(projectOverviewPosition, appSurfacePositions, nodePositions, flowUri)
     ),
     vscode.commands.registerCommand(
       "mindflow.createNodeAt",

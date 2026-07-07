@@ -159,6 +159,46 @@ test("Flow operation batches support atomic rollback and dry-run", () => {
   assert.equal(dryRun.flow.nodes.length, 2);
 });
 
+test("Flow operation batches apply auto layout positions atomically", () => {
+  const flow = createEmptyProductFlow();
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "后台。",
+    domainIds: [],
+    roleIds: []
+  }];
+  const created = applyFlowOperation(flow, { type: "node.create", input: { title: "工作台" } });
+  assert.equal(created.type, "node.create");
+  if (created.type !== "node.create") {
+    throw new Error("Expected node.create result.");
+  }
+
+  const beforeFailure = JSON.stringify(flow);
+  assertThrows(
+    () => applyFlowOperations(flow, [
+      { type: "node.move", nodeId: created.node.nodeId, x: 100.4, y: 200.6 },
+      { type: "node.move", nodeId: "missing_node", x: 300, y: 400 }
+    ], { atomic: true }),
+    /Missing node/
+  );
+  assert.equal(JSON.stringify(flow), beforeFailure);
+
+  const beforeApply = JSON.stringify(flow);
+  const applied = applyFlowOperations(flow, [
+    { type: "project.move", x: -10.2, y: 20.8 },
+    { type: "appSurface.move", appId: "app_admin", x: 520.2, y: 160.7 },
+    { type: "node.move", nodeId: created.node.nodeId, x: 1040.4, y: -20.6 }
+  ], { atomic: true });
+
+  assert.equal(applied.applied, true);
+  assert.deepEqual(applied.flow.projectOverview.view?.position, { x: -10, y: 21 });
+  assert.deepEqual(applied.flow.appSurfaces?.[0]?.view?.position, { x: 520, y: 161 });
+  assert.deepEqual(applied.flow.nodes[0]?.view?.position, { x: 1040, y: -21 });
+  assert.equal(JSON.stringify(flow), beforeApply);
+});
+
 function assertThrows(fn: () => void, pattern: RegExp): void {
   try {
     fn();

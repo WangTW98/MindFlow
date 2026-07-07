@@ -14,6 +14,12 @@ export type WebviewMessage =
   | { type: "saveNodePosition"; nodeId: string; x: number; y: number }
   | { type: "saveAppSurfacePosition"; appId: string; x: number; y: number }
   | { type: "saveProjectOverviewPosition"; x: number; y: number }
+  | {
+      type: "saveAutoLayoutPositions";
+      projectOverviewPosition: WebviewPosition;
+      appSurfacePositions: Record<string, WebviewPosition>;
+      nodePositions: Record<string, WebviewPosition>;
+    }
   | { type: "createNodeAt"; x: number; y: number; appSurfaceIds?: string[]; domainIds?: string[]; roleIds?: string[] }
   | { type: "updateNodeDetails"; nodeId: string; patch: Record<string, unknown> }
   | { type: "updateProjectOverview"; patch: Record<string, unknown> }
@@ -22,6 +28,11 @@ export type WebviewMessage =
   | { type: "updateEdgeDetails"; edgeId: string; revision?: number; patch: Record<string, unknown> }
   | { type: "removeEdge"; edgeId: string }
   | { type: "updateTaxonomy"; request: TaxonomyRequest };
+
+export interface WebviewPosition {
+  x: number;
+  y: number;
+}
 
 export interface FlowWebviewInitialState {
   flow: ProductFlow;

@@ -500,6 +500,24 @@ test("Webview message parser rejects malformed messages before command dispatch"
   assert.equal(parseWebviewMessage({ type: "saveNodePosition", nodeId: "node_a", x: Number.NaN, y: 20 }), undefined);
   assert.equal(parseWebviewMessage({ type: "saveProjectOverviewPosition", x: Number.POSITIVE_INFINITY, y: 20 }), undefined);
   assert.equal(parseWebviewMessage({
+    type: "saveAutoLayoutPositions",
+    projectOverviewPosition: { x: 0, y: 0 },
+    appSurfacePositions: { app_admin: { x: Number.NaN, y: 160 } },
+    nodePositions: {}
+  }), undefined);
+  assert.equal(parseWebviewMessage({
+    type: "saveAutoLayoutPositions",
+    projectOverviewPosition: { x: 0, y: 0 },
+    appSurfacePositions: {},
+    nodePositions: { node_a: { x: 320 } }
+  }), undefined);
+  assert.equal(parseWebviewMessage({
+    type: "saveAutoLayoutPositions",
+    projectOverviewPosition: { x: 0, y: 0 },
+    appSurfacePositions: [],
+    nodePositions: {}
+  }), undefined);
+  assert.equal(parseWebviewMessage({
     type: "createEdge",
     from: { kind: "node", nodeId: "node_a" },
     to: { kind: "featureItem", nodeId: "node_b", groupId: "group_a" }
@@ -524,6 +542,17 @@ test("Webview message parser rejects malformed messages before command dispatch"
     to: { kind: "node", nodeId: "node_b" },
     trigger: "进入",
     edgeType: "navigate"
+  });
+  assert.deepEqual(parseWebviewMessage({
+    type: "saveAutoLayoutPositions",
+    projectOverviewPosition: { x: -10.2, y: 20.8 },
+    appSurfacePositions: { app_admin: { x: 120.4, y: 160.6 } },
+    nodePositions: { node_a: { x: 520.1, y: -40.9 } }
+  }), {
+    type: "saveAutoLayoutPositions",
+    projectOverviewPosition: { x: -10.2, y: 20.8 },
+    appSurfacePositions: { app_admin: { x: 120.4, y: 160.6 } },
+    nodePositions: { node_a: { x: 520.1, y: -40.9 } }
   });
 });
 
@@ -563,6 +592,12 @@ test("Flow webview command dispatcher maps selection and edit messages", async (
   await dispatchFlowWebviewMessage({ type: "selectNode", nodeId: "node_a", selectedNodeIds: ["node_a", "node_b"] }, dispatcher.dispatcher);
   await dispatchFlowWebviewMessage({ type: "saveNodePosition", nodeId: "node_a", x: 12.2, y: 34.8 }, dispatcher.dispatcher);
   await dispatchFlowWebviewMessage({
+    type: "saveAutoLayoutPositions",
+    projectOverviewPosition: { x: 0, y: 10 },
+    appSurfacePositions: { app_admin: { x: 520, y: 120 } },
+    nodePositions: { node_a: { x: 1040, y: 240 }, node_b: { x: 1560, y: 360 } }
+  }, dispatcher.dispatcher);
+  await dispatchFlowWebviewMessage({
     type: "createEdge",
     from: { kind: "node", nodeId: "node_a" },
     to: { kind: "node", nodeId: "node_b" },
@@ -578,6 +613,14 @@ test("Flow webview command dispatcher maps selection and edit messages", async (
   });
   assert.deepEqual(dispatcher.commands, [
     ["保存节点位置", "mindflow.updateNodePosition", "node_a", 12.2, 34.8, dispatcher.documentUri],
+    [
+      "应用自动排版",
+      "mindflow.applyAutoLayoutPositions",
+      { x: 0, y: 10 },
+      { app_admin: { x: 520, y: 120 } },
+      { node_a: { x: 1040, y: 240 }, node_b: { x: 1560, y: 360 } },
+      dispatcher.documentUri
+    ],
     [
       "创建连线",
       "mindflow.createEdge",

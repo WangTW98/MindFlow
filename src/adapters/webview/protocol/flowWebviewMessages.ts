@@ -1,6 +1,6 @@
 import { readEndpoint, readOptionalEdgeType } from "./messages/endpointPayload";
 import { readConnectedNodeRequest, readEdgeDetailsPatch, readTaxonomyRequest } from "./messages/messagePayloads";
-import type { WebviewMessage } from "./messages/protocol";
+import type { WebviewMessage, WebviewPosition } from "./messages/protocol";
 import { isRecord, readNumber, readOptionalNumber, readOptionalString, readOptionalStringArray, readRecord, readString } from "./messages/readers";
 
 export type { WebviewMessage } from "./messages/protocol";
@@ -46,6 +46,14 @@ export function parseWebviewMessage(message: unknown): WebviewMessage | undefine
       const x = readNumber(message, "x");
       const y = readNumber(message, "y");
       return x !== undefined && y !== undefined ? { type: "saveProjectOverviewPosition", x, y } : undefined;
+    }
+    case "saveAutoLayoutPositions": {
+      const projectOverviewPosition = readPositionPayload(message.projectOverviewPosition);
+      const appSurfacePositions = readPositionRecordPayload(message.appSurfacePositions);
+      const nodePositions = readPositionRecordPayload(message.nodePositions);
+      return projectOverviewPosition && appSurfacePositions && nodePositions
+        ? { type: "saveAutoLayoutPositions", projectOverviewPosition, appSurfacePositions, nodePositions }
+        : undefined;
     }
     case "createNodeAt": {
       const x = readNumber(message, "x");
@@ -120,4 +128,28 @@ function readIdMessage<TType extends WebviewMessage["type"], TKey extends string
 ): Extract<WebviewMessage, { type: TType }> | undefined {
   const id = readString(message, key);
   return id ? ({ type, [key]: id } as Extract<WebviewMessage, { type: TType }>) : undefined;
+}
+
+function readPositionPayload(value: unknown): WebviewPosition | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const x = readNumber(value, "x");
+  const y = readNumber(value, "y");
+  return x !== undefined && y !== undefined ? { x, y } : undefined;
+}
+
+function readPositionRecordPayload(value: unknown): Record<string, WebviewPosition> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const positions: Record<string, WebviewPosition> = {};
+  for (const [id, position] of Object.entries(value)) {
+    const normalized = readPositionPayload(position);
+    if (!id || !normalized) {
+      return undefined;
+    }
+    positions[id] = normalized;
+  }
+  return positions;
 }

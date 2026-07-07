@@ -49,6 +49,16 @@ export async function dispatchFlowWebviewMessage(message: WebviewMessage, dispat
     case "saveProjectOverviewPosition":
       await dispatcher.executeCommand("保存项目概述位置", "mindflow.updateProjectOverviewPosition", message.x, message.y, dispatcher.documentUri);
       break;
+    case "saveAutoLayoutPositions":
+      await dispatcher.executeCommand(
+        "应用自动排版",
+        "mindflow.applyAutoLayoutPositions",
+        message.projectOverviewPosition,
+        message.appSurfacePositions,
+        message.nodePositions,
+        dispatcher.documentUri
+      );
+      break;
     case "createNodeAt":
       await dispatcher.executeCommand(
         "创建节点",

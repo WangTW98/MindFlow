@@ -126,13 +126,38 @@ function autoLayoutComputePreview(flow, measurements = {}) {
 
 function autoLayoutApplyCanvasPreview() {
   const layout = autoLayoutComputePreview(state.flow, autoLayoutCollectMeasurements());
-  autoLayoutPreviewState = autoLayoutCreatePreviewState(state.flow, layout);
-  autoLayoutApplyPreviewState(state.flow);
+  autoLayoutPreviewState = null;
+  autoLayoutApplyLayoutPositions(layout);
+  persistUiState();
   positionCards();
   autoLayoutFitCanvasPreview(layout.bounds);
   scheduleDrawEdges();
-  setCommandStatus(true, "已自动排版当前画布（预览，未保存）");
+  postWebviewMessage({
+    type: "saveAutoLayoutPositions",
+    projectOverviewPosition: layout.projectOverviewPosition,
+    appSurfacePositions: layout.appSurfacePositions,
+    nodePositions: layout.nodePositions
+  });
+  setCommandStatus(true, "已自动排版当前画布，位置已写入文档");
   updateCommandStatusElement();
+}
+
+function autoLayoutApplyLayoutPositions(layout) {
+  projectOverviewPosition = autoLayoutCopyPosition(layout.projectOverviewPosition);
+  appSurfacePositions.clear();
+  for (const [appId, position] of Object.entries(layout.appSurfacePositions || {})) {
+    const normalized = autoLayoutCopyPosition(position);
+    if (normalized) {
+      appSurfacePositions.set(appId, normalized);
+    }
+  }
+  nodePositions.clear();
+  for (const [nodeId, position] of Object.entries(layout.nodePositions || {})) {
+    const normalized = autoLayoutCopyPosition(position);
+    if (normalized) {
+      nodePositions.set(nodeId, normalized);
+    }
+  }
 }
 
 function autoLayoutCollectMeasurements() {

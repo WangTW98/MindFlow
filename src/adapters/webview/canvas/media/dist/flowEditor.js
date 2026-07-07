@@ -4288,13 +4288,37 @@
     }
     function autoLayoutApplyCanvasPreview() {
       const layout = autoLayoutComputePreview(state.flow, autoLayoutCollectMeasurements());
-      autoLayoutPreviewState = autoLayoutCreatePreviewState(state.flow, layout);
-      autoLayoutApplyPreviewState(state.flow);
+      autoLayoutPreviewState = null;
+      autoLayoutApplyLayoutPositions(layout);
+      persistUiState();
       positionCards();
       autoLayoutFitCanvasPreview(layout.bounds);
       scheduleDrawEdges();
-      setCommandStatus(true, "\u5DF2\u81EA\u52A8\u6392\u7248\u5F53\u524D\u753B\u5E03\uFF08\u9884\u89C8\uFF0C\u672A\u4FDD\u5B58\uFF09");
+      postWebviewMessage({
+        type: "saveAutoLayoutPositions",
+        projectOverviewPosition: layout.projectOverviewPosition,
+        appSurfacePositions: layout.appSurfacePositions,
+        nodePositions: layout.nodePositions
+      });
+      setCommandStatus(true, "\u5DF2\u81EA\u52A8\u6392\u7248\u5F53\u524D\u753B\u5E03\uFF0C\u4F4D\u7F6E\u5DF2\u5199\u5165\u6587\u6863");
       updateCommandStatusElement();
+    }
+    function autoLayoutApplyLayoutPositions(layout) {
+      projectOverviewPosition = autoLayoutCopyPosition(layout.projectOverviewPosition);
+      appSurfacePositions.clear();
+      for (const [appId, position] of Object.entries(layout.appSurfacePositions || {})) {
+        const normalized = autoLayoutCopyPosition(position);
+        if (normalized) {
+          appSurfacePositions.set(appId, normalized);
+        }
+      }
+      nodePositions.clear();
+      for (const [nodeId, position] of Object.entries(layout.nodePositions || {})) {
+        const normalized = autoLayoutCopyPosition(position);
+        if (normalized) {
+          nodePositions.set(nodeId, normalized);
+        }
+      }
     }
     function autoLayoutCollectMeasurements() {
       const measurements = {
