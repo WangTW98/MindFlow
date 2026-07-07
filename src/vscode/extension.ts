@@ -6,7 +6,7 @@ import {
   rememberRecentFlow
 } from "./flowContext";
 import { registerMindFlowCommands } from "./mindFlowCommands";
-import { registerMindFlowMcp } from "../mcp/vscode/adapter";
+import { registerMindFlowMcp } from "./mcp/adapter";
 import { FlowPanel } from "./webviews/canvas/FlowPanel";
 import { SidebarView } from "./webviews/sidebar/SidebarView";
 

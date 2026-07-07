@@ -1,5 +1,5 @@
 import { MINDFLOW_OPERATIONS_REFERENCE, MINDFLOW_OPERATIONS_REFERENCE_URI } from "./operationsReference";
-import type { MindFlowMcpToolHandlers } from "./tools";
+import type { MindFlowMcpToolHandlers } from "./tools/index";
 
 export interface JsonRpcRequest {
   jsonrpc?: string;

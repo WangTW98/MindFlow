@@ -1,4 +1,4 @@
-import { EDGE_TYPES } from "../state/product-flow";
+import { EDGE_TYPES } from "../domain/product-flow";
 
 export const MINDFLOW_OPERATIONS_REFERENCE_URI = "mindflow://operations-reference";
 

@@ -1,4 +1,4 @@
-import type { ProductFlow } from "../../../state/product-flow";
+import type { ProductFlow } from "../../../domain/product-flow";
 
 export function chooseFresherFlow(documentFlow: ProductFlow, fallbackFlow: ProductFlow): ProductFlow {
   if (fallbackFlow.revision > documentFlow.revision) {

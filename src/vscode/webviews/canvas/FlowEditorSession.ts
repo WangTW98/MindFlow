@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import type { ProductFlow } from "../../../state/product-flow";
-import { parseProductFlowText, serializeProductFlow, tryParseProductFlowText } from "../../../state/product-flow/codec";
+import type { ProductFlow } from "../../../domain/product-flow";
+import { parseProductFlowText, serializeProductFlow, tryParseProductFlowText } from "../../../domain/product-flow/codec";
 import { chooseFresherFlow } from "./flowDocument";
 import { dispatchFlowWebviewMessage } from "./flowCommandDispatcher";
 import { readRenderableDocumentText, replaceDocumentText as applyDocumentTextReplacement } from "./flowDocumentText";
@@ -14,7 +14,7 @@ import {
   renderFlowRestorePendingHtml,
   renderFlowWebviewHtml
 } from "./flowWebviewHtml";
-import { parseWebviewMessage, type WebviewMessage } from "../../../user-operations/flowWebviewMessages";
+import { parseWebviewMessage, type WebviewMessage } from "../../../webview/protocol/flowWebviewMessages";
 
 export class FlowEditorSession {
   private flow: ProductFlow | undefined;
@@ -147,6 +147,6 @@ export class FlowEditorSession {
   }
 
   private mediaUri(fileName: string): string {
-    return this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "src", "canvas", "media", ...fileName.split("/"))).toString();
+    return this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "src", "webview", "canvas", "media", ...fileName.split("/"))).toString();
   }
 }

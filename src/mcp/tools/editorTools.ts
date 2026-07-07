@@ -1,4 +1,4 @@
-import { normalizeFlowSelection } from "../../state/selection";
+import { normalizeFlowSelection } from "../../domain/selection";
 import type { MindFlowEditorBridge } from "../bridge";
 import { buildHydratedSelection, buildSelectionIssues, snapshotToPayload } from "./payloads";
 import { readOptionalString, readStringPatch } from "./readers";

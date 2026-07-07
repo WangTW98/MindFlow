@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
-import type { EdgeType, FlowEndpoint } from "../state/product-flow";
-import type { UpdateEdgeDetailsInput, UpdateNodeDetailsInput } from "../state/operations";
-import type { UpdateProjectOverviewInput } from "../state/operations";
-import type { TaxonomyRequest } from "../state/operations";
+import type { EdgeType, FlowEndpoint } from "../domain/product-flow";
+import type { UpdateEdgeDetailsInput, UpdateNodeDetailsInput } from "../domain/operations";
+import type { UpdateProjectOverviewInput } from "../domain/operations";
+import type { TaxonomyRequest } from "../domain/operations";
 import type { SidebarView } from "./webviews/sidebar/SidebarView";
 import { isMindFlowDocument, rememberRecentFlow, type FlowUriArgument } from "./flowContext";
-import { createEdge, createConnectedNodeAt, createNodeAt, deleteNode, disconnectEdge, saveProjectOverviewPosition, updateAppSurfacePosition, updateEdgeDetails, updateNodeDetails, updateNodePosition, updateProjectOverviewDetails, type CreateConnectedNodeRequest } from "../user-operations/vscode-commands/canvasCommands";
-import { newFlow, openFlow, saveFlowAs, validateFlowJson } from "../user-operations/vscode-commands/fileCommands";
-import { updateTaxonomy } from "../user-operations/vscode-commands/taxonomyCommands";
+import { createEdge, createConnectedNodeAt, createNodeAt, deleteNode, disconnectEdge, saveProjectOverviewPosition, updateAppSurfacePosition, updateEdgeDetails, updateNodeDetails, updateNodePosition, updateProjectOverviewDetails, type CreateConnectedNodeRequest } from "./commands/canvasCommands";
+import { newFlow, openFlow, saveFlowAs, validateFlowJson } from "./commands/fileCommands";
+import { updateTaxonomy } from "./commands/taxonomyCommands";
 
 export function registerMindFlowCommands(
   context: vscode.ExtensionContext,

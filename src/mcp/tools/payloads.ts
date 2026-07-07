@@ -1,7 +1,7 @@
-import { normalizeFlowSelection, type FlowSelectionPatch } from "../../state/selection";
-import type { FlowOperationResult } from "../../state/operations";
-import { PROJECT_OVERVIEW_NODE_ID } from "../../state/operations";
-import type { PageNode, ProductFlow } from "../../state/product-flow";
+import { normalizeFlowSelection, type FlowSelectionPatch } from "../../domain/selection";
+import type { FlowOperationResult } from "../../domain/operations";
+import { PROJECT_OVERVIEW_NODE_ID } from "../../domain/operations";
+import type { PageNode, ProductFlow } from "../../domain/product-flow";
 import type { MindFlowEditorSnapshot } from "../bridge";
 
 export function buildHydratedSelection(snapshot: MindFlowEditorSnapshot): Record<string, unknown> {

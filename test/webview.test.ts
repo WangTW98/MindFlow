@@ -11,17 +11,17 @@ import { createManualEdge, createManualNode, removeManualEdge, removeManualNode,
 import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/operations/projectOverview";
 import { applyTaxonomyRequest } from "../src/domain/operations/taxonomy";
 import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/operations/taxonomyEditing";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/extension/documents/untitledMindFlowDocument";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/vscode/documents/untitledMindFlowDocument";
 import { EDGE_TYPES, validateProductFlow } from "../src/domain/product-flow";
 import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/codec";
-import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
-import { RecentFlowStore } from "../src/extension/state/recentFlows";
-import { dispatchFlowWebviewMessage } from "../src/extension/webviews/canvas/flowCommandDispatcher";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/persistence/flowRepository";
+import { RecentFlowStore } from "../src/vscode/state/recentFlows";
+import { dispatchFlowWebviewMessage } from "../src/vscode/webviews/canvas/flowCommandDispatcher";
 import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/domain/selection";
-import { recordEdgeDetailsRevision } from "../src/extension/webviews/canvas/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/extension/webviews/canvas/flowWebviewHtml";
-import { parseWebviewMessage } from "../src/webview/flowWebviewMessages";
-import { parseSidebarMessage } from "../src/webview/sidebar/sidebarMessages";
+import { recordEdgeDetailsRevision } from "../src/vscode/webviews/canvas/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/vscode/webviews/canvas/flowWebviewHtml";
+import { parseWebviewMessage } from "../src/webview/protocol/flowWebviewMessages";
+import { parseSidebarMessage } from "../src/webview/protocol/sidebarMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("FlowPanel webview HTML loads declared media resources in order", () => {
@@ -45,7 +45,7 @@ test("FlowPanel webview HTML loads declared media resources in order", () => {
 
 test("FlowPanel declared media resources exist on disk", async () => {
   for (const fileName of [...FLOW_WEBVIEW_STYLE_FILES, ...FLOW_WEBVIEW_SCRIPT_FILES]) {
-    await fs.readFile(path.join(process.cwd(), "src", "canvas", "media", fileName));
+    await fs.readFile(path.join(process.cwd(), "src", "webview", "canvas", "media", fileName));
   }
 });
 
@@ -65,15 +65,15 @@ test("FlowPanel webview uses one bundled script instead of legacy multi-script e
   assert.equal(html.includes("media/events/canvas-bindings.js"), false);
 });
 
-test("Sidebar webview loads stylesheet from canvas media", async () => {
+test("Sidebar webview loads stylesheet from sidebar media", async () => {
   const [viewSource, htmlSource] = await Promise.all([
     fs.readFile(path.join(process.cwd(), "src", "vscode", "webviews", "sidebar", "SidebarView.ts"), "utf8"),
     fs.readFile(path.join(process.cwd(), "src", "vscode", "webviews", "sidebar", "sidebarHtml.ts"), "utf8")
   ]);
 
-  assert.ok(viewSource.includes("\"src\", \"canvas\", \"media\""));
-  assert.ok(htmlSource.includes("\"src\", \"canvas\", \"media\", \"sidebar.css\""));
-  assert.equal(`${viewSource}\n${htmlSource}`.includes("\"src\", \"webview\", \"media\""), false);
+  assert.ok(viewSource.includes("\"src\", \"webview\", \"sidebar\", \"media\""));
+  assert.ok(htmlSource.includes("\"src\", \"webview\", \"sidebar\", \"media\", \"sidebar.css\""));
+  assert.equal(`${viewSource}\n${htmlSource}`.includes("\"src\", \"canvas\", \"media\""), false);
 });
 
 test("Webview endpoint codec falls back when encoded values are malformed", async () => {
@@ -732,7 +732,7 @@ interface AutoLayoutHelpers {
 
 async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "canvas", "selectors", "canvas-endpoint-codec.js"),
+    path.join(process.cwd(), "src", "webview", "canvas", "client", "selectors", "canvas-endpoint-codec.js"),
     "utf8"
   );
   const factory = new Function(
@@ -745,7 +745,7 @@ async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
 
 async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "canvas", "render", "canvas-selection-relations.js"),
+    path.join(process.cwd(), "src", "webview", "canvas", "client", "render", "canvas-selection-relations.js"),
     "utf8"
   );
   const factory = new Function(
@@ -757,7 +757,7 @@ async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers>
 
 async function loadAutoLayoutHelpers(): Promise<AutoLayoutHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "canvas", "layout", "canvas-auto-layout.js"),
+    path.join(process.cwd(), "src", "webview", "canvas", "client", "layout", "canvas-auto-layout.js"),
     "utf8"
   );
   const factory = new Function(`${source}\nreturn { autoLayoutComputePreview, autoLayoutCreatePreviewState, autoLayoutPreviewPositionsForFlow, autoLayoutPreviewStateWithPosition, autoLayoutEstimateLabelWidth };`) as () => AutoLayoutHelpers;

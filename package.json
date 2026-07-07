@@ -29,14 +29,14 @@
   "bin": {
     "mindflow-mcp": "./out/src/mcp/stdioBridge.js"
   },
-  "main": "./out/src/extension.js",
+  "main": "./out/src/vscode/extension.js",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
           "id": "mindflow",
           "title": "MindFlow",
-          "icon": "src/canvas/media/icon.svg"
+          "icon": "src/webview/media/icon.svg"
         }
       ]
     },
@@ -60,8 +60,8 @@
           ".mindflow"
         ],
         "icon": {
-          "light": "src/canvas/media/icon.svg",
-          "dark": "src/canvas/media/icon.svg"
+          "light": "src/webview/media/icon.svg",
+          "dark": "src/webview/media/icon.svg"
         }
       }
     ],
@@ -82,7 +82,7 @@
         "fileMatch": [
           "*.mindflow"
         ],
-        "url": "./src/state/schema/productFlow.schema.json"
+        "url": "./src/domain/schema/productFlow.schema.json"
       }
     ],
     "commands": [

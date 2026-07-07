@@ -5,7 +5,7 @@ import { createManualEdge, createManualNode } from "../src/domain/operations/flo
 import type { ProductFlow } from "../src/domain/product-flow";
 import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../src/mcp/bridge";
 import { MINDFLOW_OPERATIONS_REFERENCE } from "../src/mcp/operationsReference";
-import { MindFlowMcpToolHandlers } from "../src/mcp/tools";
+import { MindFlowMcpToolHandlers } from "../src/mcp/tools/index";
 import { listMcpToolRegistryNames } from "../src/mcp/tools/registry";
 import { MINDFLOW_MCP_TOOLS } from "../src/mcp/toolSchemas";
 import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/domain/selection";

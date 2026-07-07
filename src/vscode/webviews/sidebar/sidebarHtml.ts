@@ -10,7 +10,7 @@ export interface SidebarHtmlOptions {
 
 export function renderSidebarHtml(options: SidebarHtmlOptions): string {
   const nonce = getNonce();
-  const style = options.webview.asWebviewUri(vscode.Uri.joinPath(options.extensionUri, "src", "canvas", "media", "sidebar.css"));
+  const style = options.webview.asWebviewUri(vscode.Uri.joinPath(options.extensionUri, "src", "webview", "sidebar", "media", "sidebar.css"));
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>

@@ -1,5 +1,5 @@
-import { APP_SURFACE_TYPES, EDGE_TYPES, ENTITY_STATUSES, FLOW_ENDPOINT_KINDS, type EdgeType, type EntityStatus, type FeatureGroup, type FlowEdge, type FlowEndpoint, type PageNode, type ProductFlow } from "../../state/product-flow";
-import { PROJECT_OVERVIEW_NODE_ID, type FlowOperation, type FlowOperationResult, type TaxonomyKind, type UpdateEdgeDetailsInput, type UpdateNodeDetailsInput, type UpsertEdgeOperationInput } from "../../state/operations";
+import { APP_SURFACE_TYPES, EDGE_TYPES, ENTITY_STATUSES, FLOW_ENDPOINT_KINDS, type EdgeType, type EntityStatus, type FeatureGroup, type FlowEdge, type FlowEndpoint, type PageNode, type ProductFlow } from "../../domain/product-flow";
+import { PROJECT_OVERVIEW_NODE_ID, type FlowOperation, type FlowOperationResult, type TaxonomyKind, type UpdateEdgeDetailsInput, type UpdateNodeDetailsInput, type UpsertEdgeOperationInput } from "../../domain/operations";
 import { MINDFLOW_MCP_TOOLS } from "../toolSchemas";
 import {
   asRecord,
@@ -17,7 +17,7 @@ import {
   stripUndefined
 } from "./readers";
 import { MCP_NODE_KINDS, type IdMaps, type McpNodeKind } from "./types";
-import type { FlowSelectionPatch } from "../../state/selection";
+import type { FlowSelectionPatch } from "../../domain/selection";
 
 export function taxonomyUpsertOperation(input: Record<string, unknown>, kind: TaxonomyKind): FlowOperation {
   const item = asRecord(input.item ?? input);

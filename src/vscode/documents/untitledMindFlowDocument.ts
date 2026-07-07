@@ -1,11 +1,11 @@
-import type { ProductFlow } from "../../state/product-flow";
+import type { ProductFlow } from "../../domain/product-flow";
 import {
   createMindFlowFileName,
   createUntitledMindFlowFileName,
   MINDFLOW_FILE_EXTENSION,
   MINDFLOW_LANGUAGE_ID
-} from "../../state/product-flow/fileNaming";
-import { serializeProductFlow } from "../../state/product-flow/codec";
+} from "../../domain/product-flow/fileNaming";
+import { serializeProductFlow } from "../../domain/product-flow/codec";
 
 export {
   createMindFlowFileName,

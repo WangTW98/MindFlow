@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { FlowSelectionPatch, FlowSelectionState } from "../../../state/selection";
+import type { FlowSelectionPatch, FlowSelectionState } from "../../../domain/selection";
 
 export interface FlowEditorSelectionController {
   getSelection(flowUri: vscode.Uri | string): FlowSelectionState;

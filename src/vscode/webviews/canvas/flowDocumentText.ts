@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as vscode from "vscode";
-import type { ProductFlow } from "../../../state/product-flow";
-import { serializeProductFlow } from "../../../state/product-flow/codec";
+import type { ProductFlow } from "../../../domain/product-flow";
+import { serializeProductFlow } from "../../../domain/product-flow/codec";
 
 export interface RenderableDocumentText {
   text: string;

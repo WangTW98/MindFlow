@@ -11,14 +11,14 @@ import { createManualEdge, createManualNode, removeManualEdge, removeManualNode,
 import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/operations/projectOverview";
 import { applyTaxonomyRequest } from "../src/domain/operations/taxonomy";
 import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/operations/taxonomyEditing";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/extension/documents/untitledMindFlowDocument";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/vscode/documents/untitledMindFlowDocument";
 import { EDGE_TYPES, validateProductFlow } from "../src/domain/product-flow";
 import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/codec";
-import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
-import { RecentFlowStore } from "../src/extension/state/recentFlows";
-import { recordEdgeDetailsRevision } from "../src/extension/webviews/canvas/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/extension/webviews/canvas/flowWebviewHtml";
-import { parseWebviewMessage } from "../src/webview/flowWebviewMessages";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/persistence/flowRepository";
+import { RecentFlowStore } from "../src/vscode/state/recentFlows";
+import { recordEdgeDetailsRevision } from "../src/vscode/webviews/canvas/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/vscode/webviews/canvas/flowWebviewHtml";
+import { parseWebviewMessage } from "../src/webview/protocol/flowWebviewMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("Manual node details can set and clear a status group", () => {

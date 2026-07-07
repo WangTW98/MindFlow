@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { RecentFlowStore } from "../../../state/vscode/recentFlows";
-import { parseSidebarMessage } from "../../../user-operations/sidebar/sidebarMessages";
+import { RecentFlowStore } from "../../state/recentFlows";
+import { parseSidebarMessage } from "../../../webview/protocol/sidebarMessages";
 import { renderSidebarHtml } from "./sidebarHtml";
 import { createSidebarState } from "./sidebarState";
 
@@ -20,7 +20,7 @@ export class SidebarView implements vscode.WebviewViewProvider {
     this.webviewView = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "src", "canvas", "media")]
+      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "src", "webview", "sidebar", "media")]
     };
     webviewView.webview.html = await this.render(webviewView.webview);
     webviewView.webview.onDidReceiveMessage(async (rawMessage: unknown) => {

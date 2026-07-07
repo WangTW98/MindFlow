@@ -8,8 +8,6 @@
     "test/**/*.ts"
   ],
   "exclude": [
-    "src/extension.ts",
-    "src/webview/FlowPanel.ts",
     "node_modules",
     "out"
   ]

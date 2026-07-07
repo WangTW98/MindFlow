@@ -11,14 +11,14 @@ import { createManualEdge, createManualNode, removeManualEdge, removeManualNode,
 import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/operations/projectOverview";
 import { applyTaxonomyRequest } from "../src/domain/operations/taxonomy";
 import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/operations/taxonomyEditing";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/extension/documents/untitledMindFlowDocument";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/vscode/documents/untitledMindFlowDocument";
 import { EDGE_TYPES, validateProductFlow } from "../src/domain/product-flow";
 import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/codec";
-import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
-import { RecentFlowStore } from "../src/extension/state/recentFlows";
-import { recordEdgeDetailsRevision } from "../src/extension/webviews/canvas/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/extension/webviews/canvas/flowWebviewHtml";
-import { parseWebviewMessage } from "../src/webview/flowWebviewMessages";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/persistence/flowRepository";
+import { RecentFlowStore } from "../src/vscode/state/recentFlows";
+import { recordEdgeDetailsRevision } from "../src/vscode/webviews/canvas/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/vscode/webviews/canvas/flowWebviewHtml";
+import { parseWebviewMessage } from "../src/webview/protocol/flowWebviewMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("Extension manifest contributes standalone .mindflow editor, sidebar, and MCP config command", async () => {
@@ -39,13 +39,13 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and M
     };
   };
 
-  assert.ok(manifest.contributes?.viewsContainers?.activitybar?.some((item) => item.id === "mindflow" && item.icon === "src/canvas/media/icon.svg"));
+  assert.ok(manifest.contributes?.viewsContainers?.activitybar?.some((item) => item.id === "mindflow" && item.icon === "src/webview/media/icon.svg"));
   const sidebarView = manifest.contributes?.views?.mindflow?.find((item) => item.id === "mindflow.sidebar");
   assert.equal(sidebarView?.type, "webview");
   const language = manifest.contributes?.languages?.find((item) => item.id === "mindflow");
   assert.ok(language?.extensions?.includes(".mindflow"));
-  assert.equal(language?.icon?.light, "src/canvas/media/icon.svg");
-  assert.equal(language?.icon?.dark, "src/canvas/media/icon.svg");
+  assert.equal(language?.icon?.light, "src/webview/media/icon.svg");
+  assert.equal(language?.icon?.dark, "src/webview/media/icon.svg");
   const editor = manifest.contributes?.customEditors?.find((item) => item.viewType === "mindflow.productFlow");
   assert.ok(editor);
   assert.ok(editor.selector?.some((item) => item.filenamePattern === "*.mindflow"));
@@ -63,7 +63,7 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and M
     false
   );
   assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), ["mindflow.storage.flowDirectory"]);
-  assert.equal(manifest.contributes?.jsonValidation?.[0]?.url, "./src/state/schema/productFlow.schema.json");
+  assert.equal(manifest.contributes?.jsonValidation?.[0]?.url, "./src/domain/schema/productFlow.schema.json");
   assert.deepEqual(manifest.bin, { "mindflow-mcp": "./out/src/mcp/stdioBridge.js" });
   const removedScriptPrefix = ["m", "c", "p"].join("") + ":";
   assert.equal(Object.keys(manifest.scripts ?? {}).some((script) => script.startsWith(removedScriptPrefix)), false);
