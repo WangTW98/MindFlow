@@ -4,28 +4,28 @@ import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
 import type * as vscode from "vscode";
-import { ensureAppSurfaceEntryEdges } from "../src/domain/operations/layout/appSurfaceEntryEdges";
-import { ensureReasonableNodeLayout } from "../src/domain/operations/layout/canvasLayout";
-import { createEmptyProductFlow } from "../src/domain/product-flow/factory";
-import { createManualEdge, createManualNode, deriveFeatureGroups, removeManualEdge, removeManualNode, updateManualAppSurfacePosition, updateManualEdgeDetails, updateManualNodeDetails, updateManualNodePosition } from "../src/domain/operations/flowEditing";
-import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview, updateProjectOverviewPosition } from "../src/domain/operations/projectOverview";
-import { applyTaxonomyRequest } from "../src/domain/operations/taxonomy";
-import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/operations/taxonomyEditing";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/vscode/documents/untitledMindFlowDocument";
+import { ensureAppSurfaceEntryEdges } from "../src/domain/product-flow/editing/layout/appSurfaceEntryEdges";
+import { ensureReasonableNodeLayout } from "../src/domain/product-flow/editing/layout/canvasLayout";
+import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
+import { createFlowEdge, createFlowNode, deriveFeatureGroups, removeFlowEdge, removeFlowNode, updateFlowAppSurfacePosition, updateFlowEdgeDetails, updateFlowNodeDetails, updateFlowNodePosition } from "../src/domain/product-flow/editing/graph";
+import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview, updateProjectOverviewPosition } from "../src/domain/product-flow/editing/projectOverviewMutations";
+import { applyTaxonomyRequest } from "../src/domain/product-flow/editing/taxonomy";
+import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/product-flow/editing/taxonomy/referenceCleanup";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/adapters/vscode/documents/untitledMindFlowDocument";
 import { EDGE_TYPES, validateProductFlow } from "../src/domain/product-flow";
-import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/codec";
-import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/persistence/flowRepository";
-import { RecentFlowStore } from "../src/vscode/state/recentFlows";
-import { recordEdgeDetailsRevision } from "../src/vscode/webviews/canvas/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/vscode/webviews/canvas/flowWebviewHtml";
-import { parseWebviewMessage } from "../src/webview/protocol/flowWebviewMessages";
+import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/serialization/codec";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/infrastructure/persistence/flowRepository";
+import { RecentFlowStore } from "../src/adapters/vscode/state/recentFlows";
+import { recordEdgeDetailsRevision } from "../src/adapters/vscode/editor/canvas/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/adapters/vscode/editor/canvas/webviewShellHtml";
+import { parseWebviewMessage } from "../src/adapters/webview/protocol/flowWebviewMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("Project overview endpoint can create a normal persisted edge", () => {
   const flow = createEmptyProductFlow();
-  const target = createManualNode(flow, { title: "采购工作台" });
+  const target = createFlowNode(flow, { title: "采购工作台" });
 
-  const edge = createManualEdge(flow, {
+  const edge = createFlowEdge(flow, {
     from: { kind: "projectOverview", nodeId: PROJECT_OVERVIEW_NODE_ID },
     to: { kind: "node", nodeId: target.nodeId },
     trigger: "进入项目主流程",
@@ -58,12 +58,12 @@ test("Project overview app-surface system links are not persisted", () => {
 
 test("Generated nodes without coordinates receive a structural canvas layout", () => {
   const flow = createEmptyProductFlow();
-  const start = createManualNode(flow, { title: "开始页" });
-  const review = createManualNode(flow, { title: "审核页" });
-  const done = createManualNode(flow, { title: "完成页" });
+  const start = createFlowNode(flow, { title: "开始页" });
+  const review = createFlowNode(flow, { title: "审核页" });
+  const done = createFlowNode(flow, { title: "完成页" });
 
-  createManualEdge(flow, { from: { kind: "node", nodeId: start.nodeId }, to: { kind: "node", nodeId: review.nodeId } });
-  createManualEdge(flow, { from: { kind: "node", nodeId: review.nodeId }, to: { kind: "node", nodeId: done.nodeId } });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: start.nodeId }, to: { kind: "node", nodeId: review.nodeId } });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: review.nodeId }, to: { kind: "node", nodeId: done.nodeId } });
   const revisionBeforeLayout = flow.revision;
 
   const result = ensureReasonableNodeLayout(flow);
@@ -92,19 +92,19 @@ test("Manual position changes bump revision consistently", () => {
   assert.ok(surface);
 
   const beforeNodeMove = flow.revision;
-  updateManualNodePosition(flow, node.nodeId, 128.8, 256.2);
+  updateFlowNodePosition(flow, node.nodeId, 128.8, 256.2);
   assert.equal(flow.revision, beforeNodeMove + 1);
   assert.deepEqual(node.view?.position, { x: 129, y: 256 });
 
   const beforeSurfaceMove = flow.revision;
-  updateManualAppSurfacePosition(flow, surface.appId, -420.4, 160.6);
+  updateFlowAppSurfacePosition(flow, surface.appId, -420.4, 160.6);
   assert.equal(flow.revision, beforeSurfaceMove + 1);
   assert.deepEqual(surface.view?.position, { x: -420, y: 161 });
 });
 
 test("Manual position updates reject non-finite coordinates", () => {
   const flow = createEmptyProductFlow();
-  const node = createManualNode(flow, { title: "坐标验证页" });
+  const node = createFlowNode(flow, { title: "坐标验证页" });
   flow.appSurfaces = [{
     appId: "app_admin",
     name: "管理后台",
@@ -114,11 +114,11 @@ test("Manual position updates reject non-finite coordinates", () => {
     roleIds: []
   }];
 
-  assertThrows(() => updateManualNodePosition(flow, node.nodeId, Number.NaN, 120), /finite numbers/);
-  assertThrows(() => updateManualAppSurfacePosition(flow, "app_admin", 120, Number.POSITIVE_INFINITY), /finite numbers/);
+  assertThrows(() => updateFlowNodePosition(flow, node.nodeId, Number.NaN, 120), /finite numbers/);
+  assertThrows(() => updateFlowAppSurfacePosition(flow, "app_admin", 120, Number.POSITIVE_INFINITY), /finite numbers/);
   assertThrows(() => updateProjectOverviewPosition(flow, Number.NEGATIVE_INFINITY, 120), /finite numbers/);
 
-  const fallback = createManualNode(flow, { title: "部分坐标页", x: Number.NaN, y: 240 });
+  const fallback = createFlowNode(flow, { title: "部分坐标页", x: Number.NaN, y: 240 });
   assert.deepEqual(fallback.view?.position, { x: 80, y: 240 });
   assert.equal(validateProductFlow(flow).valid, true);
 });
@@ -152,8 +152,8 @@ test("Project overview edits sanitize text and preserve required fallbacks", () 
 
 test("Canvas layout repair preserves explicit node positions", () => {
   const flow = createEmptyProductFlow();
-  const fixed = createManualNode(flow, { title: "固定页", x: 640, y: 120 });
-  const generated = createManualNode(flow, { title: "生成页" });
+  const fixed = createFlowNode(flow, { title: "固定页", x: 640, y: 120 });
+  const generated = createFlowNode(flow, { title: "生成页" });
 
   const result = ensureReasonableNodeLayout(flow);
 
@@ -193,8 +193,8 @@ test("Manual feature item outlet can connect to multiple target nodes", () => {
     groupId: group.groupId,
     itemId: item.itemId
   };
-  createManualEdge(flow, { from, toNodeId: approval.nodeId, trigger: "生成比价报告后审批", type: "submit" });
-  createManualEdge(flow, { from, toNodeId: plan.nodeId, trigger: "生成比价报告后回看计划", type: "navigate" });
+  createFlowEdge(flow, { from, toNodeId: approval.nodeId, trigger: "生成比价报告后审批", type: "submit" });
+  createFlowEdge(flow, { from, toNodeId: plan.nodeId, trigger: "生成比价报告后回看计划", type: "navigate" });
 
   const sameOutletEdges = flow.edges.filter((edge) =>
     edge.status === "active" &&
@@ -218,13 +218,13 @@ test("Manual target node inlet can accept multiple source outlets", () => {
   assert.ok(inquiryGroup);
   assert.ok(supplierGroup);
 
-  createManualEdge(flow, {
+  createFlowEdge(flow, {
     from: { kind: "featureGroup", nodeId: inquiry.nodeId, groupId: inquiryGroup.groupId },
     toNodeId: compare.nodeId,
     trigger: "询价发布后进入报价对比",
     type: "navigate"
   });
-  createManualEdge(flow, {
+  createFlowEdge(flow, {
     from: { kind: "featureGroup", nodeId: supplierHome.nodeId, groupId: supplierGroup.groupId },
     toNodeId: compare.nodeId,
     trigger: "供应商报价汇总后进入报价对比",
@@ -244,8 +244,8 @@ test("Manual app surface card can be positioned and connected as a normal edge e
   assert.ok(surface);
   assert.ok(target);
 
-  updateManualAppSurfacePosition(flow, surface.appId, -420, 160);
-  const edge = createManualEdge(flow, {
+  updateFlowAppSurfacePosition(flow, surface.appId, -420, 160);
+  const edge = createFlowEdge(flow, {
     from: { kind: "appSurface", nodeId: surface.appId, appId: surface.appId },
     to: { kind: "node", nodeId: target.nodeId },
     trigger: "从应用端进入页面",
@@ -274,21 +274,21 @@ test("Manual edge details update endpoints and new edge category types", () => {
   assert.ok(quoteGroup);
   assert.ok(quoteItem);
 
-  const defaultEdge = createManualEdge(flow, {
+  const defaultEdge = createFlowEdge(flow, {
     from: { kind: "node", nodeId: inquiry.nodeId },
     toNodeId: quote.nodeId,
     trigger: "默认连线类型"
   });
   assert.equal(defaultEdge.type, "interaction");
 
-  const edge = createManualEdge(flow, {
+  const edge = createFlowEdge(flow, {
     from: { kind: "node", nodeId: inquiry.nodeId },
     toNodeId: compare.nodeId,
     trigger: "编辑连线详情",
     type: "navigate"
   });
 
-  updateManualEdgeDetails(flow, edge.edgeId, {
+  updateFlowEdgeDetails(flow, edge.edgeId, {
     from: { kind: "featureGroup", nodeId: inquiry.nodeId, groupId: inquiryGroup.groupId },
     to: { kind: "featureItem", nodeId: quote.nodeId, groupId: quoteGroup.groupId, itemId: quoteItem.itemId },
     trigger: "报价触发规则",
@@ -312,21 +312,21 @@ test("Manual edge details update endpoints and new edge category types", () => {
   assert.equal(updated?.condition, "报价数据同步后可流转");
   assert.equal(updated?.appSurfaceIds?.join(","), "app_admin,app_supplier_portal");
 
-  updateManualEdgeDetails(flow, edge.edgeId, { type: "statusChange" });
+  updateFlowEdgeDetails(flow, edge.edgeId, { type: "statusChange" });
   assert.equal(updated?.type, "statusChange");
 
-  updateManualEdgeDetails(flow, edge.edgeId, { type: "nestedRelation" });
+  updateFlowEdgeDetails(flow, edge.edgeId, { type: "nestedRelation" });
   assert.equal(updated?.type, "nestedRelation");
 });
 
 test("Manual edge editing rejects unsupported edge types at runtime", () => {
   const flow = createEmptyProductFlow();
-  const source = createManualNode(flow, { title: "来源页" });
-  const target = createManualNode(flow, { title: "目标页" });
+  const source = createFlowNode(flow, { title: "来源页" });
+  const target = createFlowNode(flow, { title: "目标页" });
   const edgeCount = flow.edges.length;
 
   assertThrows(() => {
-    createManualEdge(flow, {
+    createFlowEdge(flow, {
       from: { kind: "node", nodeId: source.nodeId },
       toNodeId: target.nodeId,
       trigger: "非法连线类型",
@@ -335,27 +335,27 @@ test("Manual edge editing rejects unsupported edge types at runtime", () => {
   }, /Unsupported edge type/);
   assert.equal(flow.edges.length, edgeCount);
 
-  const edge = createManualEdge(flow, {
+  const edge = createFlowEdge(flow, {
     from: { kind: "node", nodeId: source.nodeId },
     toNodeId: target.nodeId,
     trigger: "合法连线类型",
     type: "interaction"
   });
   assertThrows(() => {
-    updateManualEdgeDetails(flow, edge.edgeId, { type: "teleport" as never });
+    updateFlowEdgeDetails(flow, edge.edgeId, { type: "teleport" as never });
   }, /Unsupported edge type/);
   assert.equal(edge.type, "interaction");
 });
 
 test("Manual node feature group edits preserve parent-child hierarchy and derived actions", () => {
   const flow = createProcurementFlow();
-  const node = createManualNode(flow, {
+  const node = createFlowNode(flow, {
     title: "手动验证页",
     appSurfaceIds: ["app_admin"],
     domainIds: ["domain_sourcing"],
     roleIds: ["role_buyer"]
   });
-  updateManualNodeDetails(flow, node.nodeId, {
+  updateFlowNodeDetails(flow, node.nodeId, {
     featureGroups: [
       {
         groupId: "group_filters",
@@ -399,9 +399,9 @@ test("Manual node feature group edits preserve parent-child hierarchy and derive
 
 test("Feature group normalization keeps malformed detail patches safe", () => {
   const flow = createEmptyProductFlow();
-  const node = createManualNode(flow, { title: "功能归一化页" });
+  const node = createFlowNode(flow, { title: "功能归一化页" });
 
-  updateManualNodeDetails(flow, node.nodeId, {
+  updateFlowNodeDetails(flow, node.nodeId, {
     featureGroups: [
       {
         groupId: "",
@@ -454,7 +454,7 @@ test("Feature group normalization keeps malformed detail patches safe", () => {
 
 test("Legacy node elements still derive feature groups for endpoint compatibility", () => {
   const flow = createEmptyProductFlow();
-  const node = createManualNode(flow, { title: "旧元素页" });
+  const node = createFlowNode(flow, { title: "旧元素页" });
   delete node.featureGroups;
   node.elements = [
     {
@@ -476,26 +476,26 @@ test("Legacy node elements still derive feature groups for endpoint compatibilit
 
 test("Manual node deletion removes the node and all connected edges", () => {
   const flow = createProcurementFlow();
-  const source = createManualNode(flow, { title: "删除源页" });
-  const target = createManualNode(flow, { title: "删除目标页" });
-  const other = createManualNode(flow, { title: "保留目标页" });
-  const edgeA = createManualEdge(flow, {
+  const source = createFlowNode(flow, { title: "删除源页" });
+  const target = createFlowNode(flow, { title: "删除目标页" });
+  const other = createFlowNode(flow, { title: "保留目标页" });
+  const edgeA = createFlowEdge(flow, {
     from: { kind: "node", nodeId: source.nodeId },
     toNodeId: target.nodeId,
     trigger: "进入删除目标"
   });
-  const edgeB = createManualEdge(flow, {
+  const edgeB = createFlowEdge(flow, {
     from: { kind: "node", nodeId: target.nodeId },
     toNodeId: other.nodeId,
     trigger: "离开删除目标"
   });
-  const edgeC = createManualEdge(flow, {
+  const edgeC = createFlowEdge(flow, {
     from: { kind: "node", nodeId: source.nodeId },
     toNodeId: other.nodeId,
     trigger: "保留路径"
   });
 
-  const result = removeManualNode(flow, target.nodeId);
+  const result = removeFlowNode(flow, target.nodeId);
 
   assert.equal(result.node.status, "removed");
   const removedEdgeIds = new Set(result.removedEdges.map((edge) => edge.edgeId));
@@ -509,21 +509,21 @@ test("Manual node deletion removes the node and all connected edges", () => {
 
 test("Manual edge deletion removes only the selected edge", () => {
   const flow = createProcurementFlow();
-  const source = createManualNode(flow, { title: "连线源页" });
-  const targetA = createManualNode(flow, { title: "连线目标 A" });
-  const targetB = createManualNode(flow, { title: "连线目标 B" });
-  const edgeA = createManualEdge(flow, {
+  const source = createFlowNode(flow, { title: "连线源页" });
+  const targetA = createFlowNode(flow, { title: "连线目标 A" });
+  const targetB = createFlowNode(flow, { title: "连线目标 B" });
+  const edgeA = createFlowEdge(flow, {
     from: { kind: "node", nodeId: source.nodeId },
     toNodeId: targetA.nodeId,
     trigger: "删除这条线"
   });
-  const edgeB = createManualEdge(flow, {
+  const edgeB = createFlowEdge(flow, {
     from: { kind: "node", nodeId: source.nodeId },
     toNodeId: targetB.nodeId,
     trigger: "保留这条线"
   });
 
-  removeManualEdge(flow, edgeA.edgeId);
+  removeFlowEdge(flow, edgeA.edgeId);
 
   assert.equal(flow.edges.find((edge) => edge.edgeId === edgeA.edgeId)?.status, "removed");
   assert.equal(flow.edges.find((edge) => edge.edgeId === edgeB.edgeId)?.status, "active");

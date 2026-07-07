@@ -1,4 +1,4 @@
-import { isFlowEndpointKind } from "../guards";
+import { isFlowEndpointKind } from "../model/guards";
 import { readFeatureGroups } from "./collections";
 import { isRecord, requireString } from "./primitives";
 

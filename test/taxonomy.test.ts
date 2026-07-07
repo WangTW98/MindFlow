@@ -4,32 +4,32 @@ import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
 import type * as vscode from "vscode";
-import { ensureAppSurfaceEntryEdges } from "../src/domain/operations/layout/appSurfaceEntryEdges";
-import { ensureReasonableNodeLayout } from "../src/domain/operations/layout/canvasLayout";
-import { createEmptyProductFlow } from "../src/domain/product-flow/factory";
-import { createManualEdge, createManualNode, removeManualEdge, removeManualNode, updateManualAppSurfacePosition, updateManualEdgeDetails, updateManualNodeDetails, updateManualNodePosition } from "../src/domain/operations/flowEditing";
-import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/operations/projectOverview";
-import { applyTaxonomyRequest } from "../src/domain/operations/taxonomy";
-import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/operations/taxonomyEditing";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/vscode/documents/untitledMindFlowDocument";
+import { ensureAppSurfaceEntryEdges } from "../src/domain/product-flow/editing/layout/appSurfaceEntryEdges";
+import { ensureReasonableNodeLayout } from "../src/domain/product-flow/editing/layout/canvasLayout";
+import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
+import { createFlowEdge, createFlowNode, removeFlowEdge, removeFlowNode, updateFlowAppSurfacePosition, updateFlowEdgeDetails, updateFlowNodeDetails, updateFlowNodePosition } from "../src/domain/product-flow/editing/graph";
+import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/product-flow/editing/projectOverviewMutations";
+import { applyTaxonomyRequest } from "../src/domain/product-flow/editing/taxonomy";
+import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/product-flow/editing/taxonomy/referenceCleanup";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/adapters/vscode/documents/untitledMindFlowDocument";
 import { EDGE_TYPES, validateProductFlow } from "../src/domain/product-flow";
-import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/codec";
-import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/persistence/flowRepository";
-import { RecentFlowStore } from "../src/vscode/state/recentFlows";
-import { recordEdgeDetailsRevision } from "../src/vscode/webviews/canvas/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/vscode/webviews/canvas/flowWebviewHtml";
-import { parseWebviewMessage } from "../src/webview/protocol/flowWebviewMessages";
+import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/serialization/codec";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/infrastructure/persistence/flowRepository";
+import { RecentFlowStore } from "../src/adapters/vscode/state/recentFlows";
+import { recordEdgeDetailsRevision } from "../src/adapters/vscode/editor/canvas/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/adapters/vscode/editor/canvas/webviewShellHtml";
+import { parseWebviewMessage } from "../src/adapters/webview/protocol/flowWebviewMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("Manual node details can set and clear a status group", () => {
   const flow = createEmptyProductFlow();
   flow.statusGroups = [{ statusGroupId: "status_review", title: "评审中", color: "#33aa55" }];
-  const node = createManualNode(flow, { title: "需求评审页" });
+  const node = createFlowNode(flow, { title: "需求评审页" });
 
-  updateManualNodeDetails(flow, node.nodeId, { statusGroupId: "status_review" });
+  updateFlowNodeDetails(flow, node.nodeId, { statusGroupId: "status_review" });
   assert.equal(node.statusGroupId, "status_review");
 
-  updateManualNodeDetails(flow, node.nodeId, { statusGroupId: "" });
+  updateFlowNodeDetails(flow, node.nodeId, { statusGroupId: "" });
   assert.equal(node.statusGroupId, undefined);
 
   const validation = validateProductFlow(flow);
@@ -117,13 +117,13 @@ test("Deleting an app surface removes connected edge endpoints and keeps the flo
   assert.ok(fromNode);
   assert.ok(toNode);
 
-  const connectedEdge = createManualEdge(flow, {
+  const connectedEdge = createFlowEdge(flow, {
     from: { kind: "appSurface", nodeId: surface.appId, appId: surface.appId },
     to: { kind: "node", nodeId: toNode.nodeId },
     trigger: "从被删除应用端进入页面",
     type: "navigate"
   });
-  const metadataOnlyEdge = createManualEdge(flow, {
+  const metadataOnlyEdge = createFlowEdge(flow, {
     from: { kind: "node", nodeId: fromNode.nodeId },
     to: { kind: "node", nodeId: toNode.nodeId },
     trigger: "普通节点连线",
@@ -151,7 +151,7 @@ test("Pruning app surface references removes stale connected card edges before v
   assert.ok(surface);
   assert.ok(target);
 
-  const connectedEdge = createManualEdge(flow, {
+  const connectedEdge = createFlowEdge(flow, {
     from: { kind: "appSurface", nodeId: surface.appId, appId: surface.appId },
     to: { kind: "node", nodeId: target.nodeId },
     trigger: "从管理后台进入页面",

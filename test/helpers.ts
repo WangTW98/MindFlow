@@ -1,8 +1,8 @@
 import { strict as assert } from "node:assert";
 import type { FeatureGroup, PageNode, ProductFlow } from "../src/domain/product-flow";
-import { ensureAppSurfaceEntryEdges } from "../src/domain/operations/layout/appSurfaceEntryEdges";
-import { createEmptyProductFlow } from "../src/domain/product-flow/factory";
-import { createManualEdge, createManualNode } from "../src/domain/operations/flowEditing";
+import { ensureAppSurfaceEntryEdges } from "../src/domain/product-flow/editing/layout/appSurfaceEntryEdges";
+import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
+import { createFlowEdge, createFlowNode } from "../src/domain/product-flow/editing/graph";
 
 export function createProcurementFlow(options: { includeAppSurfaceEntryEdges?: boolean } = {}): ProductFlow {
   const flow = createEmptyProductFlow("多应用端采购协同平台需求示例");
@@ -146,22 +146,22 @@ export function createProcurementFlow(options: { includeAppSurfaceEntryEdges?: b
     };
   });
 
-  createManualEdge(flow, { from: { kind: "node", nodeId: workbenchNode.nodeId }, toNodeId: planNode.nodeId, trigger: "新建采购计划", type: "create" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: planNode.nodeId }, toNodeId: inquiryNode.nodeId, trigger: "提交采购计划", type: "submit" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: inquiryNode.nodeId }, toNodeId: supplierHomeNode.nodeId, trigger: "发布询价", type: "submit" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: supplierHomeNode.nodeId }, toNodeId: quoteNode.nodeId, trigger: "进入报价", type: "navigate" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: quoteNode.nodeId }, toNodeId: compareNode.nodeId, trigger: "提交报价", type: "submit" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: compareNode.nodeId }, toNodeId: approvalStartNode.nodeId, trigger: "生成比价报告", type: "create" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: compareNode.nodeId }, toNodeId: planNode.nodeId, trigger: "回看采购计划", type: "navigate" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: approvalStartNode.nodeId }, toNodeId: mobileTodoNode.nodeId, trigger: "发起审批", type: "submit" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: mobileTodoNode.nodeId }, toNodeId: mobileDetailNode.nodeId, trigger: "查看审批详情", type: "navigate" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: mobileDetailNode.nodeId }, toNodeId: contractNode.nodeId, trigger: "审批通过", type: "approve" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: mobileDetailNode.nodeId }, toNodeId: inquiryNode.nodeId, trigger: "退回修改", type: "reject" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: contractNode.nodeId }, toNodeId: supplierContractNode.nodeId, trigger: "发送供应商确认", type: "submit" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: supplierContractNode.nodeId }, toNodeId: archiveNode.nodeId, trigger: "供应商确认", type: "submit" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: publicListNode.nodeId }, toNodeId: registerNode.nodeId, trigger: "提交注册", type: "create" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: registerNode.nodeId }, toNodeId: supplierReviewNode.nodeId, trigger: "注册申请提交", type: "submit" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: supplierReviewNode.nodeId }, toNodeId: supplierHomeNode.nodeId, trigger: "审核通过开通门户", type: "approve" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: workbenchNode.nodeId }, toNodeId: planNode.nodeId, trigger: "新建采购计划", type: "create" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: planNode.nodeId }, toNodeId: inquiryNode.nodeId, trigger: "提交采购计划", type: "submit" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: inquiryNode.nodeId }, toNodeId: supplierHomeNode.nodeId, trigger: "发布询价", type: "submit" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: supplierHomeNode.nodeId }, toNodeId: quoteNode.nodeId, trigger: "进入报价", type: "navigate" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: quoteNode.nodeId }, toNodeId: compareNode.nodeId, trigger: "提交报价", type: "submit" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: compareNode.nodeId }, toNodeId: approvalStartNode.nodeId, trigger: "生成比价报告", type: "create" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: compareNode.nodeId }, toNodeId: planNode.nodeId, trigger: "回看采购计划", type: "navigate" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: approvalStartNode.nodeId }, toNodeId: mobileTodoNode.nodeId, trigger: "发起审批", type: "submit" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: mobileTodoNode.nodeId }, toNodeId: mobileDetailNode.nodeId, trigger: "查看审批详情", type: "navigate" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: mobileDetailNode.nodeId }, toNodeId: contractNode.nodeId, trigger: "审批通过", type: "approve" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: mobileDetailNode.nodeId }, toNodeId: inquiryNode.nodeId, trigger: "退回修改", type: "reject" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: contractNode.nodeId }, toNodeId: supplierContractNode.nodeId, trigger: "发送供应商确认", type: "submit" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: supplierContractNode.nodeId }, toNodeId: archiveNode.nodeId, trigger: "供应商确认", type: "submit" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: publicListNode.nodeId }, toNodeId: registerNode.nodeId, trigger: "提交注册", type: "create" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: registerNode.nodeId }, toNodeId: supplierReviewNode.nodeId, trigger: "注册申请提交", type: "submit" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: supplierReviewNode.nodeId }, toNodeId: supplierHomeNode.nodeId, trigger: "审核通过开通门户", type: "approve" });
 
   if (options.includeAppSurfaceEntryEdges !== false) {
     ensureAppSurfaceEntryEdges(flow);
@@ -180,7 +180,7 @@ function addNode(
   purpose: string,
   items: Array<[string, string, string]>
 ): PageNode {
-  return createManualNode(flow, {
+  return createFlowNode(flow, {
     title,
     pageType,
     appSurfaceIds,

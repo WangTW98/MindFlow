@@ -19,10 +19,10 @@ await fs.mkdir(extensionRoot, { recursive: true });
 
 await copyFile("package.json", "extension/package.json");
 await copyFile("README.md", "extension/readme.md");
-await copyDir("src/domain/schema", "extension/src/domain/schema");
-await copyDir("src/webview/media", "extension/src/webview/media");
-await copyDir("src/webview/canvas/media", "extension/src/webview/canvas/media");
-await copyDir("src/webview/sidebar/media", "extension/src/webview/sidebar/media");
+await copyDir("src/domain/product-flow/schema", "extension/src/domain/product-flow/schema");
+await copyDir("src/adapters/webview/media", "extension/src/adapters/webview/media");
+await copyDir("src/adapters/webview/canvas/media", "extension/src/adapters/webview/canvas/media");
+await copyDir("src/adapters/webview/sidebar/media", "extension/src/adapters/webview/sidebar/media");
 await copyDir("out/src", "extension/out/src");
 
 await fs.writeFile(path.join(tempRoot, "extension.vsixmanifest"), renderVsixManifest(pkg), "utf8");

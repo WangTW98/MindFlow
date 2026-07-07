@@ -8,7 +8,7 @@ const tsc = path.join(root, "node_modules", ".bin", process.platform === "win32"
 
 await run(process.execPath, ["scripts/build-webview.mjs"]);
 await run(tsc, ["-p", "./", "--noEmit"]);
-for (const script of await listJavaScriptFiles(path.join(root, "src", "webview", "canvas", "media"))) {
+for (const script of await listJavaScriptFiles(path.join(root, "src", "adapters", "webview", "canvas", "media"))) {
   await run(process.execPath, ["--check", path.relative(root, script)]);
 }
 await fs.rm(path.join(root, "out", "test"), { recursive: true, force: true });

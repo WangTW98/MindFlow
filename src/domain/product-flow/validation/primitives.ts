@@ -1,5 +1,5 @@
-import { ENTITY_STATUSES } from "../constants";
-import { isEntityStatus } from "../guards";
+import { ENTITY_STATUSES } from "../model/constants";
+import { isEntityStatus } from "../model/guards";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

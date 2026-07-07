@@ -10,11 +10,11 @@ docs/**
 designs/**
 .mindflow/**
 src/**/*.ts
-src/webview/canvas/client/**
-src/webview/canvas/manifest.mjs
-!src/webview/media/**
-!src/webview/canvas/media/**
-!src/webview/sidebar/media/**
+src/adapters/webview/canvas/runtime/**
+src/adapters/webview/canvas/manifest.mjs
+!src/adapters/webview/media/**
+!src/adapters/webview/canvas/media/**
+!src/adapters/webview/sidebar/media/**
 out/**/*.map
 plan.md
 *.vsix

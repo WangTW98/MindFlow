@@ -1,14 +1,14 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { createEmptyProductFlow } from "../src/domain/product-flow/factory";
-import { createManualEdge, createManualNode } from "../src/domain/operations/flowEditing";
+import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
+import { createFlowEdge, createFlowNode } from "../src/domain/product-flow/editing/graph";
 import type { ProductFlow } from "../src/domain/product-flow";
-import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../src/mcp/bridge";
-import { MINDFLOW_OPERATIONS_REFERENCE } from "../src/mcp/operationsReference";
-import { MindFlowMcpToolHandlers } from "../src/mcp/tools/index";
-import { listMcpToolRegistryNames } from "../src/mcp/tools/registry";
-import { MINDFLOW_MCP_TOOLS } from "../src/mcp/toolSchemas";
-import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/domain/selection";
+import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../src/adapters/mcp/protocol/bridge";
+import { MINDFLOW_OPERATIONS_REFERENCE } from "../src/adapters/mcp/protocol/operationsReference";
+import { MindFlowMcpToolHandlers } from "../src/adapters/mcp/tools";
+import { listMcpToolRegistryNames } from "../src/adapters/mcp/tools/registry";
+import { MINDFLOW_MCP_TOOLS } from "../src/adapters/mcp/protocol/toolSchemas";
+import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/domain/product-flow/selection";
 
 test("MindFlow MCP tools are operation-only and omit removed generation workflow", () => {
   const handlers = new MindFlowMcpToolHandlers(new FakeBridge(createEmptyProductFlow()));
@@ -49,9 +49,9 @@ test("MindFlow MCP editor state returns complete selection and hydrated selected
     roleIds: ["role_ops"]
   }];
   flow.statusGroups = [{ statusGroupId: "status_review", title: "审核中", color: "#33aa55" }];
-  const node = createManualNode(flow, { title: "工作台", appSurfaceIds: ["app_admin"], domainIds: ["domain_ops"], roleIds: ["role_ops"] });
-  const target = createManualNode(flow, { title: "详情页" });
-  const edge = createManualEdge(flow, { from: { kind: "node", nodeId: node.nodeId }, to: { kind: "node", nodeId: target.nodeId }, type: "interaction" });
+  const node = createFlowNode(flow, { title: "工作台", appSurfaceIds: ["app_admin"], domainIds: ["domain_ops"], roleIds: ["role_ops"] });
+  const target = createFlowNode(flow, { title: "详情页" });
+  const edge = createFlowEdge(flow, { from: { kind: "node", nodeId: node.nodeId }, to: { kind: "node", nodeId: target.nodeId }, type: "interaction" });
   const bridge = new FakeBridge(flow, {
     selectedProjectOverview: true,
     selectedNodeId: node.nodeId,
@@ -84,8 +84,8 @@ test("MindFlow MCP editor state returns complete selection and hydrated selected
 
 test("MindFlow MCP can set and clear complete selection state", async () => {
   const flow = createEmptyProductFlow();
-  const node = createManualNode(flow, { title: "工作台" });
-  const edge = createManualEdge(flow, { from: { kind: "node", nodeId: node.nodeId }, to: { kind: "node", nodeId: node.nodeId }, type: "interaction" });
+  const node = createFlowNode(flow, { title: "工作台" });
+  const edge = createFlowEdge(flow, { from: { kind: "node", nodeId: node.nodeId }, to: { kind: "node", nodeId: node.nodeId }, type: "interaction" });
   const handlers = new MindFlowMcpToolHandlers(new FakeBridge(flow));
 
   const selected = await handlers.callTool("mindflow_set_selection", {

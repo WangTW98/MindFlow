@@ -4,28 +4,28 @@ import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
 import type * as vscode from "vscode";
-import { ensureAppSurfaceEntryEdges } from "../src/domain/operations/layout/appSurfaceEntryEdges";
-import { ensureReasonableNodeLayout } from "../src/domain/operations/layout/canvasLayout";
-import { createEmptyProductFlow } from "../src/domain/product-flow/factory";
-import { createManualEdge, createManualNode, removeManualEdge, removeManualNode, updateManualAppSurfacePosition, updateManualEdgeDetails, updateManualNodeDetails, updateManualNodePosition } from "../src/domain/operations/flowEditing";
-import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/operations/projectOverview";
-import { applyTaxonomyRequest } from "../src/domain/operations/taxonomy";
-import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/operations/taxonomyEditing";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/vscode/documents/untitledMindFlowDocument";
+import { ensureAppSurfaceEntryEdges } from "../src/domain/product-flow/editing/layout/appSurfaceEntryEdges";
+import { ensureReasonableNodeLayout } from "../src/domain/product-flow/editing/layout/canvasLayout";
+import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
+import { createFlowEdge, createFlowNode, removeFlowEdge, removeFlowNode, updateFlowAppSurfacePosition, updateFlowEdgeDetails, updateFlowNodeDetails, updateFlowNodePosition } from "../src/domain/product-flow/editing/graph";
+import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/product-flow/editing/projectOverviewMutations";
+import { applyTaxonomyRequest } from "../src/domain/product-flow/editing/taxonomy";
+import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/product-flow/editing/taxonomy/referenceCleanup";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/adapters/vscode/documents/untitledMindFlowDocument";
 import { EDGE_TYPES, validateProductFlow } from "../src/domain/product-flow";
-import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/codec";
-import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/persistence/flowRepository";
-import { RecentFlowStore } from "../src/vscode/state/recentFlows";
-import { dispatchFlowWebviewMessage } from "../src/vscode/webviews/canvas/flowCommandDispatcher";
-import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/domain/selection";
-import { recordEdgeDetailsRevision } from "../src/vscode/webviews/canvas/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/vscode/webviews/canvas/flowWebviewHtml";
-import { parseWebviewMessage } from "../src/webview/protocol/flowWebviewMessages";
-import { parseSidebarMessage } from "../src/webview/protocol/sidebarMessages";
+import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/serialization/codec";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/infrastructure/persistence/flowRepository";
+import { RecentFlowStore } from "../src/adapters/vscode/state/recentFlows";
+import { dispatchFlowWebviewMessage } from "../src/adapters/vscode/editor/canvas/flowCommandDispatcher";
+import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/domain/product-flow/selection";
+import { recordEdgeDetailsRevision } from "../src/adapters/vscode/editor/canvas/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/adapters/vscode/editor/canvas/webviewShellHtml";
+import { parseWebviewMessage } from "../src/adapters/webview/protocol/flowWebviewMessages";
+import { parseSidebarMessage } from "../src/adapters/webview/protocol/sidebarMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("FlowPanel webview HTML loads declared media resources in order", () => {
-  const html = renderFlowWebviewHtml({
+  const html = createFlowWebviewHtml({
     cspSource: "vscode-resource:",
     nonce: "test-nonce",
     styleUris: FLOW_WEBVIEW_STYLE_FILES.map((fileName) => `media/${fileName}`),
@@ -45,14 +45,14 @@ test("FlowPanel webview HTML loads declared media resources in order", () => {
 
 test("FlowPanel declared media resources exist on disk", async () => {
   for (const fileName of [...FLOW_WEBVIEW_STYLE_FILES, ...FLOW_WEBVIEW_SCRIPT_FILES]) {
-    await fs.readFile(path.join(process.cwd(), "src", "webview", "canvas", "media", fileName));
+    await fs.readFile(path.join(process.cwd(), "src", "adapters", "webview", "canvas", "media", fileName));
   }
 });
 
 test("FlowPanel webview uses one bundled script instead of legacy multi-script entrypoints", () => {
   assert.deepEqual([...FLOW_WEBVIEW_SCRIPT_FILES], ["dist/flowEditor.js"]);
 
-  const html = renderFlowWebviewHtml({
+  const html = createFlowWebviewHtml({
     cspSource: "vscode-resource:",
     nonce: "test-nonce",
     styleUris: FLOW_WEBVIEW_STYLE_FILES.map((fileName) => `media/${fileName}`),
@@ -67,12 +67,12 @@ test("FlowPanel webview uses one bundled script instead of legacy multi-script e
 
 test("Sidebar webview loads stylesheet from sidebar media", async () => {
   const [viewSource, htmlSource] = await Promise.all([
-    fs.readFile(path.join(process.cwd(), "src", "vscode", "webviews", "sidebar", "SidebarView.ts"), "utf8"),
-    fs.readFile(path.join(process.cwd(), "src", "vscode", "webviews", "sidebar", "sidebarHtml.ts"), "utf8")
+    fs.readFile(path.join(process.cwd(), "src", "adapters", "vscode", "sidebar", "SidebarView.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src", "adapters", "vscode", "sidebar", "sidebarHtml.ts"), "utf8")
   ]);
 
-  assert.ok(viewSource.includes("\"src\", \"webview\", \"sidebar\", \"media\""));
-  assert.ok(htmlSource.includes("\"src\", \"webview\", \"sidebar\", \"media\", \"sidebar.css\""));
+  assert.ok(viewSource.includes("\"src\", \"adapters\", \"webview\", \"sidebar\", \"media\""));
+  assert.ok(htmlSource.includes("\"src\", \"adapters\", \"webview\", \"sidebar\", \"media\", \"sidebar.css\""));
   assert.equal(`${viewSource}\n${htmlSource}`.includes("\"src\", \"canvas\", \"media\""), false);
 });
 
@@ -104,7 +104,7 @@ test("Webview endpoint codec falls back when encoded values are malformed", asyn
 test("Selection relation panel resolves feature endpoints to owning node cards", async () => {
   const { getSelectionRelationGroups } = await loadSelectionRelationHelpers();
   const flow = createEmptyProductFlow("关系列表功能项端点测试");
-  const source = createManualNode(flow, {
+  const source = createFlowNode(flow, {
     title: "来源节点卡片",
     featureGroups: [{
       groupId: "group_actions",
@@ -114,8 +114,8 @@ test("Selection relation panel resolves feature endpoints to owning node cards",
       items: [{ itemId: "item_submit", name: "提交按钮", type: "button", description: "提交。" }]
     }]
   });
-  const target = createManualNode(flow, { title: "目标节点卡片" });
-  const edge = createManualEdge(flow, {
+  const target = createFlowNode(flow, { title: "目标节点卡片" });
+  const edge = createFlowEdge(flow, {
     from: { kind: "featureItem", nodeId: source.nodeId, groupId: "group_actions", itemId: "item_submit" },
     to: { kind: "node", nodeId: target.nodeId },
     trigger: "提交",
@@ -139,8 +139,8 @@ test("Selection relation panel shows app surface card titles for entry edges", a
     domainIds: [],
     roleIds: []
   }];
-  const target = createManualNode(flow, { title: "后台工作台", appSurfaceIds: ["app_admin"] });
-  const edge = createManualEdge(flow, {
+  const target = createFlowNode(flow, { title: "后台工作台", appSurfaceIds: ["app_admin"] });
+  const edge = createFlowEdge(flow, {
     from: { kind: "appSurface", nodeId: "app_admin", appId: "app_admin" },
     to: { kind: "node", nodeId: target.nodeId },
     trigger: "进入后台",
@@ -156,21 +156,21 @@ test("Selection relation panel shows app surface card titles for entry edges", a
 test("Selection relation panel filters removed relations and deduplicates node cards", async () => {
   const { getSelectionRelationGroups } = await loadSelectionRelationHelpers();
   const flow = createEmptyProductFlow("关系列表单节点测试");
-  const selected = createManualNode(flow, { title: "当前节点" });
-  const source = createManualNode(flow, { title: "来源节点" });
-  const duplicateSource = createManualNode(flow, { title: "重复来源节点" });
-  const target = createManualNode(flow, { title: "目标节点" });
-  const removedSource = createManualNode(flow, { title: "已移除来源" });
-  const removedTarget = createManualNode(flow, { title: "已移除目标" });
+  const selected = createFlowNode(flow, { title: "当前节点" });
+  const source = createFlowNode(flow, { title: "来源节点" });
+  const duplicateSource = createFlowNode(flow, { title: "重复来源节点" });
+  const target = createFlowNode(flow, { title: "目标节点" });
+  const removedSource = createFlowNode(flow, { title: "已移除来源" });
+  const removedTarget = createFlowNode(flow, { title: "已移除目标" });
 
-  createManualEdge(flow, { from: { kind: "node", nodeId: source.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "来源一", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: source.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "来源重复", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: duplicateSource.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "第二来源", type: "interaction" }).status = "removed";
-  createManualEdge(flow, { from: { kind: "node", nodeId: removedSource.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "已移除来源", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: selected.nodeId }, to: { kind: "node", nodeId: target.nodeId }, trigger: "目标一", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "featureGroup", nodeId: selected.nodeId, groupId: selected.featureGroups![0]!.groupId }, to: { kind: "node", nodeId: target.nodeId }, trigger: "目标重复", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: selected.nodeId }, to: { kind: "node", nodeId: removedTarget.nodeId }, trigger: "已移除目标", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: selected.nodeId }, to: { kind: "node", nodeId: duplicateSource.nodeId }, trigger: "已移除出边", type: "interaction" }).status = "removed";
+  createFlowEdge(flow, { from: { kind: "node", nodeId: source.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "来源一", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: source.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "来源重复", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: duplicateSource.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "第二来源", type: "interaction" }).status = "removed";
+  createFlowEdge(flow, { from: { kind: "node", nodeId: removedSource.nodeId }, to: { kind: "node", nodeId: selected.nodeId }, trigger: "已移除来源", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: selected.nodeId }, to: { kind: "node", nodeId: target.nodeId }, trigger: "目标一", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "featureGroup", nodeId: selected.nodeId, groupId: selected.featureGroups![0]!.groupId }, to: { kind: "node", nodeId: target.nodeId }, trigger: "目标重复", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: selected.nodeId }, to: { kind: "node", nodeId: removedTarget.nodeId }, trigger: "已移除目标", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: selected.nodeId }, to: { kind: "node", nodeId: duplicateSource.nodeId }, trigger: "已移除出边", type: "interaction" }).status = "removed";
   removedSource.status = "removed";
   removedTarget.status = "removed";
 
@@ -201,18 +201,18 @@ test("Canvas auto layout previews hierarchy, lanes, spacing, and collision-free 
       roleIds: []
     }
   ];
-  const skeleton = createManualNode(flow, { title: "后台骨架", pageType: "skeleton", appSurfaceIds: ["app_admin"] });
-  const navigation = createManualNode(flow, { title: "后台导航", pageType: "navigation", appSurfaceIds: ["app_admin"] });
-  const pageA = createManualNode(flow, { title: "采购列表", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const pageB = createManualNode(flow, { title: "采购详情", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const popup = createManualNode(flow, { title: "确认弹窗", pageType: "popup", appSurfaceIds: ["app_admin"] });
-  const component = createManualNode(flow, { title: "报价组件", pageType: "component", appSurfaceIds: ["app_supplier", "app_admin"] });
-  const shared = createManualNode(flow, { title: "共享未知节点", pageType: "unknown", appSurfaceIds: [] });
+  const skeleton = createFlowNode(flow, { title: "后台骨架", pageType: "skeleton", appSurfaceIds: ["app_admin"] });
+  const navigation = createFlowNode(flow, { title: "后台导航", pageType: "navigation", appSurfaceIds: ["app_admin"] });
+  const pageA = createFlowNode(flow, { title: "采购列表", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const pageB = createFlowNode(flow, { title: "采购详情", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const popup = createFlowNode(flow, { title: "确认弹窗", pageType: "popup", appSurfaceIds: ["app_admin"] });
+  const component = createFlowNode(flow, { title: "报价组件", pageType: "component", appSurfaceIds: ["app_supplier", "app_admin"] });
+  const shared = createFlowNode(flow, { title: "共享未知节点", pageType: "unknown", appSurfaceIds: [] });
   const longTrigger = "这是一个非常长的连线标题用于验证自动排版会保留足够横向展示空间";
-  createManualEdge(flow, { from: { kind: "node", nodeId: skeleton.nodeId }, to: { kind: "node", nodeId: navigation.nodeId }, trigger: "进入导航", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: navigation.nodeId }, to: { kind: "node", nodeId: pageA.nodeId }, trigger: longTrigger, type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: pageA.nodeId }, to: { kind: "node", nodeId: popup.nodeId }, trigger: "打开确认", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: pageA.nodeId }, to: { kind: "node", nodeId: pageB.nodeId }, trigger: "查看详情", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: skeleton.nodeId }, to: { kind: "node", nodeId: navigation.nodeId }, trigger: "进入导航", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: navigation.nodeId }, to: { kind: "node", nodeId: pageA.nodeId }, trigger: longTrigger, type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: pageA.nodeId }, to: { kind: "node", nodeId: popup.nodeId }, trigger: "打开确认", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: pageA.nodeId }, to: { kind: "node", nodeId: pageB.nodeId }, trigger: "查看详情", type: "interaction" });
 
   const layout = autoLayoutComputePreview(flow);
 
@@ -243,16 +243,16 @@ test("Canvas auto layout derives tree depth from same-type interaction edges", a
     domainIds: [],
     roleIds: []
   }];
-  const start = createManualNode(flow, { title: "A 起点", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const branch = createManualNode(flow, { title: "B 分支", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const middle = createManualNode(flow, { title: "C 中间", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const child = createManualNode(flow, { title: "D 多父节点", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const final = createManualNode(flow, { title: "E 末端", pageType: "page", appSurfaceIds: ["app_admin"] });
-  createManualEdge(flow, { from: { kind: "node", nodeId: start.nodeId }, to: { kind: "node", nodeId: middle.nodeId }, trigger: "进入中间", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: start.nodeId }, to: { kind: "node", nodeId: branch.nodeId }, trigger: "进入分支", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: middle.nodeId }, to: { kind: "node", nodeId: child.nodeId }, trigger: "继续", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: branch.nodeId }, to: { kind: "node", nodeId: child.nodeId }, trigger: "汇入", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: child.nodeId }, to: { kind: "node", nodeId: final.nodeId }, trigger: "完成", type: "interaction" });
+  const start = createFlowNode(flow, { title: "A 起点", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const branch = createFlowNode(flow, { title: "B 分支", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const middle = createFlowNode(flow, { title: "C 中间", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const child = createFlowNode(flow, { title: "D 多父节点", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const final = createFlowNode(flow, { title: "E 末端", pageType: "page", appSurfaceIds: ["app_admin"] });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: start.nodeId }, to: { kind: "node", nodeId: middle.nodeId }, trigger: "进入中间", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: start.nodeId }, to: { kind: "node", nodeId: branch.nodeId }, trigger: "进入分支", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: middle.nodeId }, to: { kind: "node", nodeId: child.nodeId }, trigger: "继续", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: branch.nodeId }, to: { kind: "node", nodeId: child.nodeId }, trigger: "汇入", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: child.nodeId }, to: { kind: "node", nodeId: final.nodeId }, trigger: "完成", type: "interaction" });
 
   const layout = autoLayoutComputePreview(flow);
   const itemById = new Map(layout.items.map((item) => [item.id, item]));
@@ -279,12 +279,12 @@ test("Canvas auto layout handles cyclic same-lane flows with stable ordering", a
     domainIds: [],
     roleIds: []
   }];
-  const first = createManualNode(flow, { title: "A 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const second = createManualNode(flow, { title: "B 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const third = createManualNode(flow, { title: "C 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
-  createManualEdge(flow, { from: { kind: "node", nodeId: first.nodeId }, to: { kind: "node", nodeId: second.nodeId }, trigger: "A 到 B", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: second.nodeId }, to: { kind: "node", nodeId: third.nodeId }, trigger: "B 到 C", type: "interaction" });
-  createManualEdge(flow, { from: { kind: "node", nodeId: third.nodeId }, to: { kind: "node", nodeId: first.nodeId }, trigger: "C 到 A", type: "interaction" });
+  const first = createFlowNode(flow, { title: "A 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const second = createFlowNode(flow, { title: "B 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const third = createFlowNode(flow, { title: "C 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: first.nodeId }, to: { kind: "node", nodeId: second.nodeId }, trigger: "A 到 B", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: second.nodeId }, to: { kind: "node", nodeId: third.nodeId }, trigger: "B 到 C", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: third.nodeId }, to: { kind: "node", nodeId: first.nodeId }, trigger: "C 到 A", type: "interaction" });
 
   const layout = autoLayoutComputePreview(flow);
 
@@ -304,14 +304,14 @@ test("Canvas auto layout splits crowded same-level nodes using measured card hei
     domainIds: [],
     roleIds: []
   }];
-  const pages = Array.from({ length: 32 }, (_, index) => createManualNode(flow, {
+  const pages = Array.from({ length: 32 }, (_, index) => createFlowNode(flow, {
     title: `页面 ${index + 1}`,
     pageType: "page",
     appSurfaceIds: ["app_admin"]
   }));
-  const popup = createManualNode(flow, { title: "密集节点确认弹窗", pageType: "popup", appSurfaceIds: ["app_admin"] });
+  const popup = createFlowNode(flow, { title: "密集节点确认弹窗", pageType: "popup", appSurfaceIds: ["app_admin"] });
   const longTrigger = "这是一个非常长的跨层连线标题，用于验证分栏后的页面层不会挤入弹窗组件层";
-  createManualEdge(flow, {
+  createFlowEdge(flow, {
     from: { kind: "node", nodeId: pages[0]!.nodeId },
     to: { kind: "node", nodeId: popup.nodeId },
     trigger: longTrigger,
@@ -361,7 +361,7 @@ test("Canvas auto layout preview state restores, invalidates, and updates dragge
     domainIds: [],
     roleIds: []
   }];
-  const page = createManualNode(flow, { title: "页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const page = createFlowNode(flow, { title: "页面", pageType: "page", appSurfaceIds: ["app_admin"] });
   const layout = autoLayoutComputePreview(flow);
   const previewState = autoLayoutCreatePreviewState(flow, layout);
 
@@ -373,12 +373,12 @@ test("Canvas auto layout preview state restores, invalidates, and updates dragge
   assert.deepEqual(restoredAfterDrag?.nodePositions[page.nodeId], { x: 1234, y: 568 });
 
   const unpositionedFlow = JSON.parse(JSON.stringify(flow));
-  createManualNode(unpositionedFlow, { title: "无坐标新增节点", pageType: "page", appSurfaceIds: ["app_admin"] });
+  createFlowNode(unpositionedFlow, { title: "无坐标新增节点", pageType: "page", appSurfaceIds: ["app_admin"] });
   assert.equal(autoLayoutPreviewPositionsForFlow(unpositionedFlow, movedState), null);
 
   const positionedFlow = JSON.parse(JSON.stringify(flow));
-  const positionedNode = createManualNode(positionedFlow, { title: "拖拽新增节点", pageType: "page", appSurfaceIds: ["app_admin"], x: 880.2, y: 441.7 });
-  createManualEdge(positionedFlow, {
+  const positionedNode = createFlowNode(positionedFlow, { title: "拖拽新增节点", pageType: "page", appSurfaceIds: ["app_admin"], x: 880.2, y: 441.7 });
+  createFlowEdge(positionedFlow, {
     from: { kind: "node", nodeId: page.nodeId },
     to: { kind: "node", nodeId: positionedNode.nodeId },
     trigger: "手动连接",
@@ -404,9 +404,9 @@ test("Canvas auto layout keeps preview state and recomputes order after edge end
     domainIds: [],
     roleIds: []
   }];
-  const first = createManualNode(flow, { title: "A 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const second = createManualNode(flow, { title: "B 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const edge = createManualEdge(flow, {
+  const first = createFlowNode(flow, { title: "A 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const second = createFlowNode(flow, { title: "B 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const edge = createFlowEdge(flow, {
     from: { kind: "node", nodeId: first.nodeId },
     to: { kind: "node", nodeId: second.nodeId },
     trigger: "A 到 B",
@@ -415,7 +415,7 @@ test("Canvas auto layout keeps preview state and recomputes order after edge end
   const initialLayout = autoLayoutComputePreview(flow);
   const previewState = autoLayoutCreatePreviewState(flow, initialLayout);
 
-  updateManualEdgeDetails(flow, edge.edgeId, {
+  updateFlowEdgeDetails(flow, edge.edgeId, {
     from: { kind: "node", nodeId: second.nodeId },
     to: { kind: "node", nodeId: first.nodeId }
   });
@@ -439,15 +439,15 @@ test("Canvas auto layout breaks cycles by preserving higher-priority edge types"
     domainIds: [],
     roleIds: []
   }];
-  const first = createManualNode(flow, { title: "A 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const second = createManualNode(flow, { title: "B 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
-  createManualEdge(flow, {
+  const first = createFlowNode(flow, { title: "A 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const second = createFlowNode(flow, { title: "B 页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  createFlowEdge(flow, {
     from: { kind: "node", nodeId: first.nodeId },
     to: { kind: "node", nodeId: second.nodeId },
     trigger: "数据同步",
     type: "dataFlow"
   });
-  createManualEdge(flow, {
+  createFlowEdge(flow, {
     from: { kind: "node", nodeId: second.nodeId },
     to: { kind: "node", nodeId: first.nodeId },
     trigger: "嵌套结构",
@@ -471,16 +471,16 @@ test("Canvas auto layout aligns detail nodes to highest-priority incoming parent
     domainIds: [],
     roleIds: []
   }];
-  const dataParent = createManualNode(flow, { title: "数据父页面", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const nestedParent = createManualNode(flow, { title: "嵌套父页面", pageType: "page", appSurfaceIds: ["app_admin"] });
-  const detail = createManualNode(flow, { title: "确认弹窗", pageType: "popup", appSurfaceIds: ["app_admin"] });
-  createManualEdge(flow, {
+  const dataParent = createFlowNode(flow, { title: "数据父页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const nestedParent = createFlowNode(flow, { title: "嵌套父页面", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const detail = createFlowNode(flow, { title: "确认弹窗", pageType: "popup", appSurfaceIds: ["app_admin"] });
+  createFlowEdge(flow, {
     from: { kind: "node", nodeId: dataParent.nodeId },
     to: { kind: "node", nodeId: detail.nodeId },
     trigger: "数据同步",
     type: "dataFlow"
   });
-  createManualEdge(flow, {
+  createFlowEdge(flow, {
     from: { kind: "node", nodeId: nestedParent.nodeId },
     to: { kind: "node", nodeId: detail.nodeId },
     trigger: "打开弹窗",
@@ -732,7 +732,7 @@ interface AutoLayoutHelpers {
 
 async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "webview", "canvas", "client", "selectors", "canvas-endpoint-codec.js"),
+    path.join(process.cwd(), "src", "adapters", "webview", "canvas", "runtime", "data", "canvas-endpoint-codec.js"),
     "utf8"
   );
   const factory = new Function(
@@ -745,7 +745,7 @@ async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
 
 async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "webview", "canvas", "client", "render", "canvas-selection-relations.js"),
+    path.join(process.cwd(), "src", "adapters", "webview", "canvas", "runtime", "rendering", "canvas-selection-relations.js"),
     "utf8"
   );
   const factory = new Function(
@@ -757,7 +757,7 @@ async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers>
 
 async function loadAutoLayoutHelpers(): Promise<AutoLayoutHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "webview", "canvas", "client", "layout", "canvas-auto-layout.js"),
+    path.join(process.cwd(), "src", "adapters", "webview", "canvas", "runtime", "layout", "canvas-auto-layout.js"),
     "utf8"
   );
   const factory = new Function(`${source}\nreturn { autoLayoutComputePreview, autoLayoutCreatePreviewState, autoLayoutPreviewPositionsForFlow, autoLayoutPreviewStateWithPosition, autoLayoutEstimateLabelWidth };`) as () => AutoLayoutHelpers;

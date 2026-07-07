@@ -1,5 +1,5 @@
-import { APP_SURFACE_TYPES, EDGE_TYPES } from "../constants";
-import { isAppSurfaceType, isEdgeType } from "../guards";
+import { APP_SURFACE_TYPES, EDGE_TYPES } from "../model/constants";
+import { isAppSurfaceType, isEdgeType } from "../model/guards";
 import { validateActions, validateElements, validateExceptions, validateFeatureGroups, validateOptionalViewPosition, validateStates } from "./collections";
 import { appSurfaceIdsFromFlow, checkEndpoint, isAppSurfaceEndpoint, isProjectOverviewEndpoint } from "./endpoints";
 import { isRecord, requireArray, requireString, requireStringArray, validateEntityStatus, validateReferences } from "./primitives";
