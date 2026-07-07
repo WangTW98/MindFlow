@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { ProductFlow } from "../models/productFlow";
 import { FlowEditorSession } from "./FlowEditorSession";
-import { emptyFlowSelection, flowSelectionKey, type FlowSelectionPatch, type FlowSelectionState } from "./flowSelection";
+import { emptyFlowSelection, flowSelectionKey, normalizeFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../core/editorSelection";
 
 type OpenFlowCallback = (flowUri: vscode.Uri) => void;
 
@@ -48,14 +48,14 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
   }
 
   public static getSelection(flowUri: vscode.Uri | string): FlowSelectionState {
-    return normalizeSelection({
+    return normalizeFlowSelection({
       ...emptyFlowSelection(),
       ...(FlowPanel.selections.get(flowSelectionKey(flowUri)) ?? {})
     });
   }
 
   public static setSelection(flowUri: vscode.Uri | string, selection: FlowSelectionPatch): void {
-    FlowPanel.selections.set(flowSelectionKey(flowUri), normalizeSelection({
+    FlowPanel.selections.set(flowSelectionKey(flowUri), normalizeFlowSelection({
       ...emptyFlowSelection(),
       ...selection
     }));
@@ -156,37 +156,4 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     }
     return false;
   }
-
-}
-
-function normalizeSelection(selection: FlowSelectionPatch): FlowSelectionState {
-  const nodeIds = normalizeIds(selection.selectedNodeIds);
-  const selectedNodeId = typeof selection.selectedNodeId === "string" && selection.selectedNodeId.trim()
-    ? selection.selectedNodeId.trim()
-    : undefined;
-  const selectedNodeIds = nodeIds.length > 0
-    ? nodeIds
-    : selectedNodeId
-      ? [selectedNodeId]
-      : [];
-  const primaryNodeId = selectedNodeId && selectedNodeIds.includes(selectedNodeId)
-    ? selectedNodeId
-    : selectedNodeIds[0];
-  return {
-    selectedProjectOverview: Boolean(selection.selectedProjectOverview),
-    selectedNodeId: primaryNodeId,
-    selectedNodeIds,
-    selectedEdgeId: selection.selectedEdgeId,
-    selectedAppSurfaceId: selection.selectedAppSurfaceId,
-    selectedDomainId: selection.selectedDomainId,
-    selectedRoleId: selection.selectedRoleId,
-    selectedStatusGroupId: selection.selectedStatusGroupId
-  };
-}
-
-function normalizeIds(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return Array.from(new Set(value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)));
 }

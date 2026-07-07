@@ -4,7 +4,7 @@ import type { ProductFlow } from "../models/productFlow";
 import { parseProductFlowText } from "../models/productFlowCodec";
 import { applyFlowDocumentEdit, flowDisplayName, type FlowUriArgument } from "../extension/flowContext";
 import { FlowPanel } from "../webview/FlowPanel";
-import type { FlowSelectionPatch } from "../webview/flowSelection";
+import type { FlowSelectionPatch } from "../core/editorSelection";
 import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "./bridge";
 
 export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
@@ -26,12 +26,18 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
     return this.readSnapshot(activeUri, true);
   }
 
-  public async applyFlowEdit(flowUri: string, flow: ProductFlow, selection?: FlowSelectionPatch): Promise<MindFlowEditorSnapshot> {
+  public async setSelection(flowUri: string, selection: FlowSelectionPatch): Promise<MindFlowEditorSnapshot> {
+    const uri = resolveFlowUri(flowUri);
+    FlowPanel.setSelection(uri, selection);
+    return this.readSnapshot(uri, true);
+  }
+
+  public async applyFlowEdit(flowUri: string, flow: ProductFlow, selection?: FlowSelectionPatch, expectedRevision?: number): Promise<MindFlowEditorSnapshot> {
     const uri = resolveFlowUri(flowUri);
     if (selection) {
       FlowPanel.setSelection(uri, selection);
     }
-    await applyFlowDocumentEdit(uri, flow);
+    await applyFlowDocumentEdit(uri, flow, { expectedRevision });
     FlowPanel.createOrShow(this.extensionUri, flow, uri);
     return this.readSnapshot(uri, true);
   }

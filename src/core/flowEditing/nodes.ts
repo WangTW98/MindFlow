@@ -4,10 +4,10 @@ import { defaultFeatureGroups, featureGroupsToActions, featureGroupsToElements, 
 import { normalizeStringArray, requireAppSurface, requireNode, sanitizeText, touchFlow, uniqueNodeId } from "./shared";
 import type { CreateNodeInput, UpdateNodeDetailsInput } from "./types";
 
-export function createManualNode(flow: ProductFlow, input: CreateNodeInput = {}): PageNode {
+export function createFlowNode(flow: ProductFlow, input: CreateNodeInput = {}): PageNode {
   const title = sanitizeText(input.title, "新建页面");
   const pageType = sanitizeText(input.pageType, "page");
-  const purpose = sanitizeText(input.purpose, "手动创建的产品页面节点。");
+  const purpose = sanitizeText(input.purpose, "新建产品页面节点。");
   const seed = `${flow.flowId}:${title}:${nowIso()}:${flow.nodes.length}`;
   const nodeId = uniqueNodeId(flow, makeNodeId(title, seed));
   const featureGroups = normalizeFeatureGroups(input.featureGroups, nodeId);
@@ -50,7 +50,11 @@ export function createManualNode(flow: ProductFlow, input: CreateNodeInput = {})
   return node;
 }
 
-export function updateManualNodeDetails(flow: ProductFlow, nodeId: string, patch: UpdateNodeDetailsInput): PageNode {
+export function createManualNode(flow: ProductFlow, input: CreateNodeInput = {}): PageNode {
+  return createFlowNode(flow, input);
+}
+
+export function updateFlowNodeDetails(flow: ProductFlow, nodeId: string, patch: UpdateNodeDetailsInput): PageNode {
   const node = requireNode(flow, nodeId);
   if (patch.title !== undefined) {
     node.title = sanitizeText(patch.title, node.title);
@@ -97,7 +101,11 @@ export function updateManualNodeDetails(flow: ProductFlow, nodeId: string, patch
   return node;
 }
 
-export function updateManualNodePosition(flow: ProductFlow, nodeId: string, x: number, y: number): PageNode {
+export function updateManualNodeDetails(flow: ProductFlow, nodeId: string, patch: UpdateNodeDetailsInput): PageNode {
+  return updateFlowNodeDetails(flow, nodeId, patch);
+}
+
+export function updateFlowNodePosition(flow: ProductFlow, nodeId: string, x: number, y: number): PageNode {
   assertFiniteCoordinates(x, y);
   const node = requireNode(flow, nodeId);
   node.view = {
@@ -111,7 +119,11 @@ export function updateManualNodePosition(flow: ProductFlow, nodeId: string, x: n
   return node;
 }
 
-export function updateManualAppSurfacePosition(flow: ProductFlow, appId: string, x: number, y: number): AppSurface {
+export function updateManualNodePosition(flow: ProductFlow, nodeId: string, x: number, y: number): PageNode {
+  return updateFlowNodePosition(flow, nodeId, x, y);
+}
+
+export function updateFlowAppSurfacePosition(flow: ProductFlow, appId: string, x: number, y: number): AppSurface {
   assertFiniteCoordinates(x, y);
   const surface = requireAppSurface(flow, appId);
   surface.view = {
@@ -123,6 +135,10 @@ export function updateManualAppSurfacePosition(flow: ProductFlow, appId: string,
   };
   touchFlow(flow);
   return surface;
+}
+
+export function updateManualAppSurfacePosition(flow: ProductFlow, appId: string, x: number, y: number): AppSurface {
+  return updateFlowAppSurfacePosition(flow, appId, x, y);
 }
 
 function assertFiniteCoordinates(x: number, y: number): void {

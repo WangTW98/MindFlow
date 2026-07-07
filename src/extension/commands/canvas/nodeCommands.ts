@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { createManualEdge, createManualNode, removeManualNode, updateManualAppSurfacePosition, updateManualNodeDetails, updateManualNodePosition, type UpdateNodeDetailsInput } from "../../../core/flowEditing";
+import type { UpdateNodeDetailsInput } from "../../../core/flowOperations";
 import { hasOptionalFiniteCoordinates, isPlainObject, readFiniteCoordinates } from "../guards";
 import type { FlowUriArgument } from "../../flowContext";
 import { applyCanvasEdit, selectAndRevealFlow } from "./editSession";
@@ -13,7 +13,7 @@ export async function updateNodePosition(nodeId?: string, x?: number, y?: number
   return applyCanvasEdit({
     sourceUri,
     errorLabel: "Update node position failed",
-    edit: (flow) => updateManualNodePosition(flow, nodeId, coordinates.x, coordinates.y)
+    operation: () => ({ type: "node.move", nodeId, x: coordinates.x, y: coordinates.y })
   });
 }
 
@@ -25,7 +25,7 @@ export async function updateAppSurfacePosition(appId?: string, x?: number, y?: n
   return applyCanvasEdit({
     sourceUri,
     errorLabel: "Update app surface position failed",
-    edit: (flow) => updateManualAppSurfacePosition(flow, appId, coordinates.x, coordinates.y)
+    operation: () => ({ type: "appSurface.move", appId, x: coordinates.x, y: coordinates.y })
   });
 }
 
@@ -44,15 +44,20 @@ export async function createNodeAt(
   return applyCanvasEdit({
     sourceUri,
     errorLabel: "Create node failed",
-    edit: (flow) => createManualNode(flow, {
-      x,
-      y,
-      appSurfaceIds: Array.isArray(appSurfaceIds) ? appSurfaceIds : undefined,
-      domainIds: Array.isArray(domainIds) ? domainIds : undefined,
-      roleIds: Array.isArray(roleIds) ? roleIds : undefined
+    operation: () => ({
+      type: "node.create",
+      input: {
+        x,
+        y,
+        appSurfaceIds: Array.isArray(appSurfaceIds) ? appSurfaceIds : undefined,
+        domainIds: Array.isArray(domainIds) ? domainIds : undefined,
+        roleIds: Array.isArray(roleIds) ? roleIds : undefined
+      }
     }),
-    afterSave: (flow, flowUri, node) => {
-      selectAndRevealFlow(context, flow, flowUri, { selectedProjectOverview: false, selectedNodeId: node.nodeId });
+    afterSave: (flow, flowUri, result) => {
+      if (result.type === "node.create") {
+        selectAndRevealFlow(context, flow, flowUri, { selectedProjectOverview: false, selectedNodeId: result.node.nodeId });
+      }
     }
   });
 }
@@ -69,7 +74,7 @@ export async function updateNodeDetails(
   return applyCanvasEdit({
     sourceUri,
     errorLabel: "Update node details failed",
-    edit: (flow) => updateManualNodeDetails(flow, nodeId, patch),
+    operation: () => ({ type: "node.update", nodeId, patch }),
     afterSave: (flow, flowUri) => {
       selectAndRevealFlow(context, flow, flowUri, { selectedProjectOverview: false, selectedNodeId: nodeId });
     }
@@ -87,41 +92,11 @@ export async function createConnectedNodeAt(
   return applyCanvasEdit({
     sourceUri,
     errorLabel: "Create connected node failed",
-    edit: (flow) => {
-      const relatedNode = request.from
-        ? request.from.kind === "appSurface" ? undefined : flow.nodes.find((node) => node.nodeId === request.from?.nodeId)
-        : request.to?.kind === "appSurface" ? undefined : flow.nodes.find((node) => node.nodeId === request.to?.nodeId);
-      const relatedAppSurfaceIds = request.from?.kind === "appSurface"
-        ? [request.from.appId ?? request.from.nodeId]
-        : request.to?.kind === "appSurface"
-          ? [request.to.appId ?? request.to.nodeId]
-          : relatedNode?.appSurfaceIds;
-      const node = createManualNode(flow, {
-        x: request.x,
-        y: request.y,
-        appSurfaceIds: nonEmptyArrayOr(request.appSurfaceIds, relatedAppSurfaceIds),
-        domainIds: nonEmptyArrayOr(request.domainIds, relatedNode?.domainIds),
-        roleIds: nonEmptyArrayOr(request.roleIds, relatedNode?.roleIds)
-      });
-      if (request.from) {
-        createManualEdge(flow, {
-          from: request.from,
-          to: { kind: "node", nodeId: node.nodeId },
-          trigger: request.trigger,
-          type: request.type
-        });
-      } else if (request.to) {
-        createManualEdge(flow, {
-          from: { kind: "node", nodeId: node.nodeId },
-          to: request.to,
-          trigger: request.trigger,
-          type: request.type
-        });
+    operation: () => ({ type: "node.createConnected", request }),
+    afterSave: (flow, flowUri, result) => {
+      if (result.type === "node.createConnected") {
+        selectAndRevealFlow(context, flow, flowUri, { selectedProjectOverview: false, selectedNodeId: result.node.nodeId });
       }
-      return node;
-    },
-    afterSave: (flow, flowUri, node) => {
-      selectAndRevealFlow(context, flow, flowUri, { selectedProjectOverview: false, selectedNodeId: node.nodeId });
     }
   });
 }
@@ -133,13 +108,9 @@ export async function deleteNode(context: vscode.ExtensionContext, nodeId?: stri
   return applyCanvasEdit({
     sourceUri,
     errorLabel: "Delete node failed",
-    edit: (flow) => removeManualNode(flow, nodeId),
+    operation: () => ({ type: "node.remove", nodeId }),
     afterSave: (flow, flowUri) => {
       selectAndRevealFlow(context, flow, flowUri, { selectedProjectOverview: false });
     }
   });
-}
-
-function nonEmptyArrayOr(value: string[] | undefined, fallback: string[] | undefined): string[] | undefined {
-  return Array.isArray(value) && value.length > 0 ? value : fallback;
 }

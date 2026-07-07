@@ -14,12 +14,12 @@ import {
 } from "./shared";
 import type { CreateEdgeInput, RemoveNodeResult, UpdateEdgeDetailsInput } from "./types";
 
-export function createManualEdge(flow: ProductFlow, input: CreateEdgeInput): FlowEdge {
+export function createFlowEdge(flow: ProductFlow, input: CreateEdgeInput): FlowEdge {
   const from = normalizeEndpoint(input.from);
   const to = normalizeEndpoint(input.to ?? { kind: "node", nodeId: input.toNodeId ?? "" });
   validateEndpoint(flow, from);
   validateEndpoint(flow, to);
-  const trigger = sanitizeText(input.trigger, "手动连接");
+  const trigger = sanitizeText(input.trigger, "连接");
   const fromId = endpointStorageId(from);
   const toId = endpointStorageId(to);
   const edgeId = uniqueEdgeId(flow, fromId, toId, trigger);
@@ -43,7 +43,11 @@ export function createManualEdge(flow: ProductFlow, input: CreateEdgeInput): Flo
   return edge;
 }
 
-export function updateManualEdgeDetails(flow: ProductFlow, edgeId: string, patch: UpdateEdgeDetailsInput): FlowEdge {
+export function createManualEdge(flow: ProductFlow, input: CreateEdgeInput): FlowEdge {
+  return createFlowEdge(flow, input);
+}
+
+export function updateFlowEdgeDetails(flow: ProductFlow, edgeId: string, patch: UpdateEdgeDetailsInput): FlowEdge {
   const edge = requireEdge(flow, edgeId);
   if (patch.from !== undefined) {
     const from = normalizeEndpoint(patch.from);
@@ -84,14 +88,22 @@ export function updateManualEdgeDetails(flow: ProductFlow, edgeId: string, patch
   return edge;
 }
 
-export function removeManualEdge(flow: ProductFlow, edgeId: string): FlowEdge {
+export function updateManualEdgeDetails(flow: ProductFlow, edgeId: string, patch: UpdateEdgeDetailsInput): FlowEdge {
+  return updateFlowEdgeDetails(flow, edgeId, patch);
+}
+
+export function removeFlowEdge(flow: ProductFlow, edgeId: string): FlowEdge {
   const edge = requireEdge(flow, edgeId);
   markManualEdgeRemoved(edge);
   touchFlow(flow);
   return edge;
 }
 
-export function removeManualNode(flow: ProductFlow, nodeId: string): RemoveNodeResult {
+export function removeManualEdge(flow: ProductFlow, edgeId: string): FlowEdge {
+  return removeFlowEdge(flow, edgeId);
+}
+
+export function removeFlowNode(flow: ProductFlow, nodeId: string): RemoveNodeResult {
   const node = requireNode(flow, nodeId);
   node.status = "removed";
   node.version += 1;
@@ -106,4 +118,8 @@ export function removeManualNode(flow: ProductFlow, nodeId: string): RemoveNodeR
   }
   touchFlow(flow);
   return { node, removedEdges };
+}
+
+export function removeManualNode(flow: ProductFlow, nodeId: string): RemoveNodeResult {
+  return removeFlowNode(flow, nodeId);
 }

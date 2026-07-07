@@ -1,5 +1,5 @@
 import type { ProductFlow } from "../models/productFlow";
-import type { FlowSelectionPatch, FlowSelectionState } from "../webview/flowSelection";
+import type { FlowSelectionPatch, FlowSelectionState } from "../core/editorSelection";
 
 export interface MindFlowEditorSnapshot {
   uri: string;
@@ -14,5 +14,6 @@ export interface MindFlowEditorSnapshot {
 export interface MindFlowEditorBridge {
   getOpenEditors(): Promise<MindFlowEditorSnapshot[]>;
   getActiveEditor(flowUri?: string): Promise<MindFlowEditorSnapshot>;
-  applyFlowEdit(flowUri: string, flow: ProductFlow, selection?: FlowSelectionPatch): Promise<MindFlowEditorSnapshot>;
+  setSelection(flowUri: string, selection: FlowSelectionPatch): Promise<MindFlowEditorSnapshot>;
+  applyFlowEdit(flowUri: string, flow: ProductFlow, selection?: FlowSelectionPatch, expectedRevision?: number): Promise<MindFlowEditorSnapshot>;
 }

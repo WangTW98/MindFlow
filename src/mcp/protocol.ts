@@ -1,4 +1,4 @@
-import { MINDFLOW_AUTHORING_GUIDE, MINDFLOW_AUTHORING_GUIDE_URI } from "./authoringGuide";
+import { MINDFLOW_OPERATIONS_REFERENCE, MINDFLOW_OPERATIONS_REFERENCE_URI } from "./operationsReference";
 import type { MindFlowMcpToolHandlers } from "./tools";
 
 export interface JsonRpcRequest {
@@ -15,7 +15,10 @@ export class MindFlowMcpProtocol {
 
   public async handle(payload: unknown): Promise<JsonRpcResponse> {
     if (Array.isArray(payload)) {
-      const responses = await Promise.all(payload.map((item) => this.handleSingle(item)));
+      const responses: JsonRpcResponse[] = [];
+      for (const item of payload) {
+        responses.push(await this.handleSingle(item));
+      }
       return responses.filter((item): item is Record<string, unknown> => item !== undefined);
     }
     return this.handleSingle(payload);
@@ -81,22 +84,22 @@ export class MindFlowMcpProtocol {
       case "resources/list":
         return {
           resources: [{
-            uri: MINDFLOW_AUTHORING_GUIDE_URI,
-            name: "MindFlow authoring guide",
+            uri: MINDFLOW_OPERATIONS_REFERENCE_URI,
+            name: "MindFlow operations reference",
             mimeType: "text/markdown",
-            description: "Rules for creating and editing MindFlow through MCP."
+            description: "Operation-level reference for reading and editing MindFlow through MCP."
           }]
         };
       case "resources/read": {
         const request = asRecord(params);
-        if (request.uri !== MINDFLOW_AUTHORING_GUIDE_URI) {
+        if (request.uri !== MINDFLOW_OPERATIONS_REFERENCE_URI) {
           throw new Error(`Unknown MindFlow MCP resource: ${String(request.uri)}`);
         }
         return {
           contents: [{
-            uri: MINDFLOW_AUTHORING_GUIDE_URI,
+            uri: MINDFLOW_OPERATIONS_REFERENCE_URI,
             mimeType: "text/markdown",
-            text: MINDFLOW_AUTHORING_GUIDE
+            text: MINDFLOW_OPERATIONS_REFERENCE
           }]
         };
       }

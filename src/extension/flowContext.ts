@@ -15,8 +15,19 @@ export interface RefreshableSidebar {
   refresh(): Promise<void>;
 }
 
+export interface FlowDocumentEditOptions {
+  expectedRevision?: number;
+}
+
+export interface FlowDocumentEditResult<TResult> {
+  flow: ProductFlow;
+  flowUri: vscode.Uri;
+  result: TResult;
+}
+
 let currentFlowPath: string | undefined;
 let currentFlowUri: vscode.Uri | undefined;
+const flowEditQueues = new Map<string, Promise<void>>();
 
 export function rememberUntitledFlow(flowUri: vscode.Uri): void {
   currentFlowPath = undefined;
@@ -24,22 +35,43 @@ export function rememberUntitledFlow(flowUri: vscode.Uri): void {
 }
 
 export async function loadCurrentFlow(sourceUri?: FlowUriArgument): Promise<{ flow: ProductFlow; flowUri: vscode.Uri }> {
-  const requestedUri = normalizeFlowUri(sourceUri);
-  const flowUri = requestedUri ?? getActiveMindFlowUri() ?? currentFlowUri ?? (currentFlowPath ? vscode.Uri.file(currentFlowPath) : undefined) ?? (await chooseOrLatestFlowUri());
-  if (!flowUri) {
-    throw new Error("No MindFlow file exists. Create or open a MindFlow file first.");
-  }
+  const flowUri = await resolveCurrentFlowUri(sourceUri);
   const document = await vscode.workspace.openTextDocument(flowUri);
   const { flow } = parseProductFlowText(document.getText(), `ProductFlow document ${flowDisplayName(flowUri)}`);
   rememberCurrentFlowUri(document.uri);
   return { flow, flowUri: document.uri };
 }
 
-export async function applyFlowDocumentEdit(flowUri: vscode.Uri, flow: ProductFlow): Promise<void> {
+export async function editCurrentFlowDocument<TResult>(
+  sourceUri: FlowUriArgument,
+  edit: (flow: ProductFlow, flowUri: vscode.Uri) => TResult
+): Promise<FlowDocumentEditResult<TResult>> {
+  const flowUri = await resolveCurrentFlowUri(sourceUri);
+  return enqueueFlowDocumentEdit(flowUri, async () => {
+    const document = await vscode.workspace.openTextDocument(flowUri);
+    const { flow } = parseProductFlowText(document.getText(), `ProductFlow document ${flowDisplayName(document.uri)}`);
+    rememberCurrentFlowUri(document.uri);
+    const result = edit(flow, document.uri);
+    await applyFlowDocumentEditNow(document.uri, flow);
+    return { flow, flowUri: document.uri, result };
+  });
+}
+
+export async function applyFlowDocumentEdit(flowUri: vscode.Uri, flow: ProductFlow, options: FlowDocumentEditOptions = {}): Promise<void> {
+  await enqueueFlowDocumentEdit(flowUri, () => applyFlowDocumentEditNow(flowUri, flow, options));
+}
+
+async function applyFlowDocumentEditNow(flowUri: vscode.Uri, flow: ProductFlow, options: FlowDocumentEditOptions = {}): Promise<void> {
   flow.updatedAt = nowIso();
   pruneMissingAppSurfaceReferences(flow);
   assertValidProductFlowForSave(flow);
   const document = await vscode.workspace.openTextDocument(flowUri);
+  if (options.expectedRevision !== undefined) {
+    const { flow: currentFlow } = parseProductFlowText(document.getText(), `ProductFlow document ${flowDisplayName(document.uri)}`);
+    if (currentFlow.revision !== options.expectedRevision) {
+      throw new Error(`ProductFlow document changed before edit was applied. Expected revision ${options.expectedRevision}, found ${currentFlow.revision}. Retry the operation with the latest editor state.`);
+    }
+  }
   const edit = new vscode.WorkspaceEdit();
   const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
   edit.replace(document.uri, fullRange, serializeProductFlow(flow));
@@ -155,6 +187,15 @@ async function chooseOrLatestFlowUri(): Promise<vscode.Uri | undefined> {
   return flowPath ? vscode.Uri.file(flowPath) : undefined;
 }
 
+async function resolveCurrentFlowUri(sourceUri?: FlowUriArgument): Promise<vscode.Uri> {
+  const requestedUri = normalizeFlowUri(sourceUri);
+  const flowUri = requestedUri ?? getActiveMindFlowUri() ?? currentFlowUri ?? (currentFlowPath ? vscode.Uri.file(currentFlowPath) : undefined) ?? (await chooseOrLatestFlowUri());
+  if (!flowUri) {
+    throw new Error("No MindFlow file exists. Create or open a MindFlow file first.");
+  }
+  return flowUri;
+}
+
 async function chooseOrLatestFlow(repository: FlowRepository): Promise<string | undefined> {
   const files = await repository.list();
   if (files.length === 0) {
@@ -206,4 +247,18 @@ function normalizeFlowUri(flowUri: FlowUriArgument): vscode.Uri | undefined {
     return vscode.Uri.file(flowUri);
   }
   return flowUri.includes(":") ? vscode.Uri.parse(flowUri) : vscode.Uri.file(flowUri);
+}
+
+function enqueueFlowDocumentEdit<TResult>(flowUri: vscode.Uri, task: () => Promise<TResult>): Promise<TResult> {
+  const key = flowUri.toString();
+  const previous = flowEditQueues.get(key) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(task);
+  const queued = run.then(() => undefined, () => undefined);
+  flowEditQueues.set(key, queued);
+  void queued.then(() => {
+    if (flowEditQueues.get(key) === queued) {
+      flowEditQueues.delete(key);
+    }
+  });
+  return run;
 }

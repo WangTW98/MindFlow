@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { EdgeType, FlowEndpoint } from "../../../models/productFlow";
-import { createManualEdge, removeManualEdge, updateManualEdgeDetails, type UpdateEdgeDetailsInput } from "../../../core/flowEditing";
+import type { UpdateEdgeDetailsInput } from "../../../core/flowOperations";
 import { isPlainObject } from "../guards";
 import type { FlowUriArgument } from "../../flowContext";
 import { applyCanvasEdit, selectAndRevealFlow } from "./editSession";
@@ -19,9 +19,11 @@ export async function createEdge(
   return applyCanvasEdit({
     sourceUri,
     errorLabel: "Create edge failed",
-    edit: (flow) => createManualEdge(flow, { from, to, trigger, type }),
-    afterSave: (flow, flowUri, edge) => {
-      selectAndRevealFlow(context, flow, flowUri, { selectedProjectOverview: false, selectedEdgeId: edge.edgeId });
+    operation: () => ({ type: "edge.upsert", input: { from, to, trigger, type } }),
+    afterSave: (flow, flowUri, result) => {
+      if (result.type === "edge.upsert") {
+        selectAndRevealFlow(context, flow, flowUri, { selectedProjectOverview: false, selectedEdgeId: result.edge.edgeId });
+      }
     }
   });
 }
@@ -38,7 +40,7 @@ export async function updateEdgeDetails(
   return applyCanvasEdit({
     sourceUri,
     errorLabel: "Update edge details failed",
-    edit: (flow) => updateManualEdgeDetails(flow, edgeId, patch),
+    operation: () => ({ type: "edge.update", edgeId, patch }),
     afterSave: (flow, flowUri) => {
       selectAndRevealFlow(context, flow, flowUri, { selectedProjectOverview: false, selectedEdgeId: edgeId });
     }
@@ -52,7 +54,7 @@ export async function disconnectEdge(context: vscode.ExtensionContext, edgeId?: 
   return applyCanvasEdit({
     sourceUri,
     errorLabel: "Disconnect edge failed",
-    edit: (flow) => removeManualEdge(flow, edgeId),
+    operation: () => ({ type: "edge.remove", edgeId }),
     afterSave: (flow, flowUri) => {
       selectAndRevealFlow(context, flow, flowUri, { selectedProjectOverview: false });
     }
