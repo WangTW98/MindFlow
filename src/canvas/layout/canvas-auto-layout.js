@@ -73,13 +73,10 @@ function autoLayoutComputePreview(flow, measurements = {}) {
       appSurfacePositions[lane.surface.appId] = { x: appPosition.x, y: appPosition.y };
     }
 
-    for (const layer of [2, 3, 4]) {
+    for (const layer of plan.layers) {
       const layout = plan.layerLayouts.get(layer);
-      autoLayoutPlaceLayerNodes(layout.nodes, layout, layer, lane, laneTop, laneHeight, columnGap, itemRects, nodePositions, nodeLaneIds);
+      autoLayoutPlaceLayerNodes(layout.nodes, layout, layer, lane, laneTop, laneHeight, columnGap, itemRects, nodePositions, nodeLaneIds, plan.graphEdges, plan.nodeOrder);
     }
-
-    const detailLayout = plan.layerLayouts.get(5);
-    autoLayoutPlaceDetailNodes(detailLayout.nodes, detailLayout, lane, laneTop, laneHeight, columnGap, itemRects, nodePositions, nodeLaneIds, activeEdges);
 
     const laneBounds = autoLayoutBoundsForItems(itemRects.slice(laneRectStart));
     if (laneBounds) {
@@ -189,6 +186,7 @@ function autoLayoutApplyPreviewState(flow) {
     }
     return false;
   }
+  autoLayoutPreviewState = positions;
   projectOverviewPosition = positions.projectOverviewPosition;
   appSurfacePositions.clear();
   for (const [appId, position] of Object.entries(positions.appSurfacePositions)) {
@@ -213,17 +211,113 @@ function autoLayoutCreatePreviewState(flow, layout) {
 
 function autoLayoutPreviewPositionsForFlow(flow, previewState) {
   const normalized = autoLayoutNormalizePersistedPreviewState(previewState);
-  if (!normalized || !autoLayoutPreviewStateMatchesFlow(normalized, flow)) {
+  if (!normalized) {
     return null;
   }
+  if (autoLayoutPreviewStateMatchesFlow(normalized, flow)) {
+    return autoLayoutPreviewStateWithFlowPositions(flow, normalized);
+  }
+  if (!autoLayoutPreviewStateCanExtendToFlow(normalized, flow)) {
+    return null;
+  }
+  return autoLayoutPreviewStateWithFlowPositions(flow, normalized);
+}
+
+function autoLayoutPreviewStateWithFlowPositions(flow, previewState) {
   const activeNodeIds = (Array.isArray(flow?.nodes) ? flow.nodes : [])
     .filter((node) => node.status !== "removed")
-    .map((node) => node.nodeId);
-  const appIds = (Array.isArray(flow?.appSurfaces) ? flow.appSurfaces : []).map((surface) => surface.appId);
-  if (!activeNodeIds.every((nodeId) => normalized.nodePositions[nodeId]) || !appIds.every((appId) => normalized.appSurfacePositions[appId])) {
+    .map((node) => node.nodeId)
+    .filter((nodeId) => typeof nodeId === "string" && nodeId);
+  const activeNodesById = new Map((Array.isArray(flow?.nodes) ? flow.nodes : [])
+    .filter((node) => node.status !== "removed" && typeof node.nodeId === "string" && node.nodeId)
+    .map((node) => [node.nodeId, node]));
+  const appIds = (Array.isArray(flow?.appSurfaces) ? flow.appSurfaces : [])
+    .map((surface) => surface.appId)
+    .filter((appId) => typeof appId === "string" && appId);
+  const appSurfacesById = new Map((Array.isArray(flow?.appSurfaces) ? flow.appSurfaces : [])
+    .filter((surface) => typeof surface.appId === "string" && surface.appId)
+    .map((surface) => [surface.appId, surface]));
+  const nodePositions = {};
+  const appSurfacePositions = {};
+
+  for (const nodeId of activeNodeIds) {
+    const position = previewState.nodePositions[nodeId] || autoLayoutEntityViewPosition(activeNodesById.get(nodeId));
+    if (!position) {
+      return null;
+    }
+    nodePositions[nodeId] = position;
+  }
+  for (const appId of appIds) {
+    const position = previewState.appSurfacePositions[appId] || autoLayoutEntityViewPosition(appSurfacesById.get(appId));
+    if (!position) {
+      return null;
+    }
+    appSurfacePositions[appId] = position;
+  }
+
+  return {
+    ...previewState,
+    signature: autoLayoutFlowSignature(flow),
+    entitySignature: autoLayoutEntitySignature(flow),
+    appSurfacePositions,
+    nodePositions
+  };
+}
+
+function autoLayoutPreviewStateCanExtendToFlow(previewState, flow) {
+  const previousIds = autoLayoutEntityIdsFromSignature(previewState.entitySignature || autoLayoutPreviewEntitySignature(previewState.signature));
+  if (!previousIds) {
+    return false;
+  }
+  const nextIds = autoLayoutCurrentEntityIds(flow);
+  return autoLayoutSetIsSubset(previousIds.appIds, nextIds.appIds) &&
+    autoLayoutSetIsSubset(previousIds.nodeIds, nextIds.nodeIds);
+}
+
+function autoLayoutCurrentEntityIds(flow) {
+  return {
+    appIds: new Set((Array.isArray(flow?.appSurfaces) ? flow.appSurfaces : [])
+      .map((surface) => surface.appId)
+      .filter((id) => typeof id === "string" && id)),
+    nodeIds: new Set((Array.isArray(flow?.nodes) ? flow.nodes : [])
+      .filter((node) => node.status !== "removed")
+      .map((node) => node.nodeId)
+      .filter((id) => typeof id === "string" && id))
+  };
+}
+
+function autoLayoutEntityIdsFromSignature(signature) {
+  const value = autoLayoutPreviewEntitySignature(signature);
+  const appIds = autoLayoutSignaturePartIds(value, "apps");
+  const nodeIds = autoLayoutSignaturePartIds(value, "nodes");
+  if (!appIds || !nodeIds) {
     return null;
   }
-  return normalized;
+  return {
+    appIds: new Set(appIds),
+    nodeIds: new Set(nodeIds)
+  };
+}
+
+function autoLayoutSignaturePartIds(signature, key) {
+  const match = String(signature || "").match(new RegExp(`(?:^|;)${key}:([^;]*)`));
+  if (!match) {
+    return null;
+  }
+  return match[1] ? match[1].split("|").filter(Boolean) : [];
+}
+
+function autoLayoutSetIsSubset(left, right) {
+  for (const item of left) {
+    if (!right.has(item)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function autoLayoutEntityViewPosition(entity) {
+  return autoLayoutCopyPosition(entity?.view?.position);
 }
 
 function autoLayoutUpdatePreviewPosition(kind, id, position) {
@@ -371,11 +465,16 @@ function autoLayoutResolveNodeLane(node, laneById, sharedLane) {
 }
 
 function autoLayoutCreateLanePlan(lane, activeEdges, nodeOriginalIndex, measurements) {
-  const orderedNodes = autoLayoutOrderLaneNodes(lane.nodes, activeEdges, nodeOriginalIndex);
-  const nodesByLayer = autoLayoutGroupNodesByLayer(orderedNodes);
+  const nodeIds = new Set(lane.nodes.map((node) => node.nodeId));
+  const graphEdges = autoLayoutBuildLaneGraphEdges(nodeIds, activeEdges, nodeOriginalIndex);
+  const orderedNodes = autoLayoutOrderLaneNodesFromGraph(lane.nodes, graphEdges, nodeOriginalIndex);
+  const nodeLayers = autoLayoutAssignNodeLayers(orderedNodes, graphEdges);
+  const nodeOrder = new Map(orderedNodes.map((node, index) => [node.nodeId, index]));
+  const nodesByLayer = autoLayoutGroupNodesByLayer(orderedNodes, nodeLayers);
+  const layers = Array.from(nodesByLayer.keys()).sort((left, right) => left - right);
   const layerLayouts = new Map();
-  for (const layer of [2, 3, 4, 5]) {
-    const nodes = nodesByLayer.get(layer) || [];
+  for (const layer of layers) {
+    const nodes = nodesByLayer.get(layer);
     layerLayouts.set(layer, autoLayoutCreateLayerLayout(nodes, measurements));
   }
   const appSize = lane.surface ? autoLayoutMeasuredSize(measurements.appSurfaces?.[lane.surface.appId], AUTO_LAYOUT_APP_WIDTH, AUTO_LAYOUT_APP_HEIGHT) : null;
@@ -387,7 +486,11 @@ function autoLayoutCreateLanePlan(lane, activeEdges, nodeOriginalIndex, measurem
   return {
     lane,
     appSize,
+    layers,
     layerLayouts,
+    graphEdges,
+    nodeLayers,
+    nodeOrder,
     laneHeight
   };
 }
@@ -431,13 +534,11 @@ function autoLayoutMeasuredSize(value, fallbackWidth, fallbackHeight) {
   };
 }
 
-function autoLayoutOrderLaneNodes(nodes, activeEdges, nodeOriginalIndex) {
-  const nodeIds = new Set(nodes.map((node) => node.nodeId));
+function autoLayoutOrderLaneNodesFromGraph(nodes, graphEdges, nodeOriginalIndex) {
   const byId = new Map(nodes.map((node) => [node.nodeId, node]));
   const outgoing = new Map(nodes.map((node) => [node.nodeId, []]));
   const indegree = new Map(nodes.map((node) => [node.nodeId, 0]));
   const incomingPriority = new Map(nodes.map((node) => [node.nodeId, AUTO_LAYOUT_UNCONNECTED_PRIORITY]));
-  const graphEdges = autoLayoutBuildLaneGraphEdges(nodeIds, activeEdges, nodeOriginalIndex);
 
   for (const edge of graphEdges) {
     outgoing.get(edge.fromId)?.push(edge);
@@ -477,6 +578,21 @@ function autoLayoutOrderLaneNodes(nodes, activeEdges, nodeOriginalIndex) {
     .filter((node) => !seen.has(node.nodeId))
     .sort((left, right) => autoLayoutCompareNodes(left, right, nodeOriginalIndex));
   return [...ordered, ...remaining];
+}
+
+function autoLayoutAssignNodeLayers(orderedNodes, graphEdges) {
+  const layers = new Map(orderedNodes.map((node) => [node.nodeId, 2]));
+  const outgoing = new Map(orderedNodes.map((node) => [node.nodeId, []]));
+  for (const edge of graphEdges) {
+    outgoing.get(edge.fromId)?.push(edge);
+  }
+  for (const node of orderedNodes) {
+    const baseLayer = layers.get(node.nodeId) ?? 2;
+    for (const edge of outgoing.get(node.nodeId) || []) {
+      layers.set(edge.toId, Math.max(layers.get(edge.toId) ?? 2, baseLayer + 1));
+    }
+  }
+  return layers;
 }
 
 function autoLayoutBuildLaneGraphEdges(nodeIds, activeEdges, nodeOriginalIndex) {
@@ -554,55 +670,26 @@ function autoLayoutCompareReadyNodes(left, right, incomingPriority, nodeOriginal
   return priorityDiff || autoLayoutCompareNodes(left, right, nodeOriginalIndex);
 }
 
-function autoLayoutGroupNodesByLayer(nodes) {
-  const groups = new Map([
-    [2, []],
-    [3, []],
-    [4, []],
-    [5, []]
-  ]);
+function autoLayoutGroupNodesByLayer(nodes, nodeLayers) {
+  const groups = new Map();
   for (const node of nodes) {
-    groups.get(autoLayoutNodeLayer(node)).push(node);
+    const layer = nodeLayers.get(node.nodeId) ?? 2;
+    if (!groups.has(layer)) {
+      groups.set(layer, []);
+    }
+    groups.get(layer).push(node);
   }
   return groups;
 }
 
-function autoLayoutPlaceLayerNodes(nodes, layout, layer, lane, laneTop, laneHeight, columnGap, itemRects, nodePositions, nodeLaneIds) {
-  const startY = autoLayoutLayerStartY(laneTop, laneHeight, layout, layer);
-  nodes.forEach((node, index) => {
-    const row = index % layout.maxRows;
-    const column = Math.floor(index / layout.maxRows);
-    const size = layout.sizes.get(node.nodeId) || { width: AUTO_LAYOUT_NODE_WIDTH, height: AUTO_LAYOUT_NODE_HEIGHT };
-    const position = autoLayoutPlaceRect(itemRects, {
-      id: node.nodeId,
-      kind: "node",
-      laneId: lane.id,
-      layer,
-      x: autoLayoutLayerX(layer, columnGap, layout, column, row),
-      y: Math.round(startY + row * layout.rowStep),
-      width: size.width,
-      height: size.height
-    });
-    nodePositions[node.nodeId] = { x: position.x, y: position.y };
-    nodeLaneIds[node.nodeId] = lane.id;
-  });
-}
-
-function autoLayoutPlaceDetailNodes(nodes, layout, lane, laneTop, laneHeight, columnGap, itemRects, nodePositions, nodeLaneIds, activeEdges) {
-  const fallbackStartY = autoLayoutLayerStartY(laneTop, laneHeight, layout, 5);
-  const sorted = [...nodes].sort((left, right) => {
-    const leftParentY = autoLayoutIncomingParentY(left.nodeId, nodePositions, activeEdges);
-    const rightParentY = autoLayoutIncomingParentY(right.nodeId, nodePositions, activeEdges);
-    if (leftParentY !== rightParentY) {
-      return leftParentY - rightParentY;
-    }
-    return 0;
-  });
+function autoLayoutPlaceLayerNodes(nodes, layout, layer, lane, laneTop, laneHeight, columnGap, itemRects, nodePositions, nodeLaneIds, graphEdges, nodeOrder) {
+  const fallbackStartY = autoLayoutLayerStartY(laneTop, laneHeight, layout, layer);
+  const sorted = autoLayoutOrderLayerNodesForPlacement(nodes, nodePositions, graphEdges, nodeOrder);
   sorted.forEach((node, index) => {
-    const parentY = autoLayoutIncomingParentY(node.nodeId, nodePositions, activeEdges);
     const row = index % layout.maxRows;
     const column = Math.floor(index / layout.maxRows);
     const size = layout.sizes.get(node.nodeId) || { width: AUTO_LAYOUT_NODE_WIDTH, height: AUTO_LAYOUT_NODE_HEIGHT };
+    const parentY = autoLayoutIncomingGraphParentY(node.nodeId, nodePositions, graphEdges);
     const desiredY = Number.isFinite(parentY)
       ? parentY
       : Math.round(fallbackStartY + row * layout.rowStep);
@@ -610,14 +697,31 @@ function autoLayoutPlaceDetailNodes(nodes, layout, lane, laneTop, laneHeight, co
       id: node.nodeId,
       kind: "node",
       laneId: lane.id,
-      layer: 5,
-      x: autoLayoutLayerX(5, columnGap, layout, column, row),
+      layer,
+      x: autoLayoutLayerX(layer, columnGap, layout, column, row),
       y: desiredY,
       width: size.width,
       height: size.height
     });
     nodePositions[node.nodeId] = { x: position.x, y: position.y };
     nodeLaneIds[node.nodeId] = lane.id;
+  });
+}
+
+function autoLayoutOrderLayerNodesForPlacement(nodes, nodePositions, graphEdges, nodeOrder) {
+  return [...nodes].sort((left, right) => {
+    const leftParentY = autoLayoutIncomingGraphParentY(left.nodeId, nodePositions, graphEdges);
+    const rightParentY = autoLayoutIncomingGraphParentY(right.nodeId, nodePositions, graphEdges);
+    if (leftParentY !== rightParentY) {
+      if (!Number.isFinite(leftParentY)) {
+        return 1;
+      }
+      if (!Number.isFinite(rightParentY)) {
+        return -1;
+      }
+      return leftParentY - rightParentY;
+    }
+    return (nodeOrder.get(left.nodeId) ?? 0) - (nodeOrder.get(right.nodeId) ?? 0);
   });
 }
 
@@ -653,18 +757,16 @@ function autoLayoutLayerX(layer, columnGap, layout, column, row) {
   return layer * columnGap + column * layout.columnStep + (row % 3) * AUTO_LAYOUT_ROW_X_STAGGER;
 }
 
-function autoLayoutIncomingParentY(nodeId, nodePositions, activeEdges) {
+function autoLayoutIncomingGraphParentY(nodeId, nodePositions, graphEdges) {
   const parentYs = [];
   let bestPriority = AUTO_LAYOUT_UNCONNECTED_PRIORITY;
-  for (const edge of activeEdges) {
-    const toId = autoLayoutEdgeNodeId(edge.to, edge.toNodeId);
-    if (toId !== nodeId) {
+  for (const edge of graphEdges) {
+    if (edge.toId !== nodeId) {
       continue;
     }
-    const fromId = autoLayoutEdgeNodeId(edge.from, edge.fromNodeId);
-    const position = fromId ? nodePositions[fromId] : undefined;
+    const position = nodePositions[edge.fromId];
     if (position && Number.isFinite(position.y)) {
-      const priority = autoLayoutEdgePriority(edge.type);
+      const priority = edge.priority;
       if (priority > bestPriority) {
         continue;
       }
@@ -676,19 +778,6 @@ function autoLayoutIncomingParentY(nodeId, nodePositions, activeEdges) {
     }
   }
   return parentYs.length > 0 ? Math.round(parentYs.reduce((sum, y) => sum + y, 0) / parentYs.length) : Number.POSITIVE_INFINITY;
-}
-
-function autoLayoutNodeLayer(node) {
-  if (node.pageType === "skeleton") {
-    return 2;
-  }
-  if (node.pageType === "navigation") {
-    return 3;
-  }
-  if (node.pageType === "popup" || node.pageType === "component") {
-    return 5;
-  }
-  return 4;
 }
 
 function autoLayoutEdgeNodeId(endpoint, fallbackNodeId) {

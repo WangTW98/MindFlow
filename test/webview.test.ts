@@ -221,14 +221,50 @@ test("Canvas auto layout previews hierarchy, lanes, spacing, and collision-free 
   assert.ok(layout.nodePositions[skeleton.nodeId]!.x < layout.nodePositions[navigation.nodeId]!.x);
   assert.ok(layout.nodePositions[navigation.nodeId]!.x < layout.nodePositions[pageA.nodeId]!.x);
   assert.ok(layout.nodePositions[pageA.nodeId]!.x < layout.nodePositions[popup.nodeId]!.x);
-  assert.equal(layout.nodePositions[component.nodeId]!.x, layout.nodePositions[popup.nodeId]!.x);
-  assert.equal(layout.nodePositions[shared.nodeId]!.x, layout.nodePositions[pageA.nodeId]!.x);
   assert.ok(layout.nodePositions[pageB.nodeId]!.x > layout.nodePositions[pageA.nodeId]!.x);
+  assert.equal(layout.items.find((item) => item.id === popup.nodeId)?.layer, layout.items.find((item) => item.id === pageB.nodeId)?.layer);
+  assert.equal(layout.nodePositions[component.nodeId]!.x, layout.nodePositions[skeleton.nodeId]!.x);
+  assert.equal(layout.nodePositions[shared.nodeId]!.x, layout.nodePositions[skeleton.nodeId]!.x);
   assert.equal(layout.nodeLaneIds[component.nodeId], "app_supplier");
   assert.equal(layout.nodeLaneIds[shared.nodeId], "__shared");
-  assert.ok(Math.abs(layout.nodePositions[pageA.nodeId]!.y - layout.nodePositions[pageB.nodeId]!.y) >= 340);
   assert.ok(Math.abs(layout.appSurfacePositions.app_admin!.y - layout.appSurfacePositions.app_supplier!.y) >= 340);
   assert.ok(layout.columnGap >= 340 + autoLayoutEstimateLabelWidth(longTrigger) + 96);
+  assertNoAutoLayoutOverlap(layout.items);
+});
+
+test("Canvas auto layout derives tree depth from same-type interaction edges", async () => {
+  const { autoLayoutComputePreview } = await loadAutoLayoutHelpers();
+  const flow = createEmptyProductFlow("自动排版交互树层级测试");
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "后台",
+    domainIds: [],
+    roleIds: []
+  }];
+  const start = createManualNode(flow, { title: "A 起点", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const branch = createManualNode(flow, { title: "B 分支", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const middle = createManualNode(flow, { title: "C 中间", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const child = createManualNode(flow, { title: "D 多父节点", pageType: "page", appSurfaceIds: ["app_admin"] });
+  const final = createManualNode(flow, { title: "E 末端", pageType: "page", appSurfaceIds: ["app_admin"] });
+  createManualEdge(flow, { from: { kind: "node", nodeId: start.nodeId }, to: { kind: "node", nodeId: middle.nodeId }, trigger: "进入中间", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: start.nodeId }, to: { kind: "node", nodeId: branch.nodeId }, trigger: "进入分支", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: middle.nodeId }, to: { kind: "node", nodeId: child.nodeId }, trigger: "继续", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: branch.nodeId }, to: { kind: "node", nodeId: child.nodeId }, trigger: "汇入", type: "interaction" });
+  createManualEdge(flow, { from: { kind: "node", nodeId: child.nodeId }, to: { kind: "node", nodeId: final.nodeId }, trigger: "完成", type: "interaction" });
+
+  const layout = autoLayoutComputePreview(flow);
+  const itemById = new Map(layout.items.map((item) => [item.id, item]));
+
+  assert.ok(layout.nodePositions[start.nodeId]!.x < layout.nodePositions[middle.nodeId]!.x);
+  assert.ok(layout.nodePositions[start.nodeId]!.x < layout.nodePositions[branch.nodeId]!.x);
+  assert.ok(layout.nodePositions[middle.nodeId]!.x < layout.nodePositions[child.nodeId]!.x);
+  assert.ok(layout.nodePositions[branch.nodeId]!.x < layout.nodePositions[child.nodeId]!.x);
+  assert.ok(layout.nodePositions[child.nodeId]!.x < layout.nodePositions[final.nodeId]!.x);
+  assert.equal(itemById.get(middle.nodeId)?.layer, itemById.get(start.nodeId)!.layer + 1);
+  assert.equal(itemById.get(child.nodeId)?.layer, itemById.get(middle.nodeId)!.layer + 1);
+  assert.equal(itemById.get(final.nodeId)?.layer, itemById.get(child.nodeId)!.layer + 1);
   assertNoAutoLayoutOverlap(layout.items);
 });
 
@@ -252,8 +288,8 @@ test("Canvas auto layout handles cyclic same-lane flows with stable ordering", a
 
   const layout = autoLayoutComputePreview(flow);
 
-  assert.ok(layout.nodePositions[first.nodeId]!.y < layout.nodePositions[second.nodeId]!.y);
-  assert.ok(layout.nodePositions[second.nodeId]!.y < layout.nodePositions[third.nodeId]!.y);
+  assert.ok(layout.nodePositions[first.nodeId]!.x < layout.nodePositions[second.nodeId]!.x);
+  assert.ok(layout.nodePositions[second.nodeId]!.x < layout.nodePositions[third.nodeId]!.x);
   assertNoAutoLayoutOverlap(layout.items);
 });
 
@@ -293,10 +329,12 @@ test("Canvas auto layout splits crowded same-level nodes using measured card hei
   };
 
   const layout = autoLayoutComputePreview(flow, measurements);
-  const pageItems = layout.items.filter((item) => item.kind === "node" && item.layer === 4);
+  const pageIds = new Set(pages.map((node) => node.nodeId));
+  const pageItems = layout.items.filter((item) => item.kind === "node" && pageIds.has(item.id));
   const popupItem = layout.items.find((item) => item.id === popup.nodeId);
   assert.equal(pageItems.length, pages.length);
   assert.ok(popupItem);
+  assert.ok(popupItem.layer > pageItems[0]!.layer);
   assertNoAutoLayoutOverlap(layout.items);
   assert.ok(Math.max(...pageItems.map((item) => item.x)) - Math.min(...pageItems.map((item) => item.x)) >= 320 + 160);
   const firstColumnItems = pageItems.filter((item) => item.x - Math.min(...pageItems.map((page) => page.x)) < 100).sort((left, right) => left.y - right.y);
@@ -334,8 +372,21 @@ test("Canvas auto layout preview state restores, invalidates, and updates dragge
   const restoredAfterDrag = autoLayoutPreviewPositionsForFlow(flow, movedState);
   assert.deepEqual(restoredAfterDrag?.nodePositions[page.nodeId], { x: 1234, y: 568 });
 
-  createManualNode(flow, { title: "新增节点", pageType: "page", appSurfaceIds: ["app_admin"] });
-  assert.equal(autoLayoutPreviewPositionsForFlow(flow, movedState), null);
+  const unpositionedFlow = JSON.parse(JSON.stringify(flow));
+  createManualNode(unpositionedFlow, { title: "无坐标新增节点", pageType: "page", appSurfaceIds: ["app_admin"] });
+  assert.equal(autoLayoutPreviewPositionsForFlow(unpositionedFlow, movedState), null);
+
+  const positionedFlow = JSON.parse(JSON.stringify(flow));
+  const positionedNode = createManualNode(positionedFlow, { title: "拖拽新增节点", pageType: "page", appSurfaceIds: ["app_admin"], x: 880.2, y: 441.7 });
+  createManualEdge(positionedFlow, {
+    from: { kind: "node", nodeId: page.nodeId },
+    to: { kind: "node", nodeId: positionedNode.nodeId },
+    trigger: "手动连接",
+    type: "interaction"
+  });
+  const restoredWithPositionedNode = autoLayoutPreviewPositionsForFlow(positionedFlow, movedState);
+  assert.deepEqual(restoredWithPositionedNode?.nodePositions[page.nodeId], { x: 1234, y: 568 });
+  assert.deepEqual(restoredWithPositionedNode?.nodePositions[positionedNode.nodeId], { x: 880, y: 442 });
 });
 
 test("Canvas auto layout keeps preview state and recomputes order after edge endpoints change", async () => {
@@ -373,7 +424,7 @@ test("Canvas auto layout keeps preview state and recomputes order after edge end
 
   assert.deepEqual(restored?.nodePositions[first.nodeId], initialLayout.nodePositions[first.nodeId]);
   assert.deepEqual(restored?.nodePositions[second.nodeId], initialLayout.nodePositions[second.nodeId]);
-  assert.ok(layout.nodePositions[second.nodeId]!.y < layout.nodePositions[first.nodeId]!.y);
+  assert.ok(layout.nodePositions[second.nodeId]!.x < layout.nodePositions[first.nodeId]!.x);
   assertNoAutoLayoutOverlap(layout.items);
 });
 
@@ -405,7 +456,7 @@ test("Canvas auto layout breaks cycles by preserving higher-priority edge types"
 
   const layout = autoLayoutComputePreview(flow);
 
-  assert.ok(layout.nodePositions[second.nodeId]!.y < layout.nodePositions[first.nodeId]!.y);
+  assert.ok(layout.nodePositions[second.nodeId]!.x < layout.nodePositions[first.nodeId]!.x);
   assertNoAutoLayoutOverlap(layout.items);
 });
 
@@ -440,6 +491,7 @@ test("Canvas auto layout aligns detail nodes to highest-priority incoming parent
 
   assert.ok(layout.nodePositions[dataParent.nodeId]!.y !== layout.nodePositions[nestedParent.nodeId]!.y);
   assert.equal(layout.nodePositions[detail.nodeId]!.y, layout.nodePositions[nestedParent.nodeId]!.y);
+  assert.ok(layout.nodePositions[nestedParent.nodeId]!.x < layout.nodePositions[detail.nodeId]!.x);
   assertNoAutoLayoutOverlap(layout.items);
 });
 
