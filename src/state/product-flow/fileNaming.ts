@@ -1,4 +1,3 @@
-import * as path from "node:path";
 import { slugify } from "../id";
 import type { ProductFlow } from "./types";
 
@@ -14,12 +13,4 @@ export function createMindFlowFileName(flow: ProductFlow): string {
     return createUntitledMindFlowFileName(flow);
   }
   return `${slugify(flow.title, "flow")}-${flow.flowId}${MINDFLOW_FILE_EXTENSION}`;
-}
-
-export function createUntitledMindFlowTargetPath(
-  flow: ProductFlow,
-  workspaceRoot: string | undefined,
-  flowDirectory: string
-): string | undefined {
-  return workspaceRoot ? path.join(workspaceRoot, flowDirectory, createMindFlowFileName(flow)) : undefined;
 }

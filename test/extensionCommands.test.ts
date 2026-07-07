@@ -1,4 +1,6 @@
 import { strict as assert } from "node:assert";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import test from "node:test";
 import { createEmptyProductFlow } from "../src/domain/product-flow/factory";
 import { createManualNode } from "../src/domain/operations/flowEditing";
@@ -28,4 +30,12 @@ test("Flow document save guard rejects invalid ProductFlow before writing", () =
     () => assertValidProductFlowForSave(flow),
     /Refusing to save invalid ProductFlow/
   );
+});
+
+test("New blank MindFlow always opens a plain untitled document", async () => {
+  const source = await fs.readFile(path.join(process.cwd(), "src", "user-operations", "vscode-commands", "fileCommands.ts"), "utf8");
+
+  assert.equal(source.includes("createUntitledMindFlowUri"), false);
+  assert.equal(source.includes("openTextDocument(untitledUri)"), false);
+  assert.equal(source.includes("openTextDocument(options)"), true);
 });

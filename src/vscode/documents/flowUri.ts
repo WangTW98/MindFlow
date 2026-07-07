@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { createMindFlowFileName, createUntitledMindFlowTargetPath } from "../../state/product-flow/fileNaming";
+import { createMindFlowFileName } from "../../state/product-flow/fileNaming";
 import type { ProductFlow } from "../../state/product-flow";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../../state/storage/flowRepository";
 
@@ -53,11 +53,6 @@ export function getDefaultSaveUri(flow: ProductFlow, flowUri: vscode.Uri): vscod
   }
   const flowDirectory = getConfiguredFlowDirectory();
   return vscode.Uri.file(path.join(workspaceRoot, flowDirectory, createMindFlowFileName(flow)));
-}
-
-export function createUntitledMindFlowUri(flow: ProductFlow): vscode.Uri | undefined {
-  const targetPath = createUntitledMindFlowTargetPath(flow, getWorkspaceRootIfAvailable(), getConfiguredFlowDirectory());
-  return targetPath ? vscode.Uri.file(targetPath).with({ scheme: "untitled" }) : undefined;
 }
 
 export function createFlowRepository(): FlowRepository {

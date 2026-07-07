@@ -10,7 +10,6 @@ export {
 } from "./documents/flowDocumentService";
 export {
   createFlowRepository,
-  createUntitledMindFlowUri,
   ensureMindFlowExtension,
   flowDisplayName,
   getDefaultSaveUri,
