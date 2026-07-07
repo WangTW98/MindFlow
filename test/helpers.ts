@@ -1,8 +1,8 @@
 import { strict as assert } from "node:assert";
-import type { FeatureGroup, PageNode, ProductFlow } from "../src/models/productFlow";
-import { ensureAppSurfaceEntryEdges } from "../src/core/appSurfaceEntryEdges";
-import { createEmptyProductFlow } from "../src/core/emptyFlow";
-import { createManualEdge, createManualNode } from "../src/core/flowEditing";
+import type { FeatureGroup, PageNode, ProductFlow } from "../src/domain/product-flow";
+import { ensureAppSurfaceEntryEdges } from "../src/domain/operations/layout/appSurfaceEntryEdges";
+import { createEmptyProductFlow } from "../src/domain/product-flow/factory";
+import { createManualEdge, createManualNode } from "../src/domain/operations/flowEditing";
 
 export function createProcurementFlow(options: { includeAppSurfaceEntryEdges?: boolean } = {}): ProductFlow {
   const flow = createEmptyProductFlow("多应用端采购协同平台需求示例");

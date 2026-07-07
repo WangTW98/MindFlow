@@ -55,7 +55,7 @@ test("webview canvas source manifest matches the structured canvas directories",
   const manifestSource = await fs.readFile(manifestPath, "utf8");
   const sourceFiles = Array.from(manifestSource.matchAll(/"([^"]+\.js)"/g), (match) => match[1])
     .filter((sourceFile): sourceFile is string => typeof sourceFile === "string");
-  const allowedRoots = new Set(["bootstrap", "commands", "interactions", "render", "selectors", "state"]);
+  const allowedRoots = new Set(["bootstrap", "commands", "interactions", "layout", "render", "selectors", "state"]);
   const seenFunctions = new Map<string, string>();
   const duplicateFunctions: string[] = [];
 
@@ -102,6 +102,71 @@ test("VS Code packaging ignores canvas source and keeps bundled media", async ()
   assert.equal(ignoreSource.includes("src/webview/client/**"), false);
 });
 
+test("legacy compatibility re-export shims remain explicit and bounded", async () => {
+  const root = process.cwd();
+  const shims = [
+    ...await listReExportShims([
+    path.join(root, "src", "core"),
+    path.join(root, "src", "models")
+    ]),
+    ...await listRootReExportShims(path.join(root, "src", "webview")),
+    ...await listReExportShims([
+      path.join(root, "src", "webview", "sidebar")
+    ]).then((files) => files.filter((filePath) => /sidebar(?:Html|State)\.ts$/.test(filePath)))
+  ].sort();
+
+  assert.deepEqual(shims.map((filePath) => path.relative(root, filePath)), [
+    "src/core/appSurfaceEntryEdges.ts",
+    "src/core/canvasLayout.ts",
+    "src/core/editorSelection.ts",
+    "src/core/emptyFlow.ts",
+    "src/core/flowEditing.ts",
+    "src/core/flowEditing/edges.ts",
+    "src/core/flowEditing/endpoints.ts",
+    "src/core/flowEditing/featureGroups.ts",
+    "src/core/flowEditing/index.ts",
+    "src/core/flowEditing/nodes.ts",
+    "src/core/flowEditing/shared.ts",
+    "src/core/flowEditing/types.ts",
+    "src/core/flowOperations/index.ts",
+    "src/core/projectOverview.ts",
+    "src/core/taxonomy.ts",
+    "src/core/taxonomy/appSurfaces.ts",
+    "src/core/taxonomy/domains.ts",
+    "src/core/taxonomy/helpers.ts",
+    "src/core/taxonomy/roles.ts",
+    "src/core/taxonomy/statusGroups.ts",
+    "src/core/taxonomy/types.ts",
+    "src/core/taxonomyEditing.ts",
+    "src/core/untitledMindFlowDocument.ts",
+    "src/models/productFlow.ts",
+    "src/models/productFlow/constants.ts",
+    "src/models/productFlow/guards.ts",
+    "src/models/productFlow/index.ts",
+    "src/models/productFlow/types.ts",
+    "src/models/productFlow/validation.ts",
+    "src/models/productFlow/validation/collections.ts",
+    "src/models/productFlow/validation/endpoints.ts",
+    "src/models/productFlow/validation/entities.ts",
+    "src/models/productFlow/validation/primitives.ts",
+    "src/models/productFlowCodec.ts",
+    "src/models/productFlowSaveGuard.ts",
+    "src/webview/FlowEditorSession.ts",
+    "src/webview/FlowPanel.ts",
+    "src/webview/SidebarView.ts",
+    "src/webview/flowCommandDispatcher.ts",
+    "src/webview/flowDocument.ts",
+    "src/webview/flowDocumentText.ts",
+    "src/webview/flowMessageOrdering.ts",
+    "src/webview/flowSelection.ts",
+    "src/webview/flowSelectionController.ts",
+    "src/webview/flowWebviewHtml.ts",
+    "src/webview/flowWebviewState.ts",
+    "src/webview/sidebar/sidebarHtml.ts",
+    "src/webview/sidebar/sidebarState.ts"
+  ]);
+});
+
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await fs.readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(entries.map(async (entry) => {
@@ -118,6 +183,32 @@ async function readSources(directory: string): Promise<string> {
   const files = await listTypeScriptFiles(directory);
   const sources = await Promise.all(files.map((filePath) => fs.readFile(filePath, "utf8")));
   return sources.join("\n");
+}
+
+async function listReExportShims(directories: string[]): Promise<string[]> {
+  const nested = await Promise.all(directories.map(async (directory) => {
+    const files = await listTypeScriptFiles(directory);
+    const shims = await Promise.all(files.map(async (filePath) => {
+      const source = await fs.readFile(filePath, "utf8");
+      const trimmed = source.trim();
+      return trimmed.startsWith("export") && !/\bimport\b/.test(source) ? [filePath] : [];
+    }));
+    return shims.flat();
+  }));
+  return nested.flat().sort();
+}
+
+async function listRootReExportShims(directory: string): Promise<string[]> {
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  const files = entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
+    .map((entry) => path.join(directory, entry.name));
+  const shims = await Promise.all(files.map(async (filePath) => {
+    const source = await fs.readFile(filePath, "utf8");
+    const trimmed = source.trim();
+    return trimmed.startsWith("export") && !/\bimport\b/.test(source) ? [filePath] : [];
+  }));
+  return shims.flat().sort();
 }
 
 function assertNoForbiddenImport(source: string, forbidden: string[]): void {

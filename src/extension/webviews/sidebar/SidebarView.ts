@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { RecentFlowStore } from "../../../storage/recentFlows";
+import { RecentFlowStore } from "../../state/recentFlows";
 import { parseSidebarMessage } from "../../../webview/sidebar/sidebarMessages";
 import { renderSidebarHtml } from "./sidebarHtml";
 import { createSidebarState } from "./sidebarState";

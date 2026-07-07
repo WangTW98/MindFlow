@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { createMindFlowFileName, createUntitledMindFlowTargetPath } from "../../core/untitledMindFlowDocument";
+import { createMindFlowFileName, createUntitledMindFlowTargetPath } from "../../domain/product-flow/fileNaming";
 import type { ProductFlow } from "../../domain/product-flow";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../../storage/flowRepository";
 

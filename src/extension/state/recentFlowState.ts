@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { RecentFlowStore } from "../../storage/recentFlows";
+import { RecentFlowStore } from "./recentFlows";
 import { rememberFlowPath } from "./activeFlowState";
 
 export interface RefreshableSidebar {

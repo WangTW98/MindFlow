@@ -4,22 +4,22 @@ import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
 import type * as vscode from "vscode";
-import { ensureAppSurfaceEntryEdges } from "../src/core/appSurfaceEntryEdges";
-import { ensureReasonableNodeLayout } from "../src/core/canvasLayout";
-import { createEmptyProductFlow } from "../src/core/emptyFlow";
-import { createManualEdge, createManualNode, removeManualEdge, removeManualNode, updateManualAppSurfacePosition, updateManualEdgeDetails, updateManualNodeDetails, updateManualNodePosition } from "../src/core/flowEditing";
-import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/core/projectOverview";
-import { applyTaxonomyRequest } from "../src/core/taxonomy";
-import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/core/taxonomyEditing";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/core/untitledMindFlowDocument";
-import { EDGE_TYPES, validateProductFlow } from "../src/models/productFlow";
-import { parseProductFlowText, serializeProductFlow } from "../src/models/productFlowCodec";
+import { ensureAppSurfaceEntryEdges } from "../src/domain/operations/layout/appSurfaceEntryEdges";
+import { ensureReasonableNodeLayout } from "../src/domain/operations/layout/canvasLayout";
+import { createEmptyProductFlow } from "../src/domain/product-flow/factory";
+import { createManualEdge, createManualNode, removeManualEdge, removeManualNode, updateManualAppSurfacePosition, updateManualEdgeDetails, updateManualNodeDetails, updateManualNodePosition } from "../src/domain/operations/flowEditing";
+import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/operations/projectOverview";
+import { applyTaxonomyRequest } from "../src/domain/operations/taxonomy";
+import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/operations/taxonomyEditing";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/extension/documents/untitledMindFlowDocument";
+import { EDGE_TYPES, validateProductFlow } from "../src/domain/product-flow";
+import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/codec";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/storage/flowRepository";
-import { RecentFlowStore } from "../src/storage/recentFlows";
-import { dispatchFlowWebviewMessage } from "../src/webview/flowCommandDispatcher";
-import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/webview/flowSelection";
-import { recordEdgeDetailsRevision } from "../src/webview/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/webview/flowWebviewHtml";
+import { RecentFlowStore } from "../src/extension/state/recentFlows";
+import { dispatchFlowWebviewMessage } from "../src/extension/webviews/canvas/flowCommandDispatcher";
+import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/domain/selection";
+import { recordEdgeDetailsRevision } from "../src/extension/webviews/canvas/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, renderFlowWebviewHtml } from "../src/extension/webviews/canvas/flowWebviewHtml";
 import { parseWebviewMessage } from "../src/webview/flowWebviewMessages";
 import { parseSidebarMessage } from "../src/webview/sidebar/sidebarMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
@@ -694,7 +694,7 @@ async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers>
 
 async function loadAutoLayoutHelpers(): Promise<AutoLayoutHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "webview", "canvas", "selectors", "canvas-auto-layout.js"),
+    path.join(process.cwd(), "src", "webview", "canvas", "layout", "canvas-auto-layout.js"),
     "utf8"
   );
   const factory = new Function(`${source}\nreturn { autoLayoutComputePreview, autoLayoutCreatePreviewState, autoLayoutPreviewPositionsForFlow, autoLayoutPreviewStateWithPosition, autoLayoutEstimateLabelWidth };`) as () => AutoLayoutHelpers;

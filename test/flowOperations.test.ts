@@ -1,8 +1,8 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { createEmptyProductFlow } from "../src/core/emptyFlow";
-import { applyFlowOperation, applyFlowOperations } from "../src/core/flowOperations";
-import { validateProductFlow } from "../src/models/productFlow";
+import { createEmptyProductFlow } from "../src/domain/product-flow/factory";
+import { applyFlowOperation, applyFlowOperations } from "../src/domain/operations/flowOperations";
+import { validateProductFlow } from "../src/domain/product-flow";
 
 test("Flow operations edit root, taxonomy, nodes, app surfaces, and edges", () => {
   const flow = createEmptyProductFlow();

@@ -1,9 +1,9 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { createEmptyProductFlow } from "../src/core/emptyFlow";
-import { createManualNode } from "../src/core/flowEditing";
+import { createEmptyProductFlow } from "../src/domain/product-flow/factory";
+import { createManualNode } from "../src/domain/operations/flowEditing";
 import { hasOptionalFiniteCoordinates, isPlainObject, readFiniteCoordinates } from "../src/extension/commands/guards";
-import { assertValidProductFlowForSave } from "../src/models/productFlowSaveGuard";
+import { assertValidProductFlowForSave } from "../src/domain/product-flow/saveGuard";
 import { assertThrows } from "./helpers";
 
 test("Command guards reject non-finite coordinates and non-object patches", () => {
