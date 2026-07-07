@@ -192,6 +192,7 @@
     let nodeSearch = persisted.nodeSearch || "";
     let nodeSearchComposing = false;
     let leftPanelCollapsed = Boolean(persisted.leftPanelCollapsed);
+    let viewportInitializedFor = typeof persisted.viewportInitializedFor === "string" ? persisted.viewportInitializedFor : "";
     let zoom = clamp(Number(persisted.zoom || 1), MIN_ZOOM, MAX_ZOOM);
     let camera = persisted.camera && Number.isFinite(persisted.camera.x) && Number.isFinite(persisted.camera.y) ? { x: persisted.camera.x, y: persisted.camera.y } : { x: 800, y: 120 };
     let connectingFrom = persisted.connectingFrom || null;
@@ -1370,6 +1371,7 @@
       bindEvents();
       restoreInspectorScroll();
       positionCards();
+      initializeCanvasViewportForOpen(flow);
       applyCamera();
       persistUiState();
       scheduleDrawEdges();
@@ -1440,6 +1442,7 @@
       }
       return `<p class="save-hint ${escapeAttr(commandStatus.kind)}" role="status">${escapeHtml(commandStatus.message)}</p>`;
     }
+    const INITIAL_VIEWPORT_FIT_PADDING = 72;
     function seedProjectOverviewPosition(flow) {
       if (projectOverviewPosition) {
         return;
@@ -1507,6 +1510,110 @@
         card.style.left = `${pos.x}px`;
         card.style.top = `${pos.y}px`;
       });
+    }
+    function initializeCanvasViewportForOpen(flow) {
+      const key = canvasViewportInitializationKey(flow);
+      if (!key || viewportInitializedFor === key) {
+        return false;
+      }
+      if (fitCanvasViewportToContent()) {
+        viewportInitializedFor = key;
+        return true;
+      }
+      requestAnimationFrame(() => {
+        if (viewportInitializedFor === key || !fitCanvasViewportToContent()) {
+          return;
+        }
+        viewportInitializedFor = key;
+        applyCamera();
+        scheduleDrawEdges();
+      });
+      return false;
+    }
+    function canvasViewportInitializationKey(flow) {
+      const flowPath = typeof state.flowPath === "string" ? state.flowPath : "";
+      const flowId = typeof flow?.flowId === "string" ? flow.flowId : "";
+      return flowPath || flowId ? `${flowPath}:${flowId}` : "";
+    }
+    function fitCanvasViewportToContent() {
+      const canvas = document.getElementById("canvas");
+      const bounds = collectCanvasContentBounds();
+      const nextViewport = canvasViewportFitForBounds(bounds, {
+        width: canvas?.clientWidth,
+        height: canvas?.clientHeight
+      }, INITIAL_VIEWPORT_FIT_PADDING);
+      if (!nextViewport) {
+        return false;
+      }
+      zoom = nextViewport.zoom;
+      camera = nextViewport.camera;
+      return true;
+    }
+    function collectCanvasContentBounds() {
+      const cards = Array.from(document.querySelectorAll(".project-overview-card, .app-surface-card, .node-card"));
+      const items = cards.map(cardBounds).filter(Boolean);
+      return boundsForRects(items);
+    }
+    function cardBounds(card) {
+      const x = finiteNumberOr(Number.parseFloat(card.style.left), card.offsetLeft);
+      const y = finiteNumberOr(Number.parseFloat(card.style.top), card.offsetTop);
+      const rect = card.getBoundingClientRect?.();
+      const width = finitePositiveNumberOr(card.offsetWidth, rect?.width);
+      const height = finitePositiveNumberOr(card.offsetHeight, rect?.height);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+        return null;
+      }
+      return { x, y, width, height };
+    }
+    function boundsForRects(rects) {
+      if (!Array.isArray(rects) || rects.length === 0) {
+        return null;
+      }
+      return rects.reduce((bounds, rect) => ({
+        minX: Math.min(bounds.minX, rect.x),
+        minY: Math.min(bounds.minY, rect.y),
+        maxX: Math.max(bounds.maxX, rect.x + rect.width),
+        maxY: Math.max(bounds.maxY, rect.y + rect.height)
+      }), {
+        minX: Number.POSITIVE_INFINITY,
+        minY: Number.POSITIVE_INFINITY,
+        maxX: Number.NEGATIVE_INFINITY,
+        maxY: Number.NEGATIVE_INFINITY
+      });
+    }
+    function canvasViewportFitForBounds(bounds, viewport, padding = INITIAL_VIEWPORT_FIT_PADDING) {
+      const viewportWidth = Number(viewport?.width);
+      const viewportHeight = Number(viewport?.height);
+      if (!Number.isFinite(viewportWidth) || !Number.isFinite(viewportHeight) || viewportWidth <= 0 || viewportHeight <= 0 || !isFiniteBounds(bounds)) {
+        return null;
+      }
+      const safePadding = Math.max(0, Number.isFinite(Number(padding)) ? Number(padding) : 0);
+      const minX = bounds.minX - safePadding;
+      const minY = bounds.minY - safePadding;
+      const width = Math.max(1, bounds.maxX - bounds.minX + safePadding * 2);
+      const height = Math.max(1, bounds.maxY - bounds.minY + safePadding * 2);
+      const nextZoom = clamp(Math.min(1, viewportWidth / width, viewportHeight / height), MIN_ZOOM, MAX_ZOOM);
+      return {
+        zoom: nextZoom,
+        camera: {
+          x: Math.round((viewportWidth - width * nextZoom) / 2 - minX * nextZoom),
+          y: Math.round((viewportHeight - height * nextZoom) / 2 - minY * nextZoom)
+        }
+      };
+    }
+    function isFiniteBounds(bounds) {
+      return Boolean(
+        bounds && Number.isFinite(bounds.minX) && Number.isFinite(bounds.minY) && Number.isFinite(bounds.maxX) && Number.isFinite(bounds.maxY) && bounds.maxX >= bounds.minX && bounds.maxY >= bounds.minY
+      );
+    }
+    function finiteNumberOr(value, fallback) {
+      return Number.isFinite(value) ? value : fallback;
+    }
+    function finitePositiveNumberOr(value, fallback) {
+      if (Number.isFinite(value) && value > 0) {
+        return value;
+      }
+      return Number.isFinite(fallback) && fallback > 0 ? fallback : Number.NaN;
     }
     function applyCamera() {
       const world = document.getElementById("world");
@@ -4300,8 +4407,6 @@
         appSurfacePositions: layout.appSurfacePositions,
         nodePositions: layout.nodePositions
       });
-      setCommandStatus(true, "\u5DF2\u81EA\u52A8\u6392\u7248\u5F53\u524D\u753B\u5E03\uFF0C\u4F4D\u7F6E\u5DF2\u5199\u5165\u6587\u6863");
-      updateCommandStatusElement();
     }
     function autoLayoutApplyLayoutPositions(layout) {
       projectOverviewPosition = autoLayoutCopyPosition(layout.projectOverviewPosition);
@@ -5483,6 +5588,7 @@
         selectedStatusGroupId,
         nodeSearch,
         leftPanelCollapsed,
+        viewportInitializedFor,
         zoom,
         camera,
         connectingFrom,

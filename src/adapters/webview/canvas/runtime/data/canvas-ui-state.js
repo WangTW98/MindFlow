@@ -135,6 +135,7 @@ function persistUiState() {
     selectedStatusGroupId,
     nodeSearch,
     leftPanelCollapsed,
+    viewportInitializedFor,
     zoom,
     camera,
     connectingFrom,

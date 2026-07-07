@@ -180,6 +180,37 @@ test("Selection relation panel filters removed relations and deduplicates node c
   assert.deepEqual(groups?.to, [{ kind: "node", id: target.nodeId, title: "目标节点" }]);
 });
 
+test("Canvas viewport fit brings saved offscreen content into view", async () => {
+  const { canvasViewportFitForBounds } = await loadCanvasViewportHelpers();
+  const bounds = { minX: 2000, minY: 1000, maxX: 2600, maxY: 1400 };
+  const fit = canvasViewportFitForBounds(bounds, { width: 800, height: 600 }, 72);
+
+  assert.ok(fit);
+  assert.equal(fit.zoom <= 1, true);
+  assert.ok(bounds.minX * fit.zoom + fit.camera.x >= 0);
+  assert.ok(bounds.maxX * fit.zoom + fit.camera.x <= 800);
+  assert.ok(bounds.minY * fit.zoom + fit.camera.y >= 0);
+  assert.ok(bounds.maxY * fit.zoom + fit.camera.y <= 600);
+});
+
+test("Canvas viewport fit shrinks large content but does not enlarge small content", async () => {
+  const { canvasViewportFitForBounds } = await loadCanvasViewportHelpers();
+  const large = canvasViewportFitForBounds({ minX: 0, minY: 0, maxX: 2400, maxY: 1600 }, { width: 800, height: 600 }, 72);
+  const small = canvasViewportFitForBounds({ minX: 20, minY: 40, maxX: 220, maxY: 180 }, { width: 1000, height: 800 }, 72);
+
+  assert.ok(large);
+  assert.ok(large.zoom < 1);
+  assert.ok(small);
+  assert.equal(small.zoom, 1);
+});
+
+test("Canvas viewport fit ignores empty bounds and unavailable canvas sizes", async () => {
+  const { canvasViewportFitForBounds } = await loadCanvasViewportHelpers();
+
+  assert.equal(canvasViewportFitForBounds(null, { width: 800, height: 600 }, 72), null);
+  assert.equal(canvasViewportFitForBounds({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, { width: 0, height: 600 }, 72), null);
+});
+
 test("Canvas auto layout previews hierarchy, lanes, spacing, and collision-free positions", async () => {
   const { autoLayoutComputePreview, autoLayoutEstimateLabelWidth } = await loadAutoLayoutHelpers();
   const flow = createEmptyProductFlow("自动排版测试");
@@ -740,6 +771,30 @@ interface SelectionRelationHelpers {
   getSelectionRelationGroups(flow: unknown, selectedNode: unknown, selectedEdge: unknown): SelectionRelationGroups | null;
 }
 
+interface CanvasViewportBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+interface CanvasViewportSize {
+  width: number;
+  height: number;
+}
+
+interface CanvasViewportFit {
+  zoom: number;
+  camera: {
+    x: number;
+    y: number;
+  };
+}
+
+interface CanvasViewportHelpers {
+  canvasViewportFitForBounds(bounds: CanvasViewportBounds | null, viewport: CanvasViewportSize, padding?: number): CanvasViewportFit | null;
+}
+
 interface AutoLayoutPosition {
   x: number;
   y: number;
@@ -796,6 +851,20 @@ async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers>
     `${source}\nreturn { getSelectionRelationGroups };`
   ) as (projectOverviewNodeId: string) => SelectionRelationHelpers;
   return factory("projectOverview");
+}
+
+async function loadCanvasViewportHelpers(): Promise<CanvasViewportHelpers> {
+  const source = await fs.readFile(
+    path.join(process.cwd(), "src", "adapters", "webview", "canvas", "runtime", "interactions", "canvas-camera.js"),
+    "utf8"
+  );
+  const factory = new Function(
+    "MIN_ZOOM",
+    "MAX_ZOOM",
+    "clamp",
+    `${source}\nreturn { canvasViewportFitForBounds };`
+  ) as (minZoom: number, maxZoom: number, clamp: (value: number, min: number, max: number) => number) => CanvasViewportHelpers;
+  return factory(0.05, 2.6, (value, min, max) => Math.min(max, Math.max(min, value)));
 }
 
 async function loadAutoLayoutHelpers(): Promise<AutoLayoutHelpers> {

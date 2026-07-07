@@ -60,6 +60,7 @@ function render() {
   bindEvents();
   restoreInspectorScroll();
   positionCards();
+  initializeCanvasViewportForOpen(flow);
   applyCamera();
   persistUiState();
   scheduleDrawEdges();

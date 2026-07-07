@@ -138,8 +138,6 @@ function autoLayoutApplyCanvasPreview() {
     appSurfacePositions: layout.appSurfacePositions,
     nodePositions: layout.nodePositions
   });
-  setCommandStatus(true, "已自动排版当前画布，位置已写入文档");
-  updateCommandStatusElement();
 }
 
 function autoLayoutApplyLayoutPositions(layout) {
