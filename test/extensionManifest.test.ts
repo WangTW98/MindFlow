@@ -35,16 +35,17 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and M
       commands?: Array<{ command?: string }>;
       keybindings?: Array<{ command?: string; key?: string; mac?: string; when?: string }>;
       configuration?: { properties?: Record<string, { default?: string; enum?: string[] }> };
+      jsonValidation?: Array<{ fileMatch?: string[]; url?: string }>;
     };
   };
 
-  assert.ok(manifest.contributes?.viewsContainers?.activitybar?.some((item) => item.id === "mindflow" && item.icon === "src/webview/media/icon.svg"));
+  assert.ok(manifest.contributes?.viewsContainers?.activitybar?.some((item) => item.id === "mindflow" && item.icon === "src/canvas/media/icon.svg"));
   const sidebarView = manifest.contributes?.views?.mindflow?.find((item) => item.id === "mindflow.sidebar");
   assert.equal(sidebarView?.type, "webview");
   const language = manifest.contributes?.languages?.find((item) => item.id === "mindflow");
   assert.ok(language?.extensions?.includes(".mindflow"));
-  assert.equal(language?.icon?.light, "src/webview/media/icon.svg");
-  assert.equal(language?.icon?.dark, "src/webview/media/icon.svg");
+  assert.equal(language?.icon?.light, "src/canvas/media/icon.svg");
+  assert.equal(language?.icon?.dark, "src/canvas/media/icon.svg");
   const editor = manifest.contributes?.customEditors?.find((item) => item.viewType === "mindflow.productFlow");
   assert.ok(editor);
   assert.ok(editor.selector?.some((item) => item.filenamePattern === "*.mindflow"));
@@ -62,6 +63,7 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and M
     false
   );
   assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), ["mindflow.storage.flowDirectory"]);
+  assert.equal(manifest.contributes?.jsonValidation?.[0]?.url, "./src/state/schema/productFlow.schema.json");
   assert.deepEqual(manifest.bin, { "mindflow-mcp": "./out/src/mcp/stdioBridge.js" });
   const removedScriptPrefix = ["m", "c", "p"].join("") + ":";
   assert.equal(Object.keys(manifest.scripts ?? {}).some((script) => script.startsWith(removedScriptPrefix)), false);

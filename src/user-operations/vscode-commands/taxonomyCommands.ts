@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
-import type { TaxonomyRequest } from "../../domain/operations";
-import { applyFlowOperation, type FlowOperation, type FlowOperationResult } from "../../domain/operations";
-import { editCurrentFlowDocument, showError, type FlowUriArgument } from "../flowContext";
-import { FlowPanel } from "../webviews/canvas/FlowPanel";
+import type { TaxonomyRequest } from "../../state/operations";
+import { applyFlowOperation, type FlowOperation, type FlowOperationResult } from "../../state/operations";
+import { editCurrentFlowDocument, showError, type FlowUriArgument } from "../../vscode/flowContext";
+import { FlowPanel } from "../../vscode/webviews/canvas/FlowPanel";
 import { isPlainObject } from "./guards";
 
 export async function updateTaxonomy(context: vscode.ExtensionContext, request?: TaxonomyRequest, sourceUri?: FlowUriArgument): Promise<boolean> {

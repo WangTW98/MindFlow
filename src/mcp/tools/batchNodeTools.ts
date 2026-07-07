@@ -1,5 +1,5 @@
-import { normalizeFlowSelection } from "../../domain/selection";
-import type { FlowOperation } from "../../domain/operations";
+import { normalizeFlowSelection } from "../../state/selection";
+import type { FlowOperation } from "../../state/operations";
 import type { MindFlowEditorBridge } from "../bridge";
 import { batchSelectionPatch, resultNodes, snapshotToPayload } from "./payloads";
 import { readOptionalBoolean, readOptionalString, readOptionalStringArray, requireStringEither, stripUndefined } from "./readers";

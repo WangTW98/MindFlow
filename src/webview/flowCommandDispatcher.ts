@@ -1,1 +1,1 @@
-export * from "../extension/webviews/canvas/flowCommandDispatcher";
+export * from "../vscode/webviews/canvas/flowCommandDispatcher";

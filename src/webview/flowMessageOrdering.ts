@@ -1,1 +1,1 @@
-export * from "../extension/webviews/canvas/flowMessageOrdering";
+export * from "../vscode/webviews/canvas/flowMessageOrdering";

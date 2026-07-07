@@ -1,1 +1,1 @@
-export * from "../extension/webviews/canvas/flowWebviewState";
+export * from "../vscode/webviews/canvas/flowWebviewState";

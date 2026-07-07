@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import type { UpdateProjectOverviewInput } from "../../../domain/operations";
+import type { UpdateProjectOverviewInput } from "../../../state/operations";
 import { isPlainObject, readFiniteCoordinates } from "../guards";
-import type { FlowUriArgument } from "../../flowContext";
+import type { FlowUriArgument } from "../../../vscode/flowContext";
 import { applyCanvasEdit, selectAndRevealFlow } from "./editSession";
 
 export async function saveProjectOverviewPosition(x?: number, y?: number, sourceUri?: FlowUriArgument): Promise<boolean> {

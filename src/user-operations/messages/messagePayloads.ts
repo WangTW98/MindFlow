@@ -1,4 +1,4 @@
-import type { TaxonomyRequest } from "../../domain/operations";
+import type { TaxonomyRequest } from "../../state/operations";
 import { readEdgeType, readEndpoint } from "./endpointPayload";
 import { isRecord, readOptionalNumber, readOptionalString, readOptionalStringArray, readRecord } from "./readers";
 

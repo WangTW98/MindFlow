@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { slugify } from "../../utils/id";
+import { slugify } from "../id";
 import type { ProductFlow } from "./types";
 
 export const MINDFLOW_LANGUAGE_ID = "mindflow";

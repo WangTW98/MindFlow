@@ -1,8 +1,8 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { FlowRepository } from "../../../storage/flowRepository";
-import { RecentFlowStore, type RecentFlowRecord } from "../../state/recentFlows";
+import { FlowRepository } from "../../../state/storage/flowRepository";
+import { RecentFlowStore, type RecentFlowRecord } from "../../../state/vscode/recentFlows";
 
 export interface SidebarState {
   flows: FlowItem[];

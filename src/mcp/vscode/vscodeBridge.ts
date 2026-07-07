@@ -1,11 +1,11 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import type { FlowSelectionPatch } from "../../domain/selection";
-import type { ProductFlow } from "../../domain/product-flow";
-import { parseProductFlowText } from "../../domain/product-flow/codec";
-import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../../mcp/bridge";
-import { applyFlowDocumentEdit, flowDisplayName, type FlowUriArgument } from "../flowContext";
-import { FlowPanel } from "../webviews/canvas/FlowPanel";
+import type { FlowSelectionPatch } from "../../state/selection";
+import type { ProductFlow } from "../../state/product-flow";
+import { parseProductFlowText } from "../../state/product-flow/codec";
+import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../bridge";
+import { applyFlowDocumentEdit, flowDisplayName, type FlowUriArgument } from "../../vscode/flowContext";
+import { FlowPanel } from "../../vscode/webviews/canvas/FlowPanel";
 
 export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
   public constructor(private readonly extensionUri: vscode.Uri) {}

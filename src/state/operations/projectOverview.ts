@@ -4,7 +4,7 @@ import {
   ensureProjectOverview,
   type EnsureProjectOverviewResult
 } from "../product-flow/projectOverview";
-import { nowIso } from "../../utils/id";
+import { nowIso } from "../id";
 
 export const PROJECT_OVERVIEW_NODE_ID = "projectOverview";
 

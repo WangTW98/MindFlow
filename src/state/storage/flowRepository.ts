@@ -1,9 +1,9 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { ProductFlow } from "../domain/product-flow";
-import { parseProductFlowText, serializeProductFlow } from "../domain/product-flow/codec";
-import { nowIso, slugify } from "../utils/id";
+import type { ProductFlow } from "../product-flow";
+import { parseProductFlowText, serializeProductFlow } from "../product-flow/codec";
+import { nowIso, slugify } from "../id";
 
 export const FLOW_FILE_EXTENSION = ".mindflow";
 

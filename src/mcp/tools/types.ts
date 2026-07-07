@@ -1,6 +1,6 @@
-import type { FlowSelectionPatch } from "../../domain/selection";
-import type { FlowOperation, FlowOperationResult } from "../../domain/operations";
-import type { ProductFlow } from "../../domain/product-flow";
+import type { FlowSelectionPatch } from "../../state/selection";
+import type { FlowOperation, FlowOperationResult } from "../../state/operations";
+import type { ProductFlow } from "../../state/product-flow";
 import type { McpToolResult } from "./registry";
 
 export const MCP_NODE_KINDS = ["layout", "navigation", "page", "popup", "component"] as const;

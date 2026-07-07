@@ -38,7 +38,7 @@ await fs.writeFile(outputFile, renderHtml(initialState, styles, Date.now().toStr
 console.log(pathToFileURL(outputFile).href);
 
 function renderHtml(state, styleFiles, cacheToken) {
-  const mediaPrefix = "../../src/webview/media";
+  const mediaPrefix = "../../src/canvas/media";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

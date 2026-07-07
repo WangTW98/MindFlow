@@ -1,1 +1,1 @@
-export * from "../extension/webviews/canvas/flowWebviewHtml";
+export * from "../vscode/webviews/canvas/flowWebviewHtml";

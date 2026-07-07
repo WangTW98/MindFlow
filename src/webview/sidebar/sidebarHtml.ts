@@ -1,1 +1,1 @@
-export * from "../../extension/webviews/sidebar/sidebarHtml";
+export * from "../../vscode/webviews/sidebar/sidebarHtml";

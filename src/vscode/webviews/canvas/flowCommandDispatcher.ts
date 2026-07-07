@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { recordEdgeDetailsRevision } from "./flowMessageOrdering";
 import type { FlowEditorSelectionController } from "./flowSelectionController";
-import type { WebviewMessage } from "../../../webview/flowWebviewMessages";
+import type { WebviewMessage } from "../../../user-operations/flowWebviewMessages";
 
 export interface FlowWebviewCommandDispatcher {
   documentUri: vscode.Uri;

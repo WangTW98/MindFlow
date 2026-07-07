@@ -1,5 +1,5 @@
 import type { AppSurface, FlowEdge, PageNode, ProductFlow } from "../../product-flow";
-import { makeEdgeId, nowIso } from "../../../utils/id";
+import { makeEdgeId, nowIso } from "../../id";
 
 export interface EnsureAppSurfaceEntryEdgesResult {
   addedEdgeIds: string[];

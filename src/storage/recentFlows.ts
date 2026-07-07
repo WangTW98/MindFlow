@@ -1,1 +1,1 @@
-export * from "../extension/state/recentFlows";
+export * from "../state/vscode/recentFlows";

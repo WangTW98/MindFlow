@@ -1,1 +1,1 @@
-export * from "../extension/webviews/canvas/FlowPanel";
+export * from "../vscode/webviews/canvas/FlowPanel";

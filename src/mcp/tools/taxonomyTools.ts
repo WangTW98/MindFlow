@@ -1,4 +1,4 @@
-import type { TaxonomyKind } from "../../domain/operations";
+import type { TaxonomyKind } from "../../state/operations";
 import { requireStringEither } from "./readers";
 import { readRequiredPosition, taxonomyUpsertOperation } from "./toolInputReaders";
 import type { McpToolActions } from "./registry";

@@ -1,4 +1,4 @@
-import { shortHash, slugify } from "../../../utils/id";
+import { shortHash, slugify } from "../../id";
 import type { TaxonomyRequest } from "./types";
 
 export function upsertById<T>(items: T[], getId: (item: T) => string, next: T): void {

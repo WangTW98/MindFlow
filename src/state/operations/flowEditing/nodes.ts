@@ -1,5 +1,5 @@
 import type { AppSurface, PageNode, ProductFlow } from "../../product-flow";
-import { makeNodeId, nowIso, stableKey } from "../../../utils/id";
+import { makeNodeId, nowIso, stableKey } from "../../id";
 import { defaultFeatureGroups, featureGroupsToActions, featureGroupsToElements, normalizeFeatureGroups } from "./featureGroups";
 import { normalizeStringArray, requireAppSurface, requireNode, sanitizeText, touchFlow, uniqueNodeId } from "./shared";
 import type { CreateNodeInput, UpdateNodeDetailsInput } from "./types";

@@ -53,7 +53,7 @@ test("Empty ProductFlow starts as a valid blank canvas", () => {
 });
 
 test("JSON schema edge type enum stays aligned with runtime validation", async () => {
-  const raw = await fs.readFile(path.join(process.cwd(), "src", "schema", "productFlow.schema.json"), "utf8");
+  const raw = await fs.readFile(path.join(process.cwd(), "src", "state", "schema", "productFlow.schema.json"), "utf8");
   const schema = JSON.parse(raw) as {
     $defs?: {
       edgeType?: {

@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
-import { FlowEditorRegistry, type OpenFlowEditorSession } from "../../editors/FlowEditorRegistry";
-import { FlowSelectionStore } from "../../editors/FlowSelectionStore";
-import type { ProductFlow } from "../../../domain/product-flow";
+import { FlowEditorRegistry, type OpenFlowEditorSession } from "../../../state/vscode/editors/FlowEditorRegistry";
+import { FlowSelectionStore } from "../../../state/vscode/editors/FlowSelectionStore";
+import type { ProductFlow } from "../../../state/product-flow";
 import { FlowEditorSession } from "./FlowEditorSession";
-import type { FlowSelectionPatch, FlowSelectionState } from "../../../domain/selection";
+import type { FlowSelectionPatch, FlowSelectionState } from "../../../state/selection";
 
 type OpenFlowCallback = (flowUri: vscode.Uri) => void;
 
@@ -74,7 +74,7 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     this.onDidOpenFlow(document.uri);
     webviewPanel.webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "src", "webview", "media")]
+      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "src", "canvas", "media")]
     };
 
     const session = new FlowEditorSession(

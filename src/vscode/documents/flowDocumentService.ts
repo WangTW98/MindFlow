@@ -1,12 +1,12 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { pruneMissingAppSurfaceReferences } from "../../domain/operations";
-import type { ProductFlow } from "../../domain/product-flow";
-import { parseProductFlowText, serializeProductFlow } from "../../domain/product-flow/codec";
-import { assertValidProductFlowForSave } from "../../domain/product-flow/saveGuard";
-import { FlowRepository } from "../../storage/flowRepository";
-import { nowIso } from "../../utils/id";
-import { getRememberedFlowPath, getRememberedFlowUri, rememberCurrentFlowUri } from "../state/activeFlowState";
+import { pruneMissingAppSurfaceReferences } from "../../state/operations";
+import type { ProductFlow } from "../../state/product-flow";
+import { parseProductFlowText, serializeProductFlow } from "../../state/product-flow/codec";
+import { assertValidProductFlowForSave } from "../../state/product-flow/saveGuard";
+import { FlowRepository } from "../../state/storage/flowRepository";
+import { nowIso } from "../../state/id";
+import { getRememberedFlowPath, getRememberedFlowUri, rememberCurrentFlowUri } from "../../state/vscode/activeFlowState";
 import { enqueueFlowDocumentEdit } from "./flowEditQueue";
 import {
   createFlowRepository,

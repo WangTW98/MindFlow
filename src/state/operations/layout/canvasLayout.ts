@@ -1,5 +1,5 @@
 import type { FlowEdge, FlowEndpoint, PageNode, ProductFlow } from "../../product-flow";
-import { nowIso } from "../../../utils/id";
+import { nowIso } from "../../id";
 
 const NODE_START_X = 0;
 const NODE_START_Y = 0;

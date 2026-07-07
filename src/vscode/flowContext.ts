@@ -24,8 +24,8 @@ export {
 export {
   rememberCurrentFlowUri,
   rememberUntitledFlow
-} from "./state/activeFlowState";
+} from "../state/vscode/activeFlowState";
 export {
   rememberRecentFlow,
   type RefreshableSidebar
-} from "./state/recentFlowState";
+} from "../state/vscode/recentFlowState";

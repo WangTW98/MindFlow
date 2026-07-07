@@ -1,6 +1,6 @@
 import type { ProductFlow } from "./types";
 import { createDefaultProjectOverview } from "./projectOverview";
-import { makeFlowId, nowIso } from "../../utils/id";
+import { makeFlowId, nowIso } from "../id";
 
 export function createEmptyProductFlow(title = "Untitled MindFlow"): ProductFlow {
   const now = nowIso();

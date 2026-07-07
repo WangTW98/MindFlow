@@ -1,12 +1,12 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { createEmptyProductFlow } from "../../domain/product-flow/factory";
-import { createUntitledMindFlowDocumentOptions } from "../documents/untitledMindFlowDocument";
-import { validateProductFlow } from "../../domain/product-flow";
-import { FlowRepository } from "../../storage/flowRepository";
-import { FlowPanel } from "../webviews/canvas/FlowPanel";
-import type { SidebarView } from "../webviews/sidebar/SidebarView";
-import { createUntitledMindFlowUri, ensureMindFlowExtension, flowDisplayName, getDefaultSaveUri, loadCurrentFlow, loadMindFlowFile, pickMindFlowFile, rememberRecentFlow, rememberUntitledFlow, resolveInputFlowPath, showError, type FlowUriArgument } from "../flowContext";
+import { createEmptyProductFlow } from "../../state/product-flow/factory";
+import { createUntitledMindFlowDocumentOptions } from "../../vscode/documents/untitledMindFlowDocument";
+import { validateProductFlow } from "../../state/product-flow";
+import { FlowRepository } from "../../state/storage/flowRepository";
+import { FlowPanel } from "../../vscode/webviews/canvas/FlowPanel";
+import type { SidebarView } from "../../vscode/webviews/sidebar/SidebarView";
+import { createUntitledMindFlowUri, ensureMindFlowExtension, flowDisplayName, getDefaultSaveUri, loadCurrentFlow, loadMindFlowFile, pickMindFlowFile, rememberRecentFlow, rememberUntitledFlow, resolveInputFlowPath, showError, type FlowUriArgument } from "../../vscode/flowContext";
 
 export async function newFlow(): Promise<void> {
   try {

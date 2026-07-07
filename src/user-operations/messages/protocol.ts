@@ -1,5 +1,5 @@
-import type { TaxonomyRequest } from "../../domain/operations";
-import type { EdgeType, FlowEndpoint, ProductFlow } from "../../domain/product-flow";
+import type { TaxonomyRequest } from "../../state/operations";
+import type { EdgeType, FlowEndpoint, ProductFlow } from "../../state/product-flow";
 
 export type WebviewMessage =
   | { type: "selectNode"; nodeId: string; selectedNodeIds?: string[] }

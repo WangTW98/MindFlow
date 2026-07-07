@@ -45,7 +45,7 @@ test("FlowPanel webview HTML loads declared media resources in order", () => {
 
 test("FlowPanel declared media resources exist on disk", async () => {
   for (const fileName of [...FLOW_WEBVIEW_STYLE_FILES, ...FLOW_WEBVIEW_SCRIPT_FILES]) {
-    await fs.readFile(path.join(process.cwd(), "src", "webview", "media", fileName));
+    await fs.readFile(path.join(process.cwd(), "src", "canvas", "media", fileName));
   }
 });
 
@@ -63,6 +63,17 @@ test("FlowPanel webview uses one bundled script instead of legacy multi-script e
   assert.ok(html.includes("media/dist/flowEditor.js"));
   assert.equal(html.includes("media/state/canvas-state.js"), false);
   assert.equal(html.includes("media/events/canvas-bindings.js"), false);
+});
+
+test("Sidebar webview loads stylesheet from canvas media", async () => {
+  const [viewSource, htmlSource] = await Promise.all([
+    fs.readFile(path.join(process.cwd(), "src", "vscode", "webviews", "sidebar", "SidebarView.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src", "vscode", "webviews", "sidebar", "sidebarHtml.ts"), "utf8")
+  ]);
+
+  assert.ok(viewSource.includes("\"src\", \"canvas\", \"media\""));
+  assert.ok(htmlSource.includes("\"src\", \"canvas\", \"media\", \"sidebar.css\""));
+  assert.equal(`${viewSource}\n${htmlSource}`.includes("\"src\", \"webview\", \"media\""), false);
 });
 
 test("Webview endpoint codec falls back when encoded values are malformed", async () => {
@@ -669,7 +680,7 @@ interface AutoLayoutHelpers {
 
 async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "webview", "canvas", "selectors", "canvas-endpoint-codec.js"),
+    path.join(process.cwd(), "src", "canvas", "selectors", "canvas-endpoint-codec.js"),
     "utf8"
   );
   const factory = new Function(
@@ -682,7 +693,7 @@ async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
 
 async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "webview", "canvas", "render", "canvas-selection-relations.js"),
+    path.join(process.cwd(), "src", "canvas", "render", "canvas-selection-relations.js"),
     "utf8"
   );
   const factory = new Function(
@@ -694,7 +705,7 @@ async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers>
 
 async function loadAutoLayoutHelpers(): Promise<AutoLayoutHelpers> {
   const source = await fs.readFile(
-    path.join(process.cwd(), "src", "webview", "canvas", "layout", "canvas-auto-layout.js"),
+    path.join(process.cwd(), "src", "canvas", "layout", "canvas-auto-layout.js"),
     "utf8"
   );
   const factory = new Function(`${source}\nreturn { autoLayoutComputePreview, autoLayoutCreatePreviewState, autoLayoutPreviewPositionsForFlow, autoLayoutPreviewStateWithPosition, autoLayoutEstimateLabelWidth };`) as () => AutoLayoutHelpers;

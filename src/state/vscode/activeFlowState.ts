@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { isRealMindFlowUri } from "../documents/flowUri";
+import { isRealMindFlowUri } from "../../vscode/documents/flowUri";
 
 let currentFlowPath: string | undefined;
 let currentFlowUri: vscode.Uri | undefined;

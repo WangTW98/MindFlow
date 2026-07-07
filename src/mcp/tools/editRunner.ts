@@ -1,5 +1,5 @@
-import { applyFlowOperations } from "../../domain/operations";
-import type { ProductFlow } from "../../domain/product-flow";
+import { applyFlowOperations } from "../../state/operations";
+import type { ProductFlow } from "../../state/product-flow";
 import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../bridge";
 import { operationPayload, snapshotToPayload } from "./payloads";
 import { readOptionalBoolean, readOptionalString } from "./readers";

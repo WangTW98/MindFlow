@@ -18,7 +18,7 @@
     "resolveJsonModule": true,
     "sourceMap": false,
     "typeRoots": [
-      "./src/types"
+      "./src/vscode/types"
     ]
   },
   "include": [

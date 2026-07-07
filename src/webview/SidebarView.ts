@@ -1,1 +1,1 @@
-export * from "../extension/webviews/sidebar/SidebarView";
+export * from "../vscode/webviews/sidebar/SidebarView";

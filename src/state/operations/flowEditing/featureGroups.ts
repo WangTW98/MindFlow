@@ -1,5 +1,5 @@
 import type { FeatureGroup, FeatureItem, PageAction, PageElement, PageNode } from "../../product-flow";
-import { makeActionId, makeElementId, makeFeatureGroupId, makeFeatureItemId } from "../../../utils/id";
+import { makeActionId, makeElementId, makeFeatureGroupId, makeFeatureItemId } from "../../id";
 import { isRecord, normalizeStringArray, sanitizeText } from "./shared";
 
 export function deriveFeatureGroups(node: PageNode): FeatureGroup[] {

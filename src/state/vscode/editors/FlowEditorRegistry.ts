@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { ProductFlow } from "../../domain/product-flow";
+import type { ProductFlow } from "../../product-flow";
 
 export interface OpenFlowEditorSession {
   uri: vscode.Uri;

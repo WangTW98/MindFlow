@@ -1,5 +1,5 @@
 import type { FlowEdge, ProductFlow } from "../../product-flow";
-import { nowIso } from "../../../utils/id";
+import { nowIso } from "../../id";
 import { edgeReferencesNode, endpointAppSurfaceIds, endpointDomainIds, endpointRoleIds, endpointStorageId, normalizeEndpoint, validateEndpoint } from "./endpoints";
 import {
   markManualEdgeRemoved,

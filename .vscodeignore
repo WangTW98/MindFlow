@@ -10,8 +10,14 @@ docs/**
 designs/**
 .mindflow/**
 src/**/*.ts
-src/webview/canvas/**
-!src/webview/media/**
+src/canvas/bootstrap/**
+src/canvas/layout/**
+src/canvas/render/**
+src/canvas/selectors/**
+src/canvas/manifest.mjs
+src/state/canvas/**
+src/user-operations/canvas/**
+!src/canvas/media/**
 out/**/*.map
 plan.md
 *.vsix

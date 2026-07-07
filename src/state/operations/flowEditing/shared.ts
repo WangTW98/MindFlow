@@ -1,6 +1,6 @@
 import type { AppSurface, EdgeType, FlowEdge, PageNode, ProductFlow } from "../../product-flow";
 import { isEdgeType } from "../../product-flow";
-import { makeEdgeId, nowIso, shortHash } from "../../../utils/id";
+import { makeEdgeId, nowIso, shortHash } from "../../id";
 
 export function requireNode(flow: ProductFlow, nodeId: string | undefined): PageNode {
   const node = flow.nodes.find((item) => item.nodeId === nodeId);

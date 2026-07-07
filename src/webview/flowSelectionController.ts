@@ -1,1 +1,1 @@
-export * from "../extension/webviews/canvas/flowSelectionController";
+export * from "../vscode/webviews/canvas/flowSelectionController";

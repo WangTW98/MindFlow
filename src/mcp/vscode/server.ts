@@ -3,9 +3,9 @@ import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import type { MindFlowEditorBridge } from "../../mcp/bridge";
-import { MindFlowMcpProtocol } from "../../mcp/protocol";
-import { MindFlowMcpToolHandlers } from "../../mcp/tools";
+import type { MindFlowEditorBridge } from "../bridge";
+import { MindFlowMcpProtocol } from "../protocol";
+import { MindFlowMcpToolHandlers } from "../tools";
 
 const MAX_MCP_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
 

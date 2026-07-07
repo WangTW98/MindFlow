@@ -1,4 +1,4 @@
-import { emptyFlowSelection, normalizeFlowSelection } from "../../domain/selection";
+import { emptyFlowSelection, normalizeFlowSelection } from "../../state/selection";
 import type { MindFlowEditorBridge } from "../bridge";
 import { buildHydratedSelection, buildSelectionIssues, snapshotToPayload } from "./payloads";
 import { readOptionalString } from "./readers";

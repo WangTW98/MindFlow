@@ -1,1 +1,1 @@
-export * from "../extension/webviews/canvas/FlowEditorSession";
+export * from "../vscode/webviews/canvas/FlowEditorSession";

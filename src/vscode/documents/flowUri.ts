@@ -1,8 +1,8 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { createMindFlowFileName, createUntitledMindFlowTargetPath } from "../../domain/product-flow/fileNaming";
-import type { ProductFlow } from "../../domain/product-flow";
-import { FLOW_FILE_EXTENSION, FlowRepository } from "../../storage/flowRepository";
+import { createMindFlowFileName, createUntitledMindFlowTargetPath } from "../../state/product-flow/fileNaming";
+import type { ProductFlow } from "../../state/product-flow";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../../state/storage/flowRepository";
 
 export type FlowUriArgument = vscode.Uri | string | undefined;
 

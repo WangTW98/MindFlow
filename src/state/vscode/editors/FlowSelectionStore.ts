@@ -5,7 +5,7 @@ import {
   normalizeFlowSelection,
   type FlowSelectionPatch,
   type FlowSelectionState
-} from "../../domain/selection";
+} from "../../selection";
 
 export class FlowSelectionStore {
   private readonly selections = new Map<string, FlowSelectionState>();
