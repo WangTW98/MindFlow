@@ -55,6 +55,14 @@ npm test
 
 Press F5 in VS Code to launch the extension host.
 
+### Project Layout
+
+- `src/product-flow/domain` contains the ProductFlow model, validation, serialization, and editing primitives.
+- `src/product-flow/application/operations` contains the shared operation executor used by VS Code, MCP, and webview edits.
+- `src/product-flow/infrastructure` contains local `.mindflow` persistence.
+- `src/platform/vscode`, `src/platform/mcp`, and `src/platform/webview` contain platform adapters.
+- `assets` contains packaged schema, icons, and webview styles. Generated JavaScript bundles are written to `out/`.
+
 ## Package
 
 ```bash

@@ -2,20 +2,20 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
-import { FLOW_CLIENT_SOURCE_FILES } from "../src/adapters/webview/canvas/manifest.mjs";
+import { CANVAS_CLIENT_SOURCE_FILES } from "./canvas-client-source-order.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const clientRoot = path.join(root, "src");
-const outputDir = path.join(root, "src", "adapters", "webview", "canvas", "media", "dist");
+const outputDir = path.join(root, "out", "webview", "canvas");
 const tempDir = path.join(root, "out", ".webview");
-const tempInput = path.join(tempDir, "flowEditor.input.js");
+const tempInput = path.join(tempDir, "flowEditor.input.ts");
 const outputFile = path.join(outputDir, "flowEditor.js");
 
 await fs.mkdir(tempDir, { recursive: true });
 await fs.mkdir(outputDir, { recursive: true });
 
 const chunks = [];
-for (const fileName of FLOW_CLIENT_SOURCE_FILES) {
+for (const fileName of CANVAS_CLIENT_SOURCE_FILES) {
   const sourcePath = path.join(clientRoot, fileName);
   const source = await fs.readFile(sourcePath, "utf8");
   chunks.push(`\n/* ${fileName} */\n${source}`);
@@ -35,4 +35,5 @@ await build({
 });
 
 const stat = await fs.stat(outputFile);
+await fs.rm(tempDir, { recursive: true, force: true });
 console.log(`Built ${path.relative(root, outputFile)} (${stat.size} bytes)`);

@@ -1,14 +1,14 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
-import { createFlowEdge, createFlowNode } from "../src/domain/product-flow/editing/graph";
-import type { ProductFlow } from "../src/domain/product-flow";
-import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../src/adapters/mcp/protocol/bridge";
-import { MINDFLOW_OPERATIONS_REFERENCE } from "../src/adapters/mcp/protocol/operationsReference";
-import { MindFlowMcpToolHandlers } from "../src/adapters/mcp/tools";
-import { listMcpToolRegistryNames } from "../src/adapters/mcp/tools/registry";
-import { MINDFLOW_MCP_TOOLS } from "../src/adapters/mcp/protocol/toolSchemas";
-import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/domain/product-flow/selection";
+import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
+import { createFlowEdge, createFlowNode } from "../src/product-flow/domain/editing/graph";
+import type { ProductFlow } from "../src/product-flow/domain";
+import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../src/platform/mcp/protocol/bridge";
+import { MINDFLOW_OPERATIONS_REFERENCE } from "../src/platform/mcp/protocol/operationsReference";
+import { MindFlowMcpToolHandlers } from "../src/platform/mcp/tools";
+import { listMcpToolRegistryNames } from "../src/platform/mcp/tools/registry";
+import { MINDFLOW_MCP_TOOLS } from "../src/platform/mcp/protocol/toolSchemas";
+import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/product-flow/domain/selection";
 
 test("MindFlow MCP tools are operation-only and omit removed generation workflow", () => {
   const handlers = new MindFlowMcpToolHandlers(new FakeBridge(createEmptyProductFlow()));

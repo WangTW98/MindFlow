@@ -8,12 +8,12 @@ const tsc = path.join(root, "node_modules", ".bin", process.platform === "win32"
 
 await run(process.execPath, ["scripts/build-webview.mjs"]);
 await run(tsc, ["-p", "./", "--noEmit"]);
-for (const script of await listJavaScriptFiles(path.join(root, "src", "adapters", "webview", "canvas", "media"))) {
+for (const script of await listJavaScriptFiles(path.join(root, "out", "webview", "canvas"))) {
   await run(process.execPath, ["--check", path.relative(root, script)]);
 }
-await fs.rm(path.join(root, "out", "test"), { recursive: true, force: true });
+await fs.rm(path.join(root, "out-test"), { recursive: true, force: true });
 await run(tsc, ["-p", "./tsconfig.test.json"]);
-await run(process.execPath, ["--test", ...(await listJavaScriptFiles(path.join(root, "out", "test")))
+await run(process.execPath, ["--test", ...(await listJavaScriptFiles(path.join(root, "out-test", "test")))
   .filter((script) => script.endsWith(".test.js"))
   .map((script) => path.relative(root, script))
 ]);

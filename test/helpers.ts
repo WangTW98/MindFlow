@@ -1,10 +1,10 @@
 import { strict as assert } from "node:assert";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { FeatureGroup, PageNode, ProductFlow } from "../src/domain/product-flow";
-import { ensureAppSurfaceEntryEdges } from "../src/domain/product-flow/editing/layout/appSurfaceEntryEdges";
-import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
-import { createFlowEdge, createFlowNode } from "../src/domain/product-flow/editing/graph";
+import type { FeatureGroup, PageNode, ProductFlow } from "../src/product-flow/domain";
+import { ensureAppSurfaceEntryEdges } from "../src/product-flow/domain/editing/layout/appSurfaceEntryEdges";
+import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
+import { createFlowEdge, createFlowNode } from "../src/product-flow/domain/editing/graph";
 
 export function createProcurementFlow(options: { includeAppSurfaceEntryEdges?: boolean } = {}): ProductFlow {
   const flow = createEmptyProductFlow("多应用端采购协同平台需求示例");
@@ -436,8 +436,9 @@ async function readWebviewRuntimeFiles(files: Array<[string, string]>): Promise<
 }
 
 async function readWebviewRuntimeFile(directory: string, fileName: string): Promise<string> {
+  const sourceFileName = fileName.replace(/\.js$/, ".ts");
   return fs.readFile(
-    path.join(process.cwd(), "src", "adapters", "webview", "canvas", "runtime", directory, fileName),
+    path.join(process.cwd(), "src", "platform", "webview", "canvas", "client", directory, sourceFileName),
     "utf8"
   );
 }

@@ -4,21 +4,21 @@ import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
 import type * as vscode from "vscode";
-import { ensureAppSurfaceEntryEdges } from "../src/domain/product-flow/editing/layout/appSurfaceEntryEdges";
-import { ensureReasonableNodeLayout } from "../src/domain/product-flow/editing/layout/canvasLayout";
-import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
-import { createFlowEdge, createFlowNode, removeFlowEdge, removeFlowNode, updateFlowAppSurfacePosition, updateFlowEdgeDetails, updateFlowNodeDetails, updateFlowNodePosition } from "../src/domain/product-flow/editing/graph";
-import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/product-flow/editing/projectOverviewMutations";
-import { applyTaxonomyRequest } from "../src/domain/product-flow/editing/taxonomy";
-import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/product-flow/editing/taxonomy/referenceCleanup";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/adapters/vscode/documents/untitledMindFlowDocument";
-import { EDGE_TYPES, validateProductFlow } from "../src/domain/product-flow";
-import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/serialization/codec";
-import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/infrastructure/persistence/flowRepository";
-import { RecentFlowStore } from "../src/adapters/vscode/state/recentFlows";
-import { recordEdgeDetailsRevision } from "../src/adapters/vscode/editor/canvas/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/adapters/vscode/editor/canvas/webviewShellHtml";
-import { parseWebviewMessage } from "../src/adapters/webview/protocol/flowWebviewMessages";
+import { ensureAppSurfaceEntryEdges } from "../src/product-flow/domain/editing/layout/appSurfaceEntryEdges";
+import { ensureReasonableNodeLayout } from "../src/product-flow/domain/editing/layout/canvasLayout";
+import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
+import { createFlowEdge, createFlowNode, removeFlowEdge, removeFlowNode, updateFlowAppSurfacePosition, updateFlowEdgeDetails, updateFlowNodeDetails, updateFlowNodePosition } from "../src/product-flow/domain/editing/graph";
+import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/product-flow/domain/editing/projectOverviewMutations";
+import { applyTaxonomyRequest } from "../src/product-flow/domain/editing/taxonomy";
+import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/product-flow/domain/editing/taxonomy/referenceCleanup";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/platform/vscode/documents/untitledMindFlowDocument";
+import { EDGE_TYPES, validateProductFlow } from "../src/product-flow/domain";
+import { parseProductFlowText, serializeProductFlow } from "../src/product-flow/domain/serialization/codec";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/product-flow/infrastructure/persistence/flowRepository";
+import { RecentFlowStore } from "../src/platform/vscode/state/recentFlows";
+import { recordEdgeDetailsRevision } from "../src/platform/vscode/editor/canvas/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/platform/vscode/editor/canvas/webviewShellHtml";
+import { parseWebviewMessage } from "../src/platform/webview/protocol/flowWebviewMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("Extension manifest contributes standalone .mindflow editor, sidebar, and MCP config command", async () => {
@@ -39,13 +39,13 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and M
     };
   };
 
-  assert.ok(manifest.contributes?.viewsContainers?.activitybar?.some((item) => item.id === "mindflow" && item.icon === "src/adapters/webview/media/icon.svg"));
+  assert.ok(manifest.contributes?.viewsContainers?.activitybar?.some((item) => item.id === "mindflow" && item.icon === "assets/webview/media/icon.svg"));
   const sidebarView = manifest.contributes?.views?.mindflow?.find((item) => item.id === "mindflow.sidebar");
   assert.equal(sidebarView?.type, "webview");
   const language = manifest.contributes?.languages?.find((item) => item.id === "mindflow");
   assert.ok(language?.extensions?.includes(".mindflow"));
-  assert.equal(language?.icon?.light, "src/adapters/webview/media/icon.svg");
-  assert.equal(language?.icon?.dark, "src/adapters/webview/media/icon.svg");
+  assert.equal(language?.icon?.light, "assets/webview/media/icon.svg");
+  assert.equal(language?.icon?.dark, "assets/webview/media/icon.svg");
   const editor = manifest.contributes?.customEditors?.find((item) => item.viewType === "mindflow.productFlow");
   assert.ok(editor);
   assert.ok(editor.selector?.some((item) => item.filenamePattern === "*.mindflow"));
@@ -63,8 +63,8 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and M
     false
   );
   assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), ["mindflow.storage.flowDirectory"]);
-  assert.equal(manifest.contributes?.jsonValidation?.[0]?.url, "./src/domain/product-flow/schema/productFlow.schema.json");
-  assert.deepEqual(manifest.bin, { "mindflow-mcp": "./out/src/adapters/mcp/protocol/stdioProxy.js" });
+  assert.equal(manifest.contributes?.jsonValidation?.[0]?.url, "./assets/product-flow/schema/productFlow.schema.json");
+  assert.deepEqual(manifest.bin, { "mindflow-mcp": "./out/platform/mcp/protocol/stdioProxy.js" });
   const removedScriptPrefix = ["m", "c", "p"].join("") + ":";
   assert.equal(Object.keys(manifest.scripts ?? {}).some((script) => script.startsWith(removedScriptPrefix)), false);
   assert.equal(manifest.activationEvents?.includes("onStartupFinished"), true);

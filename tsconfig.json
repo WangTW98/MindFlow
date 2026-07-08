@@ -1,31 +1,15 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "ES2020",
-    "lib": [
-      "ES2020",
-      "DOM"
-    ],
     "outDir": "out",
-    "rootDir": ".",
-    "strict": true,
-    "noImplicitOverride": true,
-    "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "sourceMap": false,
-    "typeRoots": [
-      "./src/adapters/vscode/types"
-    ]
+    "rootDir": "src"
   },
   "include": [
     "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "out"
+    "out",
+    "src/platform/webview/canvas/client/**/*.ts"
   ]
 }

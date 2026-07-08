@@ -2,10 +2,10 @@ import { strict as assert } from "node:assert";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import test from "node:test";
-import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
-import { createFlowNode } from "../src/domain/product-flow/editing/graph";
-import { hasOptionalFiniteCoordinates, isPlainObject, readFiniteCoordinates } from "../src/adapters/vscode/commands/guards";
-import { assertValidProductFlowForSave } from "../src/domain/product-flow/validation/saveGuard";
+import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
+import { createFlowNode } from "../src/product-flow/domain/editing/graph";
+import { hasOptionalFiniteCoordinates, isPlainObject, readFiniteCoordinates } from "../src/platform/vscode/commands/guards";
+import { assertValidProductFlowForSave } from "../src/product-flow/domain/validation/saveGuard";
 import { assertThrows } from "./helpers";
 
 test("Command guards reject non-finite coordinates and non-object patches", () => {
@@ -33,7 +33,7 @@ test("Flow document save guard rejects invalid ProductFlow before writing", () =
 });
 
 test("New blank MindFlow always opens a plain untitled document", async () => {
-  const source = await fs.readFile(path.join(process.cwd(), "src", "adapters", "vscode", "commands", "fileCommands.ts"), "utf8");
+  const source = await fs.readFile(path.join(process.cwd(), "src", "platform", "vscode", "commands", "fileCommands.ts"), "utf8");
 
   assert.equal(source.includes("createUntitledMindFlowUri"), false);
   assert.equal(source.includes("openTextDocument(untitledUri)"), false);

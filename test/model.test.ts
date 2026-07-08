@@ -3,21 +3,21 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import test from "node:test";
 import type * as vscode from "vscode";
-import { ensureAppSurfaceEntryEdges } from "../src/domain/product-flow/editing/layout/appSurfaceEntryEdges";
-import { ensureReasonableNodeLayout } from "../src/domain/product-flow/editing/layout/canvasLayout";
-import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
-import { createFlowEdge, createFlowNode, removeFlowEdge, removeFlowNode, updateFlowAppSurfacePosition, updateFlowEdgeDetails, updateFlowNodeDetails, updateFlowNodePosition } from "../src/domain/product-flow/editing/graph";
-import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/product-flow/editing/projectOverviewMutations";
-import { applyTaxonomyRequest } from "../src/domain/product-flow/editing/taxonomy";
-import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/product-flow/editing/taxonomy/referenceCleanup";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/adapters/vscode/documents/untitledMindFlowDocument";
-import { EDGE_TYPES, validateProductFlow } from "../src/domain/product-flow";
-import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/serialization/codec";
-import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/infrastructure/persistence/flowRepository";
-import { RecentFlowStore } from "../src/adapters/vscode/state/recentFlows";
-import { recordEdgeDetailsRevision } from "../src/adapters/vscode/editor/canvas/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/adapters/vscode/editor/canvas/webviewShellHtml";
-import { parseWebviewMessage } from "../src/adapters/webview/protocol/flowWebviewMessages";
+import { ensureAppSurfaceEntryEdges } from "../src/product-flow/domain/editing/layout/appSurfaceEntryEdges";
+import { ensureReasonableNodeLayout } from "../src/product-flow/domain/editing/layout/canvasLayout";
+import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
+import { createFlowEdge, createFlowNode, removeFlowEdge, removeFlowNode, updateFlowAppSurfacePosition, updateFlowEdgeDetails, updateFlowNodeDetails, updateFlowNodePosition } from "../src/product-flow/domain/editing/graph";
+import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/product-flow/domain/editing/projectOverviewMutations";
+import { applyTaxonomyRequest } from "../src/product-flow/domain/editing/taxonomy";
+import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/product-flow/domain/editing/taxonomy/referenceCleanup";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/platform/vscode/documents/untitledMindFlowDocument";
+import { EDGE_TYPES, validateProductFlow } from "../src/product-flow/domain";
+import { parseProductFlowText, serializeProductFlow } from "../src/product-flow/domain/serialization/codec";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/product-flow/infrastructure/persistence/flowRepository";
+import { RecentFlowStore } from "../src/platform/vscode/state/recentFlows";
+import { recordEdgeDetailsRevision } from "../src/platform/vscode/editor/canvas/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/platform/vscode/editor/canvas/webviewShellHtml";
+import { parseWebviewMessage } from "../src/platform/webview/protocol/flowWebviewMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("real-provider fixture creates a valid ProductFlow with app-surface entry edges", () => {
@@ -52,7 +52,7 @@ test("Empty ProductFlow starts as a valid blank canvas", () => {
 });
 
 test("JSON schema edge type enum stays aligned with runtime validation", async () => {
-  const raw = await fs.readFile(path.join(process.cwd(), "src", "domain", "product-flow", "schema", "productFlow.schema.json"), "utf8");
+  const raw = await fs.readFile(path.join(process.cwd(), "assets", "product-flow", "schema", "productFlow.schema.json"), "utf8");
   const schema = JSON.parse(raw) as {
     $defs?: {
       edgeType?: {

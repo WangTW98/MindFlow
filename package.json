@@ -27,16 +27,16 @@
     "onCommand:mindflow.validateFlowJson"
   ],
   "bin": {
-    "mindflow-mcp": "./out/src/adapters/mcp/protocol/stdioProxy.js"
+    "mindflow-mcp": "./out/platform/mcp/protocol/stdioProxy.js"
   },
-  "main": "./out/src/adapters/vscode/extension.js",
+  "main": "./out/platform/vscode/extension.js",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
           "id": "mindflow",
           "title": "MindFlow",
-          "icon": "src/adapters/webview/media/icon.svg"
+          "icon": "assets/webview/media/icon.svg"
         }
       ]
     },
@@ -60,8 +60,8 @@
           ".mindflow"
         ],
         "icon": {
-          "light": "src/adapters/webview/media/icon.svg",
-          "dark": "src/adapters/webview/media/icon.svg"
+          "light": "assets/webview/media/icon.svg",
+          "dark": "assets/webview/media/icon.svg"
         }
       }
     ],
@@ -82,7 +82,7 @@
         "fileMatch": [
           "*.mindflow"
         ],
-        "url": "./src/domain/product-flow/schema/productFlow.schema.json"
+        "url": "./assets/product-flow/schema/productFlow.schema.json"
       }
     ],
     "commands": [

@@ -4,24 +4,24 @@ import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
 import type * as vscode from "vscode";
-import { ensureAppSurfaceEntryEdges } from "../src/domain/product-flow/editing/layout/appSurfaceEntryEdges";
-import { ensureReasonableNodeLayout } from "../src/domain/product-flow/editing/layout/canvasLayout";
-import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
-import { createFlowEdge, createFlowNode, removeFlowEdge, removeFlowNode, updateFlowAppSurfacePosition, updateFlowEdgeDetails, updateFlowNodeDetails, updateFlowNodePosition } from "../src/domain/product-flow/editing/graph";
-import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/domain/product-flow/editing/projectOverviewMutations";
-import { applyTaxonomyRequest } from "../src/domain/product-flow/editing/taxonomy";
-import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/domain/product-flow/editing/taxonomy/referenceCleanup";
-import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/adapters/vscode/documents/untitledMindFlowDocument";
-import { EDGE_TYPES, validateProductFlow } from "../src/domain/product-flow";
-import { parseProductFlowText, serializeProductFlow } from "../src/domain/product-flow/serialization/codec";
-import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/infrastructure/persistence/flowRepository";
-import { RecentFlowStore } from "../src/adapters/vscode/state/recentFlows";
-import { dispatchFlowWebviewMessage } from "../src/adapters/vscode/editor/canvas/flowCommandDispatcher";
-import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/domain/product-flow/selection";
-import { recordEdgeDetailsRevision } from "../src/adapters/vscode/editor/canvas/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/adapters/vscode/editor/canvas/webviewShellHtml";
-import { parseWebviewMessage } from "../src/adapters/webview/protocol/flowWebviewMessages";
-import { parseSidebarMessage } from "../src/adapters/webview/protocol/sidebarMessages";
+import { ensureAppSurfaceEntryEdges } from "../src/product-flow/domain/editing/layout/appSurfaceEntryEdges";
+import { ensureReasonableNodeLayout } from "../src/product-flow/domain/editing/layout/canvasLayout";
+import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
+import { createFlowEdge, createFlowNode, removeFlowEdge, removeFlowNode, updateFlowAppSurfacePosition, updateFlowEdgeDetails, updateFlowNodeDetails, updateFlowNodePosition } from "../src/product-flow/domain/editing/graph";
+import { PROJECT_OVERVIEW_NODE_ID, ensureProjectOverview, updateProjectOverview } from "../src/product-flow/domain/editing/projectOverviewMutations";
+import { applyTaxonomyRequest } from "../src/product-flow/domain/editing/taxonomy";
+import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/product-flow/domain/editing/taxonomy/referenceCleanup";
+import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/platform/vscode/documents/untitledMindFlowDocument";
+import { EDGE_TYPES, validateProductFlow } from "../src/product-flow/domain";
+import { parseProductFlowText, serializeProductFlow } from "../src/product-flow/domain/serialization/codec";
+import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/product-flow/infrastructure/persistence/flowRepository";
+import { RecentFlowStore } from "../src/platform/vscode/state/recentFlows";
+import { dispatchFlowWebviewMessage } from "../src/platform/vscode/editor/canvas/flowCommandDispatcher";
+import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } from "../src/product-flow/domain/selection";
+import { recordEdgeDetailsRevision } from "../src/platform/vscode/editor/canvas/flowMessageOrdering";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/platform/vscode/editor/canvas/webviewShellHtml";
+import { parseWebviewMessage } from "../src/platform/webview/protocol/flowWebviewMessages";
+import { parseSidebarMessage } from "../src/platform/webview/protocol/sidebarMessages";
 import {
   assertAppSurfaceEntryEdge,
   assertNoAutoLayoutOverlap,
@@ -57,13 +57,16 @@ test("FlowPanel webview HTML loads declared media resources in order", () => {
 });
 
 test("FlowPanel declared media resources exist on disk", async () => {
-  for (const fileName of [...FLOW_WEBVIEW_STYLE_FILES, ...FLOW_WEBVIEW_SCRIPT_FILES]) {
-    await fs.readFile(path.join(process.cwd(), "src", "adapters", "webview", "canvas", "media", fileName));
+  for (const fileName of FLOW_WEBVIEW_STYLE_FILES) {
+    await fs.readFile(path.join(process.cwd(), "assets", "webview", "canvas", "media", fileName));
+  }
+  for (const fileName of FLOW_WEBVIEW_SCRIPT_FILES) {
+    await fs.readFile(path.join(process.cwd(), "out", "webview", "canvas", fileName));
   }
 });
 
 test("FlowPanel webview uses one bundled script instead of legacy multi-script entrypoints", () => {
-  assert.deepEqual([...FLOW_WEBVIEW_SCRIPT_FILES], ["dist/flowEditor.js"]);
+  assert.deepEqual([...FLOW_WEBVIEW_SCRIPT_FILES], ["flowEditor.js"]);
 
   const html = createFlowWebviewHtml({
     cspSource: "vscode-resource:",
@@ -73,19 +76,19 @@ test("FlowPanel webview uses one bundled script instead of legacy multi-script e
     initialState: { flowPath: "sample.mindflow" }
   });
 
-  assert.ok(html.includes("media/dist/flowEditor.js"));
+  assert.ok(html.includes("media/flowEditor.js"));
   assert.equal(html.includes("media/state/canvas-state.js"), false);
   assert.equal(html.includes("media/events/canvas-bindings.js"), false);
 });
 
 test("Sidebar webview loads stylesheet from sidebar media", async () => {
   const [viewSource, htmlSource] = await Promise.all([
-    fs.readFile(path.join(process.cwd(), "src", "adapters", "vscode", "sidebar", "SidebarView.ts"), "utf8"),
-    fs.readFile(path.join(process.cwd(), "src", "adapters", "vscode", "sidebar", "sidebarHtml.ts"), "utf8")
+    fs.readFile(path.join(process.cwd(), "src", "platform", "vscode", "sidebar", "SidebarView.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src", "platform", "vscode", "sidebar", "sidebarHtml.ts"), "utf8")
   ]);
 
-  assert.ok(viewSource.includes("\"src\", \"adapters\", \"webview\", \"sidebar\", \"media\""));
-  assert.ok(htmlSource.includes("\"src\", \"adapters\", \"webview\", \"sidebar\", \"media\", \"sidebar.css\""));
+  assert.ok(viewSource.includes("\"assets\", \"webview\", \"sidebar\", \"media\""));
+  assert.ok(htmlSource.includes("\"assets\", \"webview\", \"sidebar\", \"media\", \"sidebar.css\""));
   assert.equal(`${viewSource}\n${htmlSource}`.includes("\"src\", \"canvas\", \"media\""), false);
 });
 
@@ -655,25 +658,33 @@ test("Flow webview command dispatcher maps selection and edit messages", async (
     selectedNodeId: "node_a",
     selectedNodeIds: ["node_a", "node_b"]
   });
-  assert.deepEqual(dispatcher.commands, [
-    ["保存节点位置", "mindflow.updateNodePosition", "node_a", 12.2, 34.8, dispatcher.documentUri],
-    [
-      "应用自动排版",
-      "mindflow.applyAutoLayoutPositions",
-      { x: 0, y: 10 },
-      { app_admin: { x: 520, y: 120 } },
-      { node_a: { x: 1040, y: 240 }, node_b: { x: 1560, y: 360 } },
-      dispatcher.documentUri
-    ],
-    [
-      "创建连线",
-      "mindflow.createEdge",
-      { kind: "node", nodeId: "node_a" },
-      { kind: "node", nodeId: "node_b" },
-      "进入下一页",
-      "navigate",
-      dispatcher.documentUri
-    ]
+  assert.deepEqual(dispatcher.operations, [
+    {
+      label: "保存节点位置",
+      operations: [{ type: "node.move", nodeId: "node_a", x: 12.2, y: 34.8 }]
+    },
+    {
+      label: "应用自动排版",
+      operations: [
+        { type: "project.move", x: 0, y: 10 },
+        { type: "appSurface.move", appId: "app_admin", x: 520, y: 120 },
+        { type: "node.move", nodeId: "node_a", x: 1040, y: 240 },
+        { type: "node.move", nodeId: "node_b", x: 1560, y: 360 }
+      ],
+      options: { atomic: true }
+    },
+    {
+      label: "创建连线",
+      operations: [{
+        type: "edge.upsert",
+        input: {
+          from: { kind: "node", nodeId: "node_a" },
+          to: { kind: "node", nodeId: "node_b" },
+          trigger: "进入下一页",
+          type: "navigate"
+        }
+      }]
+    }
   ]);
 });
 
@@ -694,8 +705,11 @@ test("Flow webview command dispatcher clears taxonomy selection before delete", 
   assert.equal(dispatcher.selection.selectedDomainId, undefined);
   assert.equal(dispatcher.selection.selectedRoleId, "role_ops");
   assert.equal(dispatcher.selection.selectedStatusGroupId, "status_review");
-  assert.deepEqual(dispatcher.commands, [
-    ["更新元数据", "mindflow.updateTaxonomy", { kind: "domain", action: "delete", id: "domain_ops" }, dispatcher.documentUri]
+  assert.deepEqual(dispatcher.operations, [
+    {
+      label: "更新元数据",
+      operations: [{ type: "taxonomy.remove", kind: "domain", id: "domain_ops" }]
+    }
   ]);
 });
 
@@ -721,28 +735,29 @@ test("Flow webview command dispatcher ignores stale edge detail updates", async 
     }
   }, dispatcher.dispatcher);
 
-  assert.deepEqual(dispatcher.commands, [
-    [
-      "更新连线详情",
-      "mindflow.updateEdgeDetails",
-      "edge_a",
-      {
-        from: { kind: "node", nodeId: "node_a" },
-        to: { kind: "node", nodeId: "node_b" }
-      },
-      dispatcher.documentUri
-    ]
+  assert.deepEqual(dispatcher.operations, [
+    {
+      label: "更新连线详情",
+      operations: [{
+        type: "edge.update",
+        edgeId: "edge_a",
+        patch: {
+          from: { kind: "node", nodeId: "node_a" },
+          to: { kind: "node", nodeId: "node_b" }
+        }
+      }]
+    }
   ]);
 });
 
 function createDispatcherHarness(initialSelection: FlowSelectionPatch = emptyFlowSelection()) {
   const documentUri = "file:///workspace/sample.mindflow" as unknown as vscode.Uri;
-  const commands: unknown[][] = [];
+  const operations: Array<{ label: string; operations: readonly unknown[]; options?: unknown }> = [];
   let selection: FlowSelectionState = { ...emptyFlowSelection(), ...initialSelection };
 
   return {
     documentUri,
-    commands,
+    operations,
     get selection() {
       return selection;
     },
@@ -755,8 +770,12 @@ function createDispatcherHarness(initialSelection: FlowSelectionPatch = emptyFlo
           selection = { ...emptyFlowSelection(), ...patch };
         }
       },
-      executeCommand: async (label: string, command: string, ...args: unknown[]) => {
-        commands.push([label, command, ...args]);
+      applyOperations: async (label: string, appliedOperations: readonly unknown[], options?: unknown) => {
+        operations.push({
+          label,
+          operations: appliedOperations,
+          ...(options ? { options } : {})
+        });
       }
     }
   };

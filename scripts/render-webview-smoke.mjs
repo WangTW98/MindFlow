@@ -38,7 +38,8 @@ await fs.writeFile(outputFile, renderHtml(initialState, styles, Date.now().toStr
 console.log(pathToFileURL(outputFile).href);
 
 function renderHtml(state, styleFiles, cacheToken) {
-  const mediaPrefix = "../../src/adapters/webview/canvas/media";
+  const mediaPrefix = "../../assets/webview/canvas/media";
+  const scriptPrefix = "../../out/webview/canvas";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -60,7 +61,7 @@ function renderHtml(state, styleFiles, cacheToken) {
     };
     window.__MINDFLOW_STATE__ = ${JSON.stringify(state).replace(/</g, "\\u003c")};
   </script>
-  <script src="${mediaPrefix}/dist/flowEditor.js?v=${cacheToken}"></script>
+  <script src="${scriptPrefix}/flowEditor.js?v=${cacheToken}"></script>
 </body>
 </html>`;
 }

@@ -1,2 +1,0 @@
-reconcilePendingEdgeDetailsSaves();
-render();
