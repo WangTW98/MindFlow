@@ -1,4 +1,6 @@
 import { strict as assert } from "node:assert";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type { FeatureGroup, PageNode, ProductFlow } from "../src/domain/product-flow";
 import { ensureAppSurfaceEntryEdges } from "../src/domain/product-flow/editing/layout/appSurfaceEntryEdges";
 import { createEmptyProductFlow } from "../src/domain/product-flow/model/factory";
@@ -290,4 +292,152 @@ export class FakeMemento {
   public async update(key: string, value: unknown): Promise<void> {
     this.values.set(key, value);
   }
+}
+
+export interface EndpointCodecHelpers {
+  encodeEndpoint(endpoint: Record<string, unknown>): string;
+  endpointFromButton(button: { dataset: Record<string, string | undefined> }): unknown;
+  parseEndpointValue(value: unknown, fallbackEndpoint?: Record<string, unknown>): unknown;
+  endpointKey(endpoint: Record<string, unknown>): string;
+}
+
+export interface SelectionRelationItem {
+  kind: string;
+  id: string;
+  title: string;
+}
+
+export interface SelectionRelationGroups {
+  from: SelectionRelationItem[];
+  to: SelectionRelationItem[];
+}
+
+export interface SelectionRelationHelpers {
+  getSelectionRelationGroups(flow: unknown, selectedNode: unknown, selectedEdge: unknown): SelectionRelationGroups | null;
+}
+
+export interface CanvasViewportBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export interface CanvasViewportSize {
+  width: number;
+  height: number;
+}
+
+export interface CanvasViewportFit {
+  zoom: number;
+  camera: {
+    x: number;
+    y: number;
+  };
+}
+
+export interface CanvasViewportHelpers {
+  canvasViewportFitForBounds(bounds: CanvasViewportBounds | null, viewport: CanvasViewportSize, padding?: number): CanvasViewportFit | null;
+}
+
+export interface AutoLayoutPosition {
+  x: number;
+  y: number;
+}
+
+export interface AutoLayoutItem {
+  id: string;
+  kind: string;
+  layer: number;
+  laneId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AutoLayoutResult {
+  projectOverviewPosition: AutoLayoutPosition;
+  appSurfacePositions: Record<string, AutoLayoutPosition>;
+  nodePositions: Record<string, AutoLayoutPosition>;
+  nodeLaneIds: Record<string, string>;
+  items: AutoLayoutItem[];
+  columnGap: number;
+}
+
+export interface AutoLayoutHelpers {
+  autoLayoutComputePreview(flow: unknown, measurements?: unknown): AutoLayoutResult;
+  autoLayoutCreatePreviewState(flow: unknown, layout: AutoLayoutResult): unknown;
+  autoLayoutPreviewPositionsForFlow(flow: unknown, previewState: unknown): AutoLayoutResult | null;
+  autoLayoutPreviewStateWithPosition(previewState: unknown, kind: string, id: string, position: AutoLayoutPosition): unknown;
+  autoLayoutEstimateLabelWidth(value: unknown): number;
+}
+
+export async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
+  const source = await readWebviewRuntimeFile("data", "canvas-endpoint-codec.js");
+  const factory = new Function(
+    "PROJECT_OVERVIEW_NODE_ID",
+    "getFeatureGroups",
+    `${source}\nreturn { encodeEndpoint, endpointFromButton, parseEndpointValue, endpointKey };`
+  ) as (projectOverviewNodeId: string, getFeatureGroups: (node: unknown) => unknown[]) => EndpointCodecHelpers;
+  return factory("projectOverview", () => []);
+}
+
+export async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers> {
+  const source = await readWebviewRuntimeFile("rendering", "canvas-selection-relations.js");
+  const factory = new Function(
+    "PROJECT_OVERVIEW_NODE_ID",
+    `${source}\nreturn { getSelectionRelationGroups };`
+  ) as (projectOverviewNodeId: string) => SelectionRelationHelpers;
+  return factory("projectOverview");
+}
+
+export async function loadCanvasViewportHelpers(): Promise<CanvasViewportHelpers> {
+  const source = await readWebviewRuntimeFile("interactions", "canvas-camera.js");
+  const factory = new Function(
+    "MIN_ZOOM",
+    "MAX_ZOOM",
+    "clamp",
+    `${source}\nreturn { canvasViewportFitForBounds };`
+  ) as (minZoom: number, maxZoom: number, clamp: (value: number, min: number, max: number) => number) => CanvasViewportHelpers;
+  return factory(0.05, 2.6, (value, min, max) => Math.min(max, Math.max(min, value)));
+}
+
+export async function loadAutoLayoutHelpers(): Promise<AutoLayoutHelpers> {
+  const source = await readWebviewRuntimeFiles([
+    ["layout", "canvas-auto-layout-engine.js"],
+    ["layout", "canvas-auto-layout-preview-state.js"],
+    ["layout", "canvas-auto-layout-dom.js"]
+  ]);
+  const factory = new Function(`${source}\nreturn { autoLayoutComputePreview, autoLayoutCreatePreviewState, autoLayoutPreviewPositionsForFlow, autoLayoutPreviewStateWithPosition, autoLayoutEstimateLabelWidth };`) as () => AutoLayoutHelpers;
+  return factory();
+}
+
+export function assertNoAutoLayoutOverlap(items: AutoLayoutItem[]): void {
+  const margin = 44;
+  for (let index = 0; index < items.length; index += 1) {
+    const left = items[index];
+    assert.ok(left);
+    for (let otherIndex = index + 1; otherIndex < items.length; otherIndex += 1) {
+      const right = items[otherIndex];
+      assert.ok(right);
+      const overlaps = left.x - margin < right.x + right.width + margin &&
+        left.x + left.width + margin > right.x - margin &&
+        left.y - margin < right.y + right.height + margin &&
+        left.y + left.height + margin > right.y - margin;
+      assert.equal(overlaps, false, `${left.id} should not overlap ${right.id}`);
+    }
+  }
+}
+
+async function readWebviewRuntimeFiles(files: Array<[string, string]>): Promise<string> {
+  const sources = await Promise.all(files.map(([directory, fileName]) => readWebviewRuntimeFile(directory, fileName)));
+  return sources.join("\n");
+}
+
+async function readWebviewRuntimeFile(directory: string, fileName: string): Promise<string> {
+  return fs.readFile(
+    path.join(process.cwd(), "src", "adapters", "webview", "canvas", "runtime", directory, fileName),
+    "utf8"
+  );
 }

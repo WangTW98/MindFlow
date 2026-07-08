@@ -22,7 +22,20 @@ import { recordEdgeDetailsRevision } from "../src/adapters/vscode/editor/canvas/
 import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/adapters/vscode/editor/canvas/webviewShellHtml";
 import { parseWebviewMessage } from "../src/adapters/webview/protocol/flowWebviewMessages";
 import { parseSidebarMessage } from "../src/adapters/webview/protocol/sidebarMessages";
-import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
+import {
+  assertAppSurfaceEntryEdge,
+  assertNoAutoLayoutOverlap,
+  assertNoLegacyFields,
+  assertNoLegacyKeysInJson,
+  assertThrows,
+  createProcurementFlow,
+  FakeMemento,
+  loadAutoLayoutHelpers,
+  loadCanvasViewportHelpers,
+  loadEndpointCodecHelpers,
+  loadSelectionRelationHelpers,
+  requireNodeByTitle
+} from "./helpers";
 
 test("FlowPanel webview HTML loads declared media resources in order", () => {
   const html = createFlowWebviewHtml({
@@ -747,148 +760,4 @@ function createDispatcherHarness(initialSelection: FlowSelectionPatch = emptyFlo
       }
     }
   };
-}
-
-interface EndpointCodecHelpers {
-  encodeEndpoint(endpoint: Record<string, unknown>): string;
-  endpointFromButton(button: { dataset: Record<string, string | undefined> }): unknown;
-  parseEndpointValue(value: unknown, fallbackEndpoint?: Record<string, unknown>): unknown;
-  endpointKey(endpoint: Record<string, unknown>): string;
-}
-
-interface SelectionRelationItem {
-  kind: string;
-  id: string;
-  title: string;
-}
-
-interface SelectionRelationGroups {
-  from: SelectionRelationItem[];
-  to: SelectionRelationItem[];
-}
-
-interface SelectionRelationHelpers {
-  getSelectionRelationGroups(flow: unknown, selectedNode: unknown, selectedEdge: unknown): SelectionRelationGroups | null;
-}
-
-interface CanvasViewportBounds {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-}
-
-interface CanvasViewportSize {
-  width: number;
-  height: number;
-}
-
-interface CanvasViewportFit {
-  zoom: number;
-  camera: {
-    x: number;
-    y: number;
-  };
-}
-
-interface CanvasViewportHelpers {
-  canvasViewportFitForBounds(bounds: CanvasViewportBounds | null, viewport: CanvasViewportSize, padding?: number): CanvasViewportFit | null;
-}
-
-interface AutoLayoutPosition {
-  x: number;
-  y: number;
-}
-
-interface AutoLayoutItem {
-  id: string;
-  kind: string;
-  layer: number;
-  laneId: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface AutoLayoutResult {
-  projectOverviewPosition: AutoLayoutPosition;
-  appSurfacePositions: Record<string, AutoLayoutPosition>;
-  nodePositions: Record<string, AutoLayoutPosition>;
-  nodeLaneIds: Record<string, string>;
-  items: AutoLayoutItem[];
-  columnGap: number;
-}
-
-interface AutoLayoutHelpers {
-  autoLayoutComputePreview(flow: unknown, measurements?: unknown): AutoLayoutResult;
-  autoLayoutCreatePreviewState(flow: unknown, layout: AutoLayoutResult): unknown;
-  autoLayoutPreviewPositionsForFlow(flow: unknown, previewState: unknown): AutoLayoutResult | null;
-  autoLayoutPreviewStateWithPosition(previewState: unknown, kind: string, id: string, position: AutoLayoutPosition): unknown;
-  autoLayoutEstimateLabelWidth(value: unknown): number;
-}
-
-async function loadEndpointCodecHelpers(): Promise<EndpointCodecHelpers> {
-  const source = await fs.readFile(
-    path.join(process.cwd(), "src", "adapters", "webview", "canvas", "runtime", "data", "canvas-endpoint-codec.js"),
-    "utf8"
-  );
-  const factory = new Function(
-    "PROJECT_OVERVIEW_NODE_ID",
-    "getFeatureGroups",
-    `${source}\nreturn { encodeEndpoint, endpointFromButton, parseEndpointValue, endpointKey };`
-  ) as (projectOverviewNodeId: string, getFeatureGroups: (node: unknown) => unknown[]) => EndpointCodecHelpers;
-  return factory("projectOverview", () => []);
-}
-
-async function loadSelectionRelationHelpers(): Promise<SelectionRelationHelpers> {
-  const source = await fs.readFile(
-    path.join(process.cwd(), "src", "adapters", "webview", "canvas", "runtime", "rendering", "canvas-selection-relations.js"),
-    "utf8"
-  );
-  const factory = new Function(
-    "PROJECT_OVERVIEW_NODE_ID",
-    `${source}\nreturn { getSelectionRelationGroups };`
-  ) as (projectOverviewNodeId: string) => SelectionRelationHelpers;
-  return factory("projectOverview");
-}
-
-async function loadCanvasViewportHelpers(): Promise<CanvasViewportHelpers> {
-  const source = await fs.readFile(
-    path.join(process.cwd(), "src", "adapters", "webview", "canvas", "runtime", "interactions", "canvas-camera.js"),
-    "utf8"
-  );
-  const factory = new Function(
-    "MIN_ZOOM",
-    "MAX_ZOOM",
-    "clamp",
-    `${source}\nreturn { canvasViewportFitForBounds };`
-  ) as (minZoom: number, maxZoom: number, clamp: (value: number, min: number, max: number) => number) => CanvasViewportHelpers;
-  return factory(0.05, 2.6, (value, min, max) => Math.min(max, Math.max(min, value)));
-}
-
-async function loadAutoLayoutHelpers(): Promise<AutoLayoutHelpers> {
-  const source = await fs.readFile(
-    path.join(process.cwd(), "src", "adapters", "webview", "canvas", "runtime", "layout", "canvas-auto-layout.js"),
-    "utf8"
-  );
-  const factory = new Function(`${source}\nreturn { autoLayoutComputePreview, autoLayoutCreatePreviewState, autoLayoutPreviewPositionsForFlow, autoLayoutPreviewStateWithPosition, autoLayoutEstimateLabelWidth };`) as () => AutoLayoutHelpers;
-  return factory();
-}
-
-function assertNoAutoLayoutOverlap(items: AutoLayoutItem[]): void {
-  const margin = 44;
-  for (let index = 0; index < items.length; index += 1) {
-    const left = items[index];
-    assert.ok(left);
-    for (let otherIndex = index + 1; otherIndex < items.length; otherIndex += 1) {
-      const right = items[otherIndex];
-      assert.ok(right);
-      const overlaps = left.x - margin < right.x + right.width + margin &&
-        left.x + left.width + margin > right.x - margin &&
-        left.y - margin < right.y + right.height + margin &&
-        left.y + left.height + margin > right.y - margin;
-      assert.equal(overlaps, false, `${left.id} should not overlap ${right.id}`);
-    }
-  }
 }

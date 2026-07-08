@@ -101,6 +101,12 @@ test("webview canvas source manifest matches the structured client directories",
   assert.equal(/(?:^|")webview\/canvas\/client\//.test(manifestSource), false);
   assert.equal(manifestSource.includes("state/canvas/"), false);
   assert.equal(manifestSource.includes("user-operations/canvas/"), false);
+  assert.equal(sourceFiles.includes("adapters/webview/canvas/runtime/layout/canvas-auto-layout.js"), false);
+  assert.deepEqual(sourceFiles.filter((sourceFile) => sourceFile.startsWith("adapters/webview/canvas/runtime/layout/")), [
+    "adapters/webview/canvas/runtime/layout/canvas-auto-layout-engine.js",
+    "adapters/webview/canvas/runtime/layout/canvas-auto-layout-preview-state.js",
+    "adapters/webview/canvas/runtime/layout/canvas-auto-layout-dom.js"
+  ]);
 
   for (const sourceFile of sourceFiles) {
     assert.ok(allowedPrefixes.some((prefix) => sourceFile.startsWith(prefix)), `${sourceFile} must live in a structured webview client directory`);

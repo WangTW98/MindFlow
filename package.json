@@ -122,7 +122,7 @@
     "build:webview": "node scripts/build-webview.mjs",
     "smoke:webview": "node scripts/render-webview-smoke.mjs",
     "compile": "npm run build:webview && tsc -p ./",
-    "typecheck": "npm run build:webview && tsc -p ./ --noEmit",
+    "typecheck": "npm run build:webview && tsc -p ./ --noEmit && tsc -p ./tsconfig.test.json --noEmit",
     "watch": "npm run build:webview && tsc -watch -p ./",
     "package": "node scripts/package-vsix.mjs",
     "test": "node scripts/run-tests.mjs"
