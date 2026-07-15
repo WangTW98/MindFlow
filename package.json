@@ -21,13 +21,12 @@
     "onCommand:mindflow.newFlow",
     "onCommand:mindflow.openFlow",
     "onCommand:mindflow.saveFlowAs",
+    "onCommand:mindflow.copyGlobalMcpConfig",
+    "onCommand:mindflow.showMcpConnectionStatus",
     "onCustomEditor:mindflow.productFlow",
     "onLanguage:mindflow",
     "onCommand:mindflow.validateFlowJson"
   ],
-  "bin": {
-    "mindflow-mcp": "./out/platform/mcp/protocol/stdioProxy.js"
-  },
   "main": "./out/platform/vscode/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -100,6 +99,14 @@
       {
         "command": "mindflow.validateFlowJson",
         "title": "MindFlow: Validate Flow JSON"
+      },
+      {
+        "command": "mindflow.copyGlobalMcpConfig",
+        "title": "MindFlow: Copy Global MCP Config"
+      },
+      {
+        "command": "mindflow.showMcpConnectionStatus",
+        "title": "MindFlow: Show MCP Connection Status"
       }
     ],
     "configuration": {
@@ -118,8 +125,9 @@
     "clean": "node -e \"require('node:fs').rmSync('out',{recursive:true,force:true})\"",
     "build:webview": "node scripts/build-webview.mjs",
     "smoke:webview": "node scripts/render-webview-smoke.mjs",
-    "compile": "npm run clean && npm run build:webview && tsc -p ./",
-    "typecheck": "npm run build:webview && tsc -p ./ --noEmit && tsc -p ./tsconfig.webview.json && tsc -p ./tsconfig.test.json --noEmit",
+    "build:mcp-router": "node scripts/build-mcp-router.mjs",
+    "compile": "npm run clean && npm run build:webview && npm run build:mcp-router && tsc -p ./",
+    "typecheck": "npm run build:webview && npm run build:mcp-router && tsc -p ./ --noEmit && tsc -p ./tsconfig.webview.json && tsc -p ./tsconfig.test.json --noEmit",
     "watch": "npm run build:webview && tsc -watch -p ./",
     "package": "vsce package --no-dependencies",
     "test": "node scripts/run-tests.mjs"

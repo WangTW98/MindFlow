@@ -1,31 +1,23 @@
 import { strict as assert } from "node:assert";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs/promises";
-import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
 
 const root = process.cwd();
-const sharedSkills = path.join(root, "integrations/shared/skills");
-const codexPlugin = path.join(root, "integrations/codex/mindflow-product-mapper");
-const claudePlugin = path.join(root, "integrations/claude/mindflow-product-mapper");
+const sharedSkills = path.join(root, "agent-assets/skills");
 const skillNames = ["mindflow-task-orchestrator", "mindflow-canvas-authoring", "mindflow-from-documents", "mindflow-from-code"];
 
-test("Codex and Claude plugins package the four canonical MindFlow skills", async () => {
-  const codexManifest = JSON.parse(await fs.readFile(path.join(codexPlugin, ".codex-plugin/plugin.json"), "utf8")) as Record<string, unknown>;
-  const codexMcp = JSON.parse(await fs.readFile(path.join(codexPlugin, ".mcp.json"), "utf8")) as { mcpServers: { mindflow: { args: string[] } } };
-  const claudeMcp = JSON.parse(await fs.readFile(path.join(claudePlugin, ".mcp.json"), "utf8")) as { mcpServers: { mindflow: { args: string[] } } };
-  assert.equal(codexManifest.skills, "./skills/");
-  assert.deepEqual(codexMcp.mcpServers.mindflow.args, ["${PLUGIN_ROOT}/scripts/mindflow-mcp-bootstrap.js"]);
-  assert.deepEqual(claudeMcp.mcpServers.mindflow.args, ["${CLAUDE_PLUGIN_ROOT}/scripts/mindflow-mcp-bootstrap.js"]);
-  assert.ok((await fs.readFile(path.join(claudePlugin, "agents/mindflow-product-mapper.md"), "utf8")).includes("feature-item"));
+test("standalone Agent assets retain the four canonical MindFlow skills without client plugins", async () => {
   for (const name of skillNames) {
     const canonical = await fs.readFile(path.join(sharedSkills, name, "SKILL.md"), "utf8");
-    assert.equal(await fs.readFile(path.join(codexPlugin, "skills", name, "SKILL.md"), "utf8"), canonical);
-    assert.equal(await fs.readFile(path.join(claudePlugin, "skills", name, "SKILL.md"), "utf8"), canonical);
     assert.equal(canonical.includes("[TODO:"), false);
   }
+  await assert.rejects(() => fs.access(path.join(root, "integrations/codex/mindflow-product-mapper/.codex-plugin/plugin.json")));
+  await assert.rejects(() => fs.access(path.join(root, "integrations/claude/mindflow-product-mapper/.claude-plugin/plugin.json")));
+  const vscodeIgnore = await fs.readFile(path.join(root, ".vscodeignore"), "utf8");
+  assert.ok(vscodeIgnore.includes("agent-assets/**"));
 });
 
 test("MindFlow task script creates, checkpoints, validates, and ignores recoverable task state", async () => {
@@ -53,47 +45,6 @@ test("MindFlow task script creates, checkpoints, validates, and ignores recovera
       assert.equal((await fs.stat(path.join(task, relative))).isFile(), true);
     }
   } finally {
-    await fs.rm(workspace, { recursive: true, force: true });
-  }
-});
-
-test("plugin bootstrap discovers a matching live VS Code session without client configuration", async () => {
-  const temporaryHome = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-bootstrap-home-"));
-  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-bootstrap-workspace-"));
-  const received: unknown[] = [];
-  const server = http.createServer((request, response) => {
-    const chunks: Buffer[] = [];
-    request.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-    request.on("end", () => {
-      received.push(JSON.parse(Buffer.concat(chunks).toString("utf8")));
-      assert.equal(request.headers.authorization, "Bearer test-token");
-      response.setHeader("content-type", "application/json");
-      response.end(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { serverInfo: { name: "mindflow-test" } } }));
-    });
-  });
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => resolve());
-  });
-  try {
-    const address = server.address();
-    if (!address || typeof address === "string") throw new Error("Missing test server address.");
-    const sessions = path.join(temporaryHome, ".mindflow/mcp/sessions");
-    await fs.mkdir(sessions, { recursive: true });
-    await fs.writeFile(path.join(sessions, "test.json"), JSON.stringify({
-      endpoint: `http://127.0.0.1:${address.port}/mcp`, token: "test-token", pid: process.pid,
-      workspaceRoots: [workspace], createdAt: new Date().toISOString(), lastSeenAt: new Date().toISOString()
-    }));
-    const bootstrap = path.join(codexPlugin, "scripts/mindflow-mcp-bootstrap.js");
-    const result = await run(process.execPath, [bootstrap], workspace, {
-      ...process.env,
-      HOME: temporaryHome
-    }, `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} })}\n`);
-    assert.deepEqual(JSON.parse(result.stdout.trim()), { jsonrpc: "2.0", id: 1, result: { serverInfo: { name: "mindflow-test" } } });
-    assert.equal(received.length, 1);
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-    await fs.rm(temporaryHome, { recursive: true, force: true });
     await fs.rm(workspace, { recursive: true, force: true });
   }
 });

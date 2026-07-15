@@ -19,7 +19,7 @@
 
 - 工作区：`/Users/wang/Public/developments.localized/MindFlow`。
 - 来源文档：`samples/procurement-collaboration-prd.md`。
-- 实时服务通过 Codex 插件同款 session bootstrap 自动发现，session 的 `workspaceRoots` 与当前工作区一致。
+- 实时服务通过全局 MCP Router 从 session 注册表发现，session 的 `workspaceFolders` 包含当前工作区。
 - 测试前读取 `mindflow://operations-reference`、`mindflow://current-model`、`mindflow://authoring-rules`。
 - 删除、移除、版本冲突和非法输入只作用于一次性探针画布。
 - 正式业务画布使用单独的 `mindflow_create_flow` 创建，未混入探针实体。

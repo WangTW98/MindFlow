@@ -11,6 +11,8 @@ samples/**
 docs/**
 designs/**
 .mindflow/**
+agent-assets/**
+integrations/**
 src/**
 assets/**
 !assets/

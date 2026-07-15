@@ -1,9 +1,42 @@
 import * as vscode from "vscode";
+import { MindFlowGlobalRuntimeManager } from "./globalRuntime";
 import { MindFlowMcpServerManager } from "./server";
 import { VsCodeMindFlowEditorBridge } from "./vscodeBridge";
 
 export function registerMindFlowMcp(context: vscode.ExtensionContext): vscode.Disposable[] {
   const mcpServer = new MindFlowMcpServerManager(context, new VsCodeMindFlowEditorBridge(context.extensionUri));
+  const runtime = new MindFlowGlobalRuntimeManager(context);
+  const output = vscode.window.createOutputChannel("MindFlow MCP");
   void mcpServer.start();
-  return [mcpServer];
+  void runtime.ensureInstalled().catch((error) => console.warn(`MindFlow global Router installation failed: ${errorMessage(error)}`));
+  return [
+    mcpServer,
+    output,
+    vscode.commands.registerCommand("mindflow.copyGlobalMcpConfig", async () => {
+      try {
+        await mcpServer.ensureStarted();
+        const config = await runtime.buildGlobalConfig();
+        await vscode.env.clipboard.writeText(JSON.stringify(config, null, 2));
+        await vscode.window.showInformationMessage("MindFlow global MCP configuration copied. Add it to your Agent's global MCP configuration, then refresh MCP servers.");
+      } catch (error) {
+        await vscode.window.showErrorMessage(`Unable to copy MindFlow global MCP configuration: ${errorMessage(error)}`);
+      }
+    }),
+    vscode.commands.registerCommand("mindflow.showMcpConnectionStatus", async () => {
+      try {
+        await mcpServer.ensureStarted();
+        const status = await runtime.status();
+        output.clear();
+        output.appendLine("MindFlow MCP connection status");
+        output.appendLine(JSON.stringify(status, null, 2));
+        output.show(true);
+      } catch (error) {
+        await vscode.window.showErrorMessage(`Unable to read MindFlow MCP status: ${errorMessage(error)}`);
+      }
+    })
+  ];
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

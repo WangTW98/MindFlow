@@ -32,6 +32,8 @@ Submit, approve, reject, and CRUD meaning belongs in `trigger`, `action`, and `c
 | `MindFlow: Open Product Flow` | Open a workspace `.mindflow` file |
 | `MindFlow: Save Flow As...` | Save the active canvas |
 | `MindFlow: Validate Flow JSON` | Validate the active document |
+| `MindFlow: Copy Global MCP Config` | Copy a global stdio MCP configuration to the clipboard |
+| `MindFlow: Show MCP Connection Status` | Show the Router, runtime, workspace, and session diagnostics |
 
 Canvas drag, detail, taxonomy, edge, and delete commands are internal custom-editor commands shared with the application operation layer.
 
@@ -50,23 +52,28 @@ The extension starts an authenticated loopback MCP session. MCP can:
 
 MCP edits the VS Code document through one workspace edit. It does not save the file; the user reviews and saves a dirty canvas.
 
-## Zero-config agent discovery
+## Global MCP registration
 
-The extension registers live sessions in:
+There is no client plugin or universal zero-configuration discovery. The extension starts authenticated loopback sessions and installs a global stdio Router at a stable per-user path:
 
-- macOS/Linux: `~/.mindflow/mcp/sessions/`
-- Windows: `%LOCALAPPDATA%/MindFlow/mcp/sessions/`
+- macOS/Linux: `~/.mindflow/mcp/runtime/mindflow-mcp-router.cjs`
+- Windows: `%LOCALAPPDATA%/MindFlow/mcp/runtime/mindflow-mcp-router.cjs`
 
-Each permission-restricted record includes the loopback endpoint, token, process, workspace roots, extension version, and timestamps. Stale process records are removed. The Codex and Claude plugin bootstrap selects the live session matching the agent working directory and proxies stdio MCP traffic. After installing the VS Code extension and the relevant plugin, no agent MCP configuration edit is required.
+Register it once:
 
-Repository plugin packages:
+1. Install the MindFlow VSIX and open at least one local VS Code workspace.
+2. Run `MindFlow: Copy Global MCP Config`.
+3. Add the copied `mcpServers.mindflow` entry to the Agent's user/global MCP configuration.
+4. Restart or refresh the Agent's MCP servers.
+5. Call `mindflow_list_workspaces`, then `mindflow_get_open_editors`.
 
-- `integrations/codex/mindflow-product-mapper`
-- `integrations/claude/mindflow-product-mapper`
+The copied JSON contains only a verified runtime command and the stable Router path. It contains no workspace path, session id, port, or token. Codex users can translate the entry to `codex mcp add mindflow [--env KEY=VALUE] -- <command> <router-path>`. Claude Code users can add the inner server object with `claude mcp add-json` at `--scope user`; see the [official Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp).
+
+The Router discovers live session records from `~/.mindflow/mcp/sessions/` (or `%LOCALAPPDATA%/MindFlow/mcp/sessions/` on Windows), validates them, and routes each call dynamically. With multiple workspaces, use `workspaceUri` for create/open and a precise `flowUri` for all subsequent canvas calls. The Router never selects a write target from window focus alone.
 
 ## Agent workflow and resumable tasks
 
-Both plugins include four shared Skills:
+The repository keeps four optional standalone Agent Skills under `agent-assets/skills/`:
 
 - `mindflow-task-orchestrator`
 - `mindflow-canvas-authoring`
@@ -78,9 +85,9 @@ Every new full analysis creates `.mindflow/tasks/YYYYMMDD-HHmmss-short-slug/`. T
 Task state is local and ignored by Git by default. Initialize or validate it with:
 
 ```bash
-python3 integrations/shared/skills/mindflow-task-orchestrator/scripts/mindflow_task.py init \
+python3 agent-assets/skills/mindflow-task-orchestrator/scripts/mindflow_task.py init \
   --workspace . --title "Order management" --source-type code --source-root src
-python3 integrations/shared/skills/mindflow-task-orchestrator/scripts/mindflow_task.py validate \
+python3 agent-assets/skills/mindflow-task-orchestrator/scripts/mindflow_task.py validate \
   --task .mindflow/tasks/<task-id>
 ```
 
@@ -98,8 +105,7 @@ Press F5 to launch the Extension Host. Source boundaries:
 - `src/product-flow/application/operations`: atomic operations shared by VS Code and MCP
 - `src/product-flow/infrastructure`: local persistence
 - `src/platform/vscode`, `src/platform/mcp`, `src/platform/webview`: platform adapters
-- `integrations/shared`: canonical Skills, templates, draft schema, and validators
-- `integrations/codex`, `integrations/claude`: installable client plugins
+- `agent-assets`: optional standalone Skills, templates, draft schema, and validators; excluded from the VSIX
 
 To package the extension:
 

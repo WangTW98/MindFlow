@@ -1,6 +1,0 @@
-{
-  "name": "mindflow-product-mapper",
-  "version": "0.1.0",
-  "description": "Partitioned document/code analysis and validated MindFlow canvas authoring.",
-  "author": { "name": "MindFlow" }
-}
