@@ -5,6 +5,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import type { MindFlowEditorBridge } from "../../mcp/protocol/bridge";
 import { MindFlowMcpProtocol } from "../../mcp/protocol/jsonRpcProtocol";
+import { MINDFLOW_STDIO_PROXY_RELATIVE_PATH } from "../../mcp/protocol/stdioProxyPath";
 import { MindFlowMcpToolHandlers } from "../../mcp/tools";
 
 const MAX_MCP_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
@@ -41,7 +42,7 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
       const port = await listen(server);
       const sessionPath = this.sessionPath();
       const endpoint = `http://127.0.0.1:${port}/mcp`;
-      const stdioBridgePath = path.join(this.context.extensionUri.fsPath, "out", "src", "mcp", "stdioBridge.js");
+      const stdioBridgePath = path.join(this.context.extensionUri.fsPath, MINDFLOW_STDIO_PROXY_RELATIVE_PATH);
       const session: MindFlowMcpSession = {
         endpoint,
         port,

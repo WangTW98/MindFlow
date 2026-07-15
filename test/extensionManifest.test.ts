@@ -19,6 +19,7 @@ import { RecentFlowStore } from "../src/platform/vscode/state/recentFlows";
 import { recordEdgeDetailsRevision } from "../src/platform/vscode/editor/canvas/flowMessageOrdering";
 import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/platform/vscode/editor/canvas/webviewShellHtml";
 import { parseWebviewMessage } from "../src/platform/webview/protocol/flowWebviewMessages";
+import { MINDFLOW_STDIO_PROXY_RELATIVE_PATH } from "../src/platform/mcp/protocol/stdioProxyPath";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("Extension manifest contributes standalone .mindflow editor, sidebar, and MCP config command", async () => {
@@ -64,7 +65,7 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and M
   );
   assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), ["mindflow.storage.flowDirectory"]);
   assert.equal(manifest.contributes?.jsonValidation?.[0]?.url, "./assets/product-flow/schema/productFlow.schema.json");
-  assert.deepEqual(manifest.bin, { "mindflow-mcp": "./out/platform/mcp/protocol/stdioProxy.js" });
+  assert.deepEqual(manifest.bin, { "mindflow-mcp": `./${MINDFLOW_STDIO_PROXY_RELATIVE_PATH}` });
   const removedScriptPrefix = ["m", "c", "p"].join("") + ":";
   assert.equal(Object.keys(manifest.scripts ?? {}).some((script) => script.startsWith(removedScriptPrefix)), false);
   assert.equal(manifest.activationEvents?.includes("onStartupFinished"), true);
