@@ -88,14 +88,6 @@ export function validateActions(value: unknown, path: string, errors: string[]):
   }
 }
 
-export function validateStates(value: unknown, path: string, errors: string[]): void {
-  validateObjectArrayWithStrings(value, path, ["stateId", "name", "description"], "stateId", errors);
-}
-
-export function validateExceptions(value: unknown, path: string, errors: string[]): void {
-  validateObjectArrayWithStrings(value, path, ["exceptionId", "name", "handling"], "exceptionId", errors);
-}
-
 export function readFeatureGroups(node: Record<string, unknown>): Array<{ groupId: string; items: Array<{ itemId: string }> }> {
   if (!Array.isArray(node.featureGroups)) {
     return [];

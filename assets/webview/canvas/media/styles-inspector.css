@@ -180,3 +180,9 @@
 .inspector textarea {
   line-height: 1.35;
 }
+
+.inspector textarea.long-form-copy {
+  min-height: 132px;
+  resize: vertical;
+  white-space: pre-wrap;
+}

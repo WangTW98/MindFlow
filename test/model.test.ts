@@ -28,10 +28,10 @@ test("real-provider fixture creates a valid ProductFlow with app-surface entry e
   assert.equal(flow.appSurfaces?.length, 4);
   assert.ok(flow.nodes.length >= 15);
   assert.ok(flow.edges.length >= 20);
-  assertAppSurfaceEntryEdge(flow, "app_admin", "采购工作台");
-  assertAppSurfaceEntryEdge(flow, "app_supplier_portal", "供应商门户首页");
-  assertAppSurfaceEntryEdge(flow, "app_mobile_approval", "移动审批待办");
-  assertAppSurfaceEntryEdge(flow, "app_public_site", "采购公告列表");
+  assertAppSurfaceEntryEdge(flow, "app_admin", "管理后台骨架");
+  assertAppSurfaceEntryEdge(flow, "app_supplier_portal", "供应商门户骨架");
+  assertAppSurfaceEntryEdge(flow, "app_mobile_approval", "移动审批骨架");
+  assertAppSurfaceEntryEdge(flow, "app_public_site", "公开网站骨架");
 });
 
 test("Empty ProductFlow starts as a valid blank canvas", () => {
@@ -60,6 +60,7 @@ test("JSON schema edge type enum stays aligned with runtime validation", async (
     };
   };
 
+  assert.deepEqual([...EDGE_TYPES], ["interaction", "autoNavigate", "dataFlow", "statusChange", "nestedRelation"]);
   assert.deepEqual(schema.$defs?.edgeType?.enum, [...EDGE_TYPES]);
 });
 
@@ -85,7 +86,7 @@ test("ProductFlow validation rejects empty required values and broken graph refe
   const removed = createFlowNode(flow, { title: "已删除页" });
   removed.status = "removed";
   removed.removedAt = new Date().toISOString();
-  source.replacementNodeIds = [source.nodeId, "missing_replacement"];
+  (source as unknown as Record<string, unknown>).replacementNodeIds = [source.nodeId, "missing_replacement"];
   source.featureGroups[0]!.actions = [{
     actionId: "action_missing_target",
     label: "打开不存在页面",
@@ -105,8 +106,7 @@ test("ProductFlow validation rejects empty required values and broken graph refe
   assert.equal(validation.valid, false);
   assert.ok(validation.errors.some((error) => error.includes("title must be a non-empty string")));
   assert.ok(validation.errors.some((error) => error.includes("createdAt must be a valid ISO date")));
-  assert.ok(validation.errors.some((error) => error.includes("replacementNodeIds cannot reference the node itself")));
-  assert.ok(validation.errors.some((error) => error.includes("missing_replacement")));
+  assert.ok(validation.errors.some((error) => error.includes("replacementNodeIds is not supported")));
   assert.ok(validation.errors.some((error) => error.includes("missing_target")));
   assert.ok(validation.errors.some((error) => error.includes("references removed node")));
   assert.ok(validation.errors.some((error) => error.includes("domainIds must be derived")));
@@ -133,7 +133,7 @@ test("ProductFlow validation catches duplicate ids, invalid views, and endpoint 
     from: { kind: "node", nodeId: node.nodeId },
     to: { kind: "node", nodeId: node.nodeId },
     trigger: "异常连线",
-    type: "navigate"
+    type: "interaction"
   });
   edge.from = { kind: "featureGroup", nodeId: node.nodeId, groupId: "missing_group" };
   edge.to = { kind: "featureItem", nodeId: node.nodeId, groupId: "missing_group", itemId: "missing_item" };

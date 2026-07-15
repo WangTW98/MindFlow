@@ -154,13 +154,13 @@ test("Deleting an app surface removes connected edge endpoints and keeps the flo
     from: { kind: "appSurface", nodeId: surface.appId, appId: surface.appId },
     to: { kind: "node", nodeId: toNode.nodeId },
     trigger: "从被删除应用端进入页面",
-    type: "navigate"
+    type: "interaction"
   });
   const metadataOnlyEdge = createFlowEdge(flow, {
     from: { kind: "node", nodeId: fromNode.nodeId },
     to: { kind: "node", nodeId: toNode.nodeId },
     trigger: "普通节点连线",
-    type: "navigate"
+    type: "interaction"
   });
   metadataOnlyEdge.appSurfaceIds = [surface.appId];
   fromNode.appSurfaceIds = [...(fromNode.appSurfaceIds ?? []), surface.appId];
@@ -188,7 +188,7 @@ test("Pruning app surface references removes stale connected card edges before v
     from: { kind: "appSurface", nodeId: surface.appId, appId: surface.appId },
     to: { kind: "node", nodeId: target.nodeId },
     trigger: "从管理后台进入页面",
-    type: "navigate"
+    type: "interaction"
   });
   flow.appSurfaces = (flow.appSurfaces ?? []).filter((item) => item.appId !== surface.appId);
 

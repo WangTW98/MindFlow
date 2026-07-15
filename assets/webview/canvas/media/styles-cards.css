@@ -310,6 +310,14 @@
   line-height: 1.42;
 }
 
+.app-surface-card > .purpose {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
 .meta-grid,
 .edge-summary {
   display: grid;

@@ -1,10 +1,66 @@
+# Dependencies and package-manager caches
 node_modules/
+.npm-cache/
+.pnpm-store/
+.yarn/
+
+# Build, compiler, and package outputs
 out/
 out-test/
-.npm-cache/
+dist/
+build/
+*.tsbuildinfo
 *.vsix
-.DS_Store
+*.tgz
+
+# Test and coverage outputs
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+junit*.xml
+*.lcov
+.vscode-test/
+.vscode-test-web/
+
+# Tool caches, temporary files, and logs
+.cache/
+.parcel-cache/
+.eslintcache
+.tmp/
+tmp/
+*.tmp
+*.temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python validation artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated example and sample outputs; source Markdown remains tracked
+samples/generated/
+samples/output/
+samples/.tmp/
+examples/generated/
+examples/output/
+examples/.tmp/
+
+# MindFlow runtime, analysis, probe, and generated flow data
 .mindflow/debug/
+.mindflow/tasks/
 .mindflow/tmp/
+.mindflow/mcp/
 .mindflow/flows/*.mindflow
 !.mindflow/flows/.gitkeep
+
+# Operating-system and editor residue
+.DS_Store
+*.swp
+*.swo

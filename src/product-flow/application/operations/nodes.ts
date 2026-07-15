@@ -79,12 +79,16 @@ function createConnectedNode(flow: ProductFlow, request: CreateConnectedNodeOper
       ? [request.to.appId!]
       : relatedNode?.appSurfaceIds;
   const node = createFlowNode(flow, {
+    ...request.input,
     x: request.x,
     y: request.y,
     appSurfaceIds: nonEmptyArrayOr(request.appSurfaceIds, relatedAppSurfaceIds),
     domainIds: nonEmptyArrayOr(request.domainIds, relatedNode?.domainIds),
     roleIds: nonEmptyArrayOr(request.roleIds, relatedNode?.roleIds)
   });
+  if (request.detailPatch && Object.keys(request.detailPatch).length > 0) {
+    updateFlowNodeDetails(flow, node.nodeId, request.detailPatch);
+  }
   if (request.from) {
     return {
       node,

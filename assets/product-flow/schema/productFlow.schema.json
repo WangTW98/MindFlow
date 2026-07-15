@@ -20,7 +20,7 @@
   ],
   "properties": {
     "flowId": { "type": "string" },
-    "revision": { "type": "number" },
+    "revision": { "type": "integer", "minimum": 1 },
     "title": { "type": "string" },
     "createdAt": { "type": "string" },
     "updatedAt": { "type": "string" },
@@ -62,16 +62,7 @@
         "autoNavigate",
         "dataFlow",
         "statusChange",
-        "nestedRelation",
-        "navigate",
-        "submit",
-        "approve",
-        "reject",
-        "create",
-        "update",
-        "delete",
-        "system",
-        "branch"
+        "nestedRelation"
       ]
     },
     "stringArray": {
@@ -201,34 +192,12 @@
         }
       }
     },
-    "state": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["stateId", "name", "description"],
-      "properties": {
-        "stateId": { "type": "string" },
-        "name": { "type": "string" },
-        "description": { "type": "string" }
-      }
-    },
-    "exception": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["exceptionId", "name", "handling"],
-      "properties": {
-        "exceptionId": { "type": "string" },
-        "name": { "type": "string" },
-        "handling": { "type": "string" }
-      }
-    },
     "node": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "nodeId",
-        "stableKey",
         "status",
-        "version",
         "title",
         "pageType",
         "appSurfaceIds",
@@ -236,19 +205,18 @@
         "roleIds",
         "purpose",
         "featureGroups",
-        "states",
-        "exceptions",
         "inputs",
         "outputs",
         "permissions"
       ],
       "properties": {
         "nodeId": { "type": "string" },
-        "stableKey": { "type": "string" },
         "status": { "$ref": "#/$defs/entityStatus" },
-        "version": { "type": "number" },
         "title": { "type": "string" },
-        "pageType": { "type": "string" },
+        "pageType": {
+          "type": "string",
+          "enum": ["skeleton", "navigation", "page", "popup", "component"]
+        },
         "appSurfaceIds": { "$ref": "#/$defs/stringArray" },
         "statusGroupId": { "type": "string" },
         "domainIds": { "$ref": "#/$defs/stringArray" },
@@ -258,18 +226,9 @@
           "type": "array",
           "items": { "$ref": "#/$defs/featureGroup" }
         },
-        "states": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/state" }
-        },
-        "exceptions": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/exception" }
-        },
         "inputs": { "$ref": "#/$defs/stringArray" },
         "outputs": { "$ref": "#/$defs/stringArray" },
         "permissions": { "$ref": "#/$defs/stringArray" },
-        "replacementNodeIds": { "$ref": "#/$defs/stringArray" },
         "removedAt": { "type": "string" },
         "view": { "$ref": "#/$defs/view" }
       }

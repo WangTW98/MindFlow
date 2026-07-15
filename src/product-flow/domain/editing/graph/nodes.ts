@@ -1,5 +1,5 @@
-import type { AppSurface, PageNode, ProductFlow } from "../..";
-import { makeNodeId, nowIso, stableKey } from "../../id";
+import { NODE_PAGE_TYPES, type AppSurface, type NodePageType, type PageNode, type ProductFlow } from "../..";
+import { makeNodeId, nowIso } from "../../id";
 import { defaultFeatureGroups, normalizeFeatureGroups } from "./featureGroups";
 import { refreshAllFlowEdgeDerivedState } from "./edges";
 import { normalizeStringArray, requireAppSurface, requireNode, sanitizeText, touchFlow, uniqueNodeId } from "./shared";
@@ -7,18 +7,20 @@ import type { CreateNodeInput, UpdateNodeDetailsInput } from "./types";
 
 export function createFlowNode(flow: ProductFlow, input: CreateNodeInput = {}): PageNode {
   const title = sanitizeText(input.title, "新建页面");
-  const pageType = sanitizeText(input.pageType, "page");
+  const pageType = requireNodePageType(input.pageType ?? "page");
   const purpose = sanitizeText(input.purpose, "新建产品页面节点。");
   const seed = `${flow.flowId}:${title}:${nowIso()}:${flow.nodes.length}`;
-  const nodeId = uniqueNodeId(flow, makeNodeId(title, seed));
+  const requestedNodeId = typeof input.nodeId === "string" ? input.nodeId.trim() : "";
+  if (requestedNodeId && flow.nodes.some((node) => node.nodeId === requestedNodeId)) {
+    throw new Error(`Node already exists: ${requestedNodeId}`);
+  }
+  const nodeId = requestedNodeId || uniqueNodeId(flow, makeNodeId(title, seed));
   const featureGroups = normalizeFeatureGroups(input.featureGroups, nodeId);
   const groups = featureGroups.length > 0 ? featureGroups : defaultFeatureGroups(nodeId);
   const hasExplicitPosition = Number.isFinite(input.x) || Number.isFinite(input.y);
   const node: PageNode = {
     nodeId,
-    stableKey: stableKey(title, purpose, seed),
     status: "active",
-    version: 1,
     title,
     pageType,
     appSurfaceIds: normalizeStringArray(input.appSurfaceIds),
@@ -26,8 +28,6 @@ export function createFlowNode(flow: ProductFlow, input: CreateNodeInput = {}): 
     roleIds: normalizeStringArray(input.roleIds),
     purpose,
     featureGroups: groups,
-    states: [{ stateId: `state_${stableKey(nodeId, "default")}`, name: "默认态", description: "页面加载并可正常操作。" }],
-    exceptions: [{ exceptionId: `ex_${stableKey(nodeId, "manual")}`, name: "异常处理", handling: "按业务规则提示用户并支持重试。" }],
     inputs: [],
     outputs: [],
     permissions: normalizeStringArray(input.roleIds),
@@ -53,7 +53,7 @@ export function updateFlowNodeDetails(flow: ProductFlow, nodeId: string, patch: 
     node.title = sanitizeText(patch.title, node.title);
   }
   if (patch.pageType !== undefined) {
-    node.pageType = sanitizeText(patch.pageType, node.pageType);
+    node.pageType = requireNodePageType(patch.pageType);
   }
   if (patch.purpose !== undefined) {
     node.purpose = sanitizeText(patch.purpose, node.purpose);
@@ -87,7 +87,6 @@ export function updateFlowNodeDetails(flow: ProductFlow, nodeId: string, patch: 
   if (patch.featureGroups !== undefined) {
     node.featureGroups = normalizeFeatureGroups(patch.featureGroups, node.nodeId);
   }
-  node.version += 1;
   refreshAllFlowEdgeDerivedState(flow);
   touchFlow(flow);
   return node;
@@ -129,4 +128,11 @@ function assertFiniteCoordinates(x: number, y: number): void {
 
 function finiteCoordinateOrDefault(value: number | undefined, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.round(value) : fallback;
+}
+
+function requireNodePageType(value: string): NodePageType {
+  if ((NODE_PAGE_TYPES as readonly string[]).includes(value)) {
+    return value as NodePageType;
+  }
+  throw new Error(`Node pageType must be ${NODE_PAGE_TYPES.join(", ")}.`);
 }

@@ -1,6 +1,6 @@
-import { APP_SURFACE_TYPES, EDGE_TYPES } from "../model/constants";
+import { APP_SURFACE_TYPES, EDGE_TYPES, NODE_PAGE_TYPES } from "../model/constants";
 import { isAppSurfaceType, isEdgeType } from "../model/guards";
-import { validateExceptions, validateFeatureGroups, validateOptionalViewPosition, validateStates } from "./collections";
+import { validateFeatureGroups, validateOptionalViewPosition } from "./collections";
 import { appSurfaceIdsFromFlow, checkEndpoint, isAppSurfaceEndpoint, isProjectOverviewEndpoint } from "./endpoints";
 import {
   isRecord,
@@ -86,17 +86,18 @@ export function validateNodes(flow: Record<string, unknown>, domainIds: Set<stri
       continue;
     }
     rejectUnknownKeys(node, [
-      "nodeId", "stableKey", "status", "version", "title", "pageType", "appSurfaceIds", "statusGroupId",
-      "domainIds", "roleIds", "purpose", "featureGroups", "states", "exceptions",
-      "inputs", "outputs", "permissions", "replacementNodeIds", "removedAt", "view"
+      "nodeId", "status", "title", "pageType", "appSurfaceIds", "statusGroupId",
+      "domainIds", "roleIds", "purpose", "featureGroups",
+      "inputs", "outputs", "permissions", "removedAt", "view"
     ], `nodes[${index}]`, errors);
     requireNonEmptyString(node, "nodeId", errors, `nodes[${index}]`);
-    requireNonEmptyString(node, "stableKey", errors, `nodes[${index}]`);
     requireNonEmptyString(node, "status", errors, `nodes[${index}]`);
     validateEntityStatus(node.status, `nodes[${index}].status`, errors);
-    requirePositiveInteger(node, "version", errors, `nodes[${index}]`);
     requireNonEmptyString(node, "title", errors, `nodes[${index}]`);
     requireNonEmptyString(node, "pageType", errors, `nodes[${index}]`);
+    if (typeof node.pageType === "string" && !(NODE_PAGE_TYPES as readonly string[]).includes(node.pageType)) {
+      errors.push(`nodes[${index}].pageType must be ${NODE_PAGE_TYPES.join(", ")}.`);
+    }
     const nodeAppSurfaceIds = requireStringArray(node, "appSurfaceIds", errors, `nodes[${index}]`);
     validateReferences(nodeAppSurfaceIds, appSurfaceIds, `nodes[${index}].appSurfaceIds`, "app surface", errors);
     const nodeDomainIds = requireStringArray(node, "domainIds", errors, `nodes[${index}]`);
@@ -106,15 +107,10 @@ export function validateNodes(flow: Record<string, unknown>, domainIds: Set<stri
     requireNonEmptyString(node, "purpose", errors, `nodes[${index}]`);
     requireArray(node, "featureGroups", errors, `nodes[${index}]`);
     validateFeatureGroups(node.featureGroups, `nodes[${index}].featureGroups`, errors);
-    validateStates(node.states, `nodes[${index}].states`, errors);
-    validateExceptions(node.exceptions, `nodes[${index}].exceptions`, errors);
     requireStringArray(node, "inputs", errors, `nodes[${index}]`);
     requireStringArray(node, "outputs", errors, `nodes[${index}]`);
     const permissions = requireStringArray(node, "permissions", errors, `nodes[${index}]`);
     validateReferences(permissions, roleIds, `nodes[${index}].permissions`, "role", warnings);
-    if ("replacementNodeIds" in node) {
-      requireStringArray(node, "replacementNodeIds", errors, `nodes[${index}]`);
-    }
     if ("removedAt" in node) {
       requireIsoDateString(node, "removedAt", errors, `nodes[${index}]`);
     }
@@ -212,19 +208,6 @@ export function validateNodeReferences(flow: Record<string, unknown>, nodeIndex:
     if (!isRecord(node)) {
       continue;
     }
-    const nodeId = typeof node.nodeId === "string" ? node.nodeId : "";
-    if (Array.isArray(node.replacementNodeIds)) {
-      for (const replacementId of node.replacementNodeIds) {
-        if (typeof replacementId !== "string") {
-          continue;
-        }
-        if (replacementId === nodeId) {
-          errors.push(`nodes[${index}].replacementNodeIds cannot reference the node itself.`);
-        } else if (!nodeIndex.nodeIds.has(replacementId)) {
-          errors.push(`nodes[${index}].replacementNodeIds references missing node ${replacementId}.`);
-        }
-      }
-    }
     if (Array.isArray(node.featureGroups)) {
       for (const [groupIndex, group] of node.featureGroups.entries()) {
         if (isRecord(group)) {
@@ -295,6 +278,59 @@ export function validateEdges(
     checkEndpoint(edge.to, `edges[${index}].to`, nodeIndex.nodeIds, nodeIndex.nodesById, appSurfaceIds, errors);
     validateEdgeConsistency(flow, edge, index, nodeIndex, errors);
   }
+  validateSingleTargetOutlets(edges, errors);
+  validateNavigationParents(edges, nodeIndex, errors);
+}
+
+const SINGLE_TARGET_EDGE_TYPES = new Set(["interaction", "autoNavigate", "statusChange"]);
+
+function validateSingleTargetOutlets(edges: unknown[], errors: string[]): void {
+  const sources = new Map<string, string>();
+  for (const edge of edges) {
+    if (!isRecord(edge) || edge.status !== "active" || !SINGLE_TARGET_EDGE_TYPES.has(String(edge.type)) || !isRecord(edge.from)) continue;
+    const key = featureOutletKey(edge.from);
+    if (!key) continue;
+    const previous = sources.get(key);
+    if (previous) {
+      errors.push(`Active feature outlet ${key} has multiple interaction/autoNavigate/statusChange targets: ${previous}, ${String(edge.edgeId)}.`);
+    } else {
+      sources.set(key, String(edge.edgeId));
+    }
+  }
+}
+
+function validateNavigationParents(edges: unknown[], nodeIndex: NodeValidationIndex, errors: string[]): void {
+  const activeNavigationIds = new Set<string>();
+  for (const [nodeId, node] of nodeIndex.nodesById) {
+    if (node.status !== "removed" && node.pageType === "navigation") activeNavigationIds.add(nodeId);
+  }
+  const parents = new Map<string, string[]>();
+  for (const edge of edges) {
+    if (!isRecord(edge) || edge.status !== "active" || !isRecord(edge.to) || typeof edge.to.nodeId !== "string" || !activeNavigationIds.has(edge.to.nodeId)) continue;
+    const targetId = edge.to.nodeId;
+    const list = parents.get(targetId) ?? [];
+    list.push(String(edge.edgeId));
+    parents.set(targetId, list);
+    const source = endpointNodeRecord(edge.from, nodeIndex);
+    const validSkeletonParent = source?.pageType === "skeleton" && edge.type === "nestedRelation";
+    const validNavigationParent = source?.pageType === "navigation" && edge.type === "interaction";
+    if (!validSkeletonParent && !validNavigationParent) {
+      errors.push(`Navigation node ${targetId} edge ${String(edge.edgeId)} must come from a skeleton nestedRelation or navigation interaction.`);
+    }
+  }
+  for (const [nodeId, edgeIds] of parents) {
+    if (edgeIds.length > 1) errors.push(`Navigation node ${nodeId} has multiple active hierarchy parents: ${edgeIds.join(", ")}.`);
+  }
+}
+
+function featureOutletKey(endpoint: Record<string, unknown>): string | undefined {
+  if (endpoint.kind === "featureGroup" && typeof endpoint.nodeId === "string" && typeof endpoint.groupId === "string") {
+    return `${endpoint.nodeId}/${endpoint.groupId}`;
+  }
+  if (endpoint.kind === "featureItem" && typeof endpoint.nodeId === "string" && typeof endpoint.groupId === "string" && typeof endpoint.itemId === "string") {
+    return `${endpoint.nodeId}/${endpoint.groupId}/${endpoint.itemId}`;
+  }
+  return undefined;
 }
 
 function validateActionTargets(value: unknown, path: string, nodeIndex: NodeValidationIndex, errors: string[]): void {
@@ -342,9 +378,26 @@ function validateEdgeConsistency(
     }
   }
 
+  if (edge.status === "active" && edge.type === "statusChange") {
+    const fromNode = endpointNodeRecord(edge.from, nodeIndex);
+    const toNode = endpointNodeRecord(edge.to, nodeIndex);
+    const fromGroup = typeof fromNode?.statusGroupId === "string" ? fromNode.statusGroupId : "";
+    const toGroup = typeof toNode?.statusGroupId === "string" ? toNode.statusGroupId : "";
+    if (!fromNode || !toNode || !fromGroup || fromGroup !== toGroup) {
+      errors.push(`edges[${index}] statusChange endpoints must belong to nodes in the same statusGroupId.`);
+    }
+  }
+
   validateDerivedEdgeField(flow, edge, index, "appSurfaceIds", nodeIndex, errors);
   validateDerivedEdgeField(flow, edge, index, "domainIds", nodeIndex, errors);
   validateDerivedEdgeField(flow, edge, index, "roleIds", nodeIndex, errors);
+}
+
+function endpointNodeRecord(endpoint: unknown, nodeIndex: NodeValidationIndex): Record<string, unknown> | undefined {
+  if (!isRecord(endpoint) || endpoint.kind === "projectOverview" || endpoint.kind === "appSurface" || typeof endpoint.nodeId !== "string") {
+    return undefined;
+  }
+  return nodeIndex.nodesById.get(endpoint.nodeId);
 }
 
 function endpointStorageId(value: unknown): string | undefined {

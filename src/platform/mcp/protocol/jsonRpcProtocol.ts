@@ -1,4 +1,12 @@
-import { MINDFLOW_OPERATIONS_REFERENCE, MINDFLOW_OPERATIONS_REFERENCE_URI } from "./operationsReference";
+import {
+  MINDFLOW_AUTHORING_REFERENCE,
+  MINDFLOW_AUTHORING_REFERENCE_URI,
+  MINDFLOW_MODEL_REFERENCE,
+  MINDFLOW_MODEL_REFERENCE_URI,
+  MINDFLOW_OPERATIONS_REFERENCE,
+  MINDFLOW_OPERATIONS_REFERENCE_URI,
+  MINDFLOW_SERVER_INSTRUCTIONS
+} from "./operationsReference";
 import type { MindFlowMcpToolHandlers } from "../tools";
 
 const SUPPORTED_PROTOCOL_VERSION = "2024-11-05";
@@ -79,7 +87,8 @@ export class MindFlowMcpProtocol {
       return {
         protocolVersion: SUPPORTED_PROTOCOL_VERSION,
         capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: "mindflow-vscode", version: "0.1.0" }
+        serverInfo: { name: "mindflow-vscode", version: "0.1.0" },
+        instructions: MINDFLOW_SERVER_INSTRUCTIONS
       };
     }
 
@@ -109,23 +118,29 @@ export class MindFlowMcpProtocol {
       }
       case "resources/list":
         return {
-          resources: [{
-            uri: MINDFLOW_OPERATIONS_REFERENCE_URI,
-            name: "MindFlow operations reference",
-            mimeType: "text/markdown",
-            description: "Operation-level reference for reading and editing MindFlow through MCP."
-          }]
+          resources: [
+            resource(MINDFLOW_OPERATIONS_REFERENCE_URI, "MindFlow operations reference", "Operation-level workflow for reading and editing MindFlow."),
+            resource(MINDFLOW_MODEL_REFERENCE_URI, "MindFlow current model", "Current root, app-surface, generic-node, state, endpoint, and edge model."),
+            resource(MINDFLOW_AUTHORING_REFERENCE_URI, "MindFlow authoring rules", "Canonical edge-type and orange-outlet selection rules.")
+          ]
         };
       case "resources/read": {
         const request = requireRecord(params, "resources/read params must be an object.");
-        if (request.uri !== MINDFLOW_OPERATIONS_REFERENCE_URI) {
+        const text = request.uri === MINDFLOW_OPERATIONS_REFERENCE_URI
+          ? MINDFLOW_OPERATIONS_REFERENCE
+          : request.uri === MINDFLOW_MODEL_REFERENCE_URI
+            ? MINDFLOW_MODEL_REFERENCE
+            : request.uri === MINDFLOW_AUTHORING_REFERENCE_URI
+              ? MINDFLOW_AUTHORING_REFERENCE
+              : undefined;
+        if (!text) {
           throw new JsonRpcDispatchError(-32602, `Unknown MindFlow MCP resource: ${String(request.uri)}`);
         }
         return {
           contents: [{
-            uri: MINDFLOW_OPERATIONS_REFERENCE_URI,
+            uri: request.uri,
             mimeType: "text/markdown",
-            text: MINDFLOW_OPERATIONS_REFERENCE
+            text
           }]
         };
       }
@@ -139,6 +154,10 @@ export class MindFlowMcpProtocol {
       throw new JsonRpcDispatchError(-32002, `MindFlow MCP server must be initialized before ${method}.`);
     }
   }
+}
+
+function resource(uri: string, name: string, description: string): Record<string, string> {
+  return { uri, name, mimeType: "text/markdown", description };
 }
 
 function jsonRpcError(id: string | number | null, code: number, message: string): Record<string, unknown> {

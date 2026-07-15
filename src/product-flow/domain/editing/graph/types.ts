@@ -1,8 +1,9 @@
-import type { EdgeType, FeatureGroup, FlowEdge, FlowEndpoint, PageNode } from "../..";
+import type { EdgeType, FeatureGroup, FlowEdge, FlowEndpoint, NodePageType, PageNode } from "../..";
 
 export interface CreateNodeInput {
+  nodeId?: string;
   title?: string;
-  pageType?: string;
+  pageType?: NodePageType;
   purpose?: string;
   x?: number;
   y?: number;
@@ -14,7 +15,7 @@ export interface CreateNodeInput {
 
 export interface UpdateNodeDetailsInput {
   title?: string;
-  pageType?: string;
+  pageType?: NodePageType;
   purpose?: string;
   appSurfaceIds?: string[];
   statusGroupId?: string;

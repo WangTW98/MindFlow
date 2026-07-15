@@ -50,10 +50,10 @@ function renderProjectOverviewInspector(flow) {
       </header>
       <input id="projectOverviewTitle" type="hidden" value="${escapeAttr(flow.title || "项目概述")}">
       <label>项目综述
-        <textarea id="projectOverviewSummary" rows="5">${escapeHtml(overview.summary || "")}</textarea>
+        <textarea id="projectOverviewSummary" class="long-form-copy" rows="10">${escapeHtml(overview.summary || "")}</textarea>
       </label>
       <label>项目目标
-        <textarea id="projectOverviewGoal" rows="5">${escapeHtml(overview.goal || "")}</textarea>
+        <textarea id="projectOverviewGoal" class="long-form-copy" rows="8">${escapeHtml(overview.goal || "")}</textarea>
       </label>
       <section class="project-overview-inspector-taxonomy">
         <div class="section-title">
@@ -87,7 +87,7 @@ function renderAppSurfaceInspector(flow, surface) {
       <input id="appSurfaceName" type="hidden" value="${escapeAttr(surface.name)}">
       ${renderAppSurfaceTypePicker(surface.type)}
       <label>应用端介绍
-        <textarea id="appSurfaceDescription" rows="4">${escapeHtml(surface.description || "")}</textarea>
+        <textarea id="appSurfaceDescription" class="long-form-copy" rows="8">${escapeHtml(surface.description || "")}</textarea>
       </label>
       ${renderTagMultiSelect("appSurfaceDomainIds", "关联业务域", flow.domains || [], "domainId", "name", surface.domainIds || [])}
       ${renderTagMultiSelect("appSurfaceRoleIds", "关联角色", flow.roles || [], "roleId", "name", surface.roleIds || [])}

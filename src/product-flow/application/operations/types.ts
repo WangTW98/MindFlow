@@ -26,6 +26,8 @@ export type FlowOperation =
   | { type: "edge.remove"; edgeId: string };
 
 export interface CreateConnectedNodeOperationInput {
+  input?: CreateNodeInput;
+  detailPatch?: UpdateNodeDetailsInput;
   from?: FlowEndpoint;
   to?: FlowEndpoint;
   x?: number;

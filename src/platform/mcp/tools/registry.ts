@@ -13,6 +13,12 @@ export type McpToolInvoker = (input: McpToolInput) => Promise<McpToolResult>;
 export type McpToolEntry = readonly [string, McpToolInvoker];
 
 export interface McpToolActions {
+  createFlow(input: McpToolInput): Promise<McpToolResult>;
+  openFlow(input: McpToolInput): Promise<McpToolResult>;
+  validateFlow(input: McpToolInput): Promise<McpToolResult>;
+  queryEntities(input: McpToolInput): Promise<McpToolResult>;
+  applyCanvasChanges(input: McpToolInput): Promise<McpToolResult>;
+  createConnectedNode(input: McpToolInput): Promise<McpToolResult>;
   getEditorState(input: McpToolInput): Promise<McpToolResult>;
   getOpenEditors(input: McpToolInput): Promise<McpToolResult>;
   getSelection(input: McpToolInput): Promise<McpToolResult>;
@@ -29,11 +35,7 @@ export interface McpToolActions {
   removeRole(input: McpToolInput): Promise<McpToolResult>;
   upsertStatusGroup(input: McpToolInput): Promise<McpToolResult>;
   removeStatusGroup(input: McpToolInput): Promise<McpToolResult>;
-  upsertLayoutNode(input: McpToolInput): Promise<McpToolResult>;
-  upsertNavigationNode(input: McpToolInput): Promise<McpToolResult>;
-  upsertPageNode(input: McpToolInput): Promise<McpToolResult>;
-  upsertPopupNode(input: McpToolInput): Promise<McpToolResult>;
-  upsertComponentNode(input: McpToolInput): Promise<McpToolResult>;
+  upsertNode(input: McpToolInput): Promise<McpToolResult>;
   updateNode(input: McpToolInput): Promise<McpToolResult>;
   moveNode(input: McpToolInput): Promise<McpToolResult>;
   removeNode(input: McpToolInput): Promise<McpToolResult>;

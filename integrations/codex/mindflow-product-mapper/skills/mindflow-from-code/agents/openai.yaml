@@ -1,0 +1,4 @@
+interface:
+  display_name: "MindFlow From Code"
+  short_description: "Reverse engineer code into MindFlow graph partitions"
+  default_prompt: "Read the codebase without modifying it, extract product behavior into MindFlow task partitions, and preserve evidence locations."

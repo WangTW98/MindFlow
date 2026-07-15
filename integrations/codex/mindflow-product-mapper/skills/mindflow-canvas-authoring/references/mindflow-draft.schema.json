@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MindFlowDraft",
+  "type": "object",
+  "required": ["entities", "unresolved", "staleCandidates"],
+  "properties": {
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "entity": { "enum": ["root", "appSurface", "domain", "role", "statusGroup", "node", "featureGroup", "featureItem", "edge"] },
+          "pageType": { "enum": ["skeleton", "navigation", "page", "popup", "component"] },
+          "type": { "enum": ["interaction", "autoNavigate", "dataFlow", "statusChange", "nestedRelation"] },
+          "origin": { "enum": ["explicit", "inferred"] }
+        },
+        "required": ["entity"]
+      }
+    },
+    "unresolved": { "type": "array" },
+    "staleCandidates": { "type": "array" }
+  },
+  "additionalProperties": false
+}

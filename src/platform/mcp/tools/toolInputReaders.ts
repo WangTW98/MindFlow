@@ -1,4 +1,4 @@
-import { APP_SURFACE_TYPES, EDGE_TYPES, ENTITY_STATUSES, FLOW_ENDPOINT_KINDS, type EdgeType, type EntityStatus, type FeatureGroup, type FlowEdge, type FlowEndpoint, type PageNode, type ProductFlow } from "../../../product-flow/domain";
+import { APP_SURFACE_TYPES, EDGE_TYPES, ENTITY_STATUSES, FLOW_ENDPOINT_KINDS, NODE_PAGE_TYPES, type EdgeType, type EntityStatus, type FeatureGroup, type FlowEdge, type FlowEndpoint, type NodePageType, type PageNode, type ProductFlow } from "../../../product-flow/domain";
 import { PROJECT_OVERVIEW_NODE_ID, type FlowOperation, type FlowOperationResult, type TaxonomyKind, type UpdateEdgeDetailsInput, type UpdateNodeDetailsInput, type UpsertEdgeOperationInput } from "../../../product-flow/application/operations";
 import { MINDFLOW_MCP_TOOLS } from "../protocol/toolSchemas";
 import {
@@ -16,8 +16,9 @@ import {
   resolveId,
   stripUndefined
 } from "./readers";
-import { MCP_NODE_KINDS, type IdMaps, type McpNodeKind } from "./types";
+import type { IdMaps } from "./types";
 import type { FlowSelectionPatch } from "../../../product-flow/domain/selection";
+import { assertMcpNodeFeatureGroups } from "./authoringValidation";
 
 export function taxonomyUpsertOperation(input: Record<string, unknown>, kind: TaxonomyKind): FlowOperation {
   const item = asRecord(input.item ?? input);
@@ -25,10 +26,13 @@ export function taxonomyUpsertOperation(input: Record<string, unknown>, kind: Ta
   return { type: "taxonomy.upsert", kind, id, item };
 }
 
-export function nodeUpsertOperations(flow: ProductFlow, input: Record<string, unknown>, kind: McpNodeKind): FlowOperation[] {
+export function nodeUpsertOperations(flow: ProductFlow, input: Record<string, unknown>): FlowOperation[] {
   const nodeId = readOptionalString(input, "nodeId") ?? readOptionalString(input, "id");
   const existing = nodeId ? flow.nodes.find((node) => node.nodeId === nodeId) : undefined;
-  const patch = readNodeDetailsPatch({ ...input, pageType: pageTypeForNodeKind(kind) });
+  const patch = readNodeDetailsPatch(input);
+  if (!patch.pageType) {
+    throw new Error(`Node pageType is required and must be ${NODE_PAGE_TYPES.join(", ")}.`);
+  }
   const x = readOptionalNumber(input, "x");
   const y = readOptionalNumber(input, "y");
   if (existing) {
@@ -38,6 +42,7 @@ export function nodeUpsertOperations(flow: ProductFlow, input: Record<string, un
     }
     return operations;
   }
+  assertMcpNodeFeatureGroups(patch.featureGroups);
   const detailPatch: UpdateNodeDetailsInput = stripUndefined({
     statusGroupId: patch.statusGroupId,
     permissions: patch.permissions,
@@ -48,6 +53,7 @@ export function nodeUpsertOperations(flow: ProductFlow, input: Record<string, un
   return [{
     type: "node.create",
     input: {
+      nodeId,
       title: patch.title,
       pageType: patch.pageType,
       purpose: patch.purpose,
@@ -63,9 +69,13 @@ export function nodeUpsertOperations(flow: ProductFlow, input: Record<string, un
 }
 
 export function readNodeDetailsPatch(input: Record<string, unknown>): UpdateNodeDetailsInput {
+  const featureGroups = Array.isArray(input.featureGroups) ? input.featureGroups as FeatureGroup[] : undefined;
+  if (input.featureGroups !== undefined) {
+    assertMcpNodeFeatureGroups(featureGroups);
+  }
   return {
     title: readStringPatch(input, "title") ?? readStringPatch(input, "name"),
-    pageType: readStringPatch(input, "pageType"),
+    pageType: readNodePageType(input.pageType),
     purpose: readStringPatch(input, "purpose") ?? readStringPatch(input, "description"),
     appSurfaceIds: readOptionalStringArray(input, "appSurfaceIds"),
     statusGroupId: readStringPatch(input, "statusGroupId"),
@@ -74,7 +84,7 @@ export function readNodeDetailsPatch(input: Record<string, unknown>): UpdateNode
     permissions: readOptionalStringArray(input, "permissions"),
     inputs: readOptionalStringArray(input, "inputs"),
     outputs: readOptionalStringArray(input, "outputs"),
-    featureGroups: Array.isArray(input.featureGroups) ? input.featureGroups as FeatureGroup[] : undefined
+    featureGroups
   };
 }
 
@@ -113,8 +123,8 @@ export function schemaPayload(): Record<string, unknown> {
     edgeTypes: [...EDGE_TYPES],
     runtimeEdgeTypes: [...EDGE_TYPES],
     endpointKinds: [...FLOW_ENDPOINT_KINDS, "root"],
-    nodeKinds: [...MCP_NODE_KINDS],
-    nodePageTypes: MCP_NODE_KINDS.map(pageTypeForNodeKind)
+    nodeKinds: ["root", "appSurface", "node"],
+    nodePageTypes: [...NODE_PAGE_TYPES]
   };
 }
 
@@ -125,16 +135,14 @@ export function capabilitiesPayload(): Record<string, unknown> {
     requiresUserSave: true,
     supportsSelection: true,
     supportsBatchNodeOperations: true,
-    supportsDryRun: true
+    supportsDryRun: true,
+    supportsAtomicChangesets: true,
+    supportsPagedEntityQuery: true,
+    genericNodePageTypes: [...NODE_PAGE_TYPES],
+    edgeTypes: [...EDGE_TYPES],
+    maxChangesetNodes: 40,
+    maxChangesetEdges: 80
   };
-}
-
-export function readNodeKind(input: Record<string, unknown>): McpNodeKind {
-  const kind = readOptionalString(input, "kind");
-  if (kind && isMcpNodeKind(kind)) {
-    return kind;
-  }
-  throw new Error("Node batch item kind must be layout, navigation, page, popup, or component.");
 }
 
 export function readStatuses(input: Record<string, unknown>): EntityStatus[] | undefined {
@@ -196,7 +204,7 @@ export function requiredResult(result: FlowOperationResult | undefined): FlowOpe
   return result;
 }
 
-function readEndpoint(value: unknown, maps: IdMaps): FlowEndpoint | undefined {
+export function readEndpoint(value: unknown, maps: IdMaps): FlowEndpoint | undefined {
   if (typeof value === "string") {
     return { kind: "node", nodeId: resolveId(value, maps.nodes) };
   }
@@ -224,18 +232,21 @@ function readEndpoint(value: unknown, maps: IdMaps): FlowEndpoint | undefined {
   throw new Error(`Unsupported endpoint kind: ${kind}.`);
 }
 
-function readMcpEdgeType(input: Record<string, unknown>, fallback?: EdgeType): EdgeType {
-  const explicit = readOptionalString(input, "type") ?? readOptionalString(input, "edgeType");
+export function readMcpEdgeType(input: Record<string, unknown>, fallback?: EdgeType): EdgeType {
+  const explicit = readOptionalString(input, "type");
   if (explicit) {
     if (isEdgeTypeValue(explicit)) {
       return explicit;
     }
     throw new Error(`Unsupported MCP edge type: ${explicit}. Use one of ${EDGE_TYPES.join(", ")}.`);
   }
-  return fallback ?? "interaction";
+  if (fallback) {
+    return fallback;
+  }
+  throw new Error(`MCP edge type is required. Use one of ${EDGE_TYPES.join(", ")}; interaction is not an uncertainty fallback.`);
 }
 
-function createIdMaps(flow: ProductFlow): IdMaps {
+export function createIdMaps(flow: ProductFlow): IdMaps {
   return {
     nodes: new Map(flow.nodes.map((node) => [node.nodeId, node.nodeId])),
     appSurfaces: new Map((flow.appSurfaces ?? []).map((surface) => [surface.appId, surface.appId]))
@@ -255,12 +266,14 @@ function taxonomyItemId(kind: TaxonomyKind, item: Record<string, unknown>): stri
   return readOptionalString(item, "statusGroupId");
 }
 
-function pageTypeForNodeKind(kind: McpNodeKind): string {
-  return kind === "layout" ? "skeleton" : kind;
-}
-
-function isMcpNodeKind(value: string): value is McpNodeKind {
-  return (MCP_NODE_KINDS as readonly string[]).includes(value);
+function readNodePageType(value: unknown): NodePageType | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value === "string" && (NODE_PAGE_TYPES as readonly string[]).includes(value)) {
+    return value as NodePageType;
+  }
+  throw new Error(`Node pageType must be ${NODE_PAGE_TYPES.join(", ")}.`);
 }
 
 function matchesOptional(value: string, filters: readonly string[] | undefined): boolean {

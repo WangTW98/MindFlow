@@ -1,4 +1,4 @@
-import type { AppSurfaceType, EdgeType, EntityStatus } from "./constants";
+import type { AppSurfaceType, EdgeType, EntityStatus, NodePageType } from "./constants";
 
 export interface BusinessDomain {
   domainId: string;
@@ -73,37 +73,20 @@ export interface FeatureGroup {
   actions?: PageAction[];
 }
 
-export interface PageState {
-  stateId: string;
-  name: string;
-  description: string;
-}
-
-export interface PageException {
-  exceptionId: string;
-  name: string;
-  handling: string;
-}
-
 export interface PageNode {
   nodeId: string;
-  stableKey: string;
   status: EntityStatus;
-  version: number;
   title: string;
-  pageType: string;
+  pageType: NodePageType;
   appSurfaceIds: string[];
   statusGroupId?: string;
   domainIds: string[];
   roleIds: string[];
   purpose: string;
   featureGroups: FeatureGroup[];
-  states: PageState[];
-  exceptions: PageException[];
   inputs: string[];
   outputs: string[];
   permissions: string[];
-  replacementNodeIds?: string[];
   removedAt?: string;
   view?: {
     position?: {

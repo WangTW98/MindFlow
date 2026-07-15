@@ -174,19 +174,7 @@ function getPageTypeOption(type) {
 
 function normalizePageTypeForSelect(type) {
   const value = String(type || "").trim().toLowerCase();
-  if (value === "popup" || value === "modal" || value === "dialog" || value === "弹窗") {
-    return "popup";
-  }
-  if (value === "component" || value === "components" || value === "组件") {
-    return "component";
-  }
-  if (value === "navigation" || value === "nav" || value === "menu" || value === "导航") {
-    return "navigation";
-  }
-  if (value === "skeleton" || value === "wireframe" || value === "layout" || value === "骨架") {
-    return "skeleton";
-  }
-  return "page";
+  return PAGE_TYPE_OPTIONS.some((option) => option.value === value) ? value : "page";
 }
 
 function normalizeEdgeTypeForSelect(type) {
@@ -205,10 +193,10 @@ function edgeTypeGroup(type) {
   if (type === "nestedRelation") {
     return "nesting";
   }
-  if (type === "autoNavigate" || type === "navigate" || type === "branch") {
+  if (type === "autoNavigate") {
     return "auto";
   }
-  if (type === "dataFlow" || type === "system") {
+  if (type === "dataFlow") {
     return "data";
   }
   return "interaction";

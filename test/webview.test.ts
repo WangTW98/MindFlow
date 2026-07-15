@@ -102,6 +102,25 @@ test("Sidebar webview loads stylesheet from sidebar media", async () => {
   assert.equal(`${viewSource}\n${htmlSource}`.includes("\"src\", \"canvas\", \"media\""), false);
 });
 
+test("Overview and application cards summarize long copy while inspectors expose full multiline fields", async () => {
+  const [inspectorSource, projectStyles, cardStyles, inspectorStyles] = await Promise.all([
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/rendering/canvas-taxonomy-inspector.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "assets/webview/canvas/media/styles-project-overview.css"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "assets/webview/canvas/media/styles-cards.css"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "assets/webview/canvas/media/styles-inspector.css"), "utf8")
+  ]);
+
+  assert.ok(inspectorSource.includes('id="projectOverviewSummary" class="long-form-copy" rows="10"'));
+  assert.ok(inspectorSource.includes('id="projectOverviewGoal" class="long-form-copy" rows="8"'));
+  assert.ok(inspectorSource.includes('id="appSurfaceDescription" class="long-form-copy" rows="8"'));
+  assert.ok(projectStyles.includes("white-space: pre-line"));
+  assert.ok(projectStyles.includes("-webkit-line-clamp: 2"));
+  assert.ok(cardStyles.includes(".app-surface-card > .purpose"));
+  assert.ok(cardStyles.includes("-webkit-line-clamp: 4"));
+  assert.ok(inspectorStyles.includes("textarea.long-form-copy"));
+  assert.ok(inspectorStyles.includes("white-space: pre-wrap"));
+});
+
 test("Webview endpoint codec falls back when encoded values are malformed", async () => {
   const { encodeEndpoint, endpointFromButton, parseEndpointValue } = await loadEndpointCodecHelpers();
   const fallback = { kind: "node", nodeId: "node_a" };
@@ -260,13 +279,18 @@ test("Canvas auto layout previews hierarchy, lanes, spacing, and collision-free 
   ];
   const skeleton = createFlowNode(flow, { title: "后台骨架", pageType: "skeleton", appSurfaceIds: ["app_admin"] });
   const navigation = createFlowNode(flow, { title: "后台导航", pageType: "navigation", appSurfaceIds: ["app_admin"] });
+  const subnavigation = createFlowNode(flow, { title: "内容子导航", pageType: "navigation", appSurfaceIds: ["app_admin"] });
+  const topbar = createFlowNode(flow, { title: "后台顶栏", pageType: "component", appSurfaceIds: ["app_admin"] });
   const pageA = createFlowNode(flow, { title: "采购列表", pageType: "page", appSurfaceIds: ["app_admin"] });
   const pageB = createFlowNode(flow, { title: "采购详情", pageType: "page", appSurfaceIds: ["app_admin"] });
   const popup = createFlowNode(flow, { title: "确认弹窗", pageType: "popup", appSurfaceIds: ["app_admin"] });
   const component = createFlowNode(flow, { title: "报价组件", pageType: "component", appSurfaceIds: ["app_supplier", "app_admin"] });
-  const shared = createFlowNode(flow, { title: "共享未知节点", pageType: "unknown", appSurfaceIds: [] });
+  const shared = createFlowNode(flow, { title: "共享组件", pageType: "component", appSurfaceIds: [] });
   const longTrigger = "这是一个非常长的连线标题用于验证自动排版会保留足够横向展示空间";
-  createFlowEdge(flow, { from: { kind: "node", nodeId: skeleton.nodeId }, to: { kind: "node", nodeId: navigation.nodeId }, trigger: "进入导航", type: "interaction" });
+  const skeletonGroup = skeleton.featureGroups[0]!;
+  createFlowEdge(flow, { from: { kind: "featureGroup", nodeId: skeleton.nodeId, groupId: skeletonGroup.groupId }, to: { kind: "node", nodeId: navigation.nodeId }, trigger: "主导航布局", type: "nestedRelation" });
+  createFlowEdge(flow, { from: { kind: "featureGroup", nodeId: skeleton.nodeId, groupId: skeletonGroup.groupId }, to: { kind: "node", nodeId: subnavigation.nodeId }, trigger: "子导航布局", type: "nestedRelation" });
+  createFlowEdge(flow, { from: { kind: "featureGroup", nodeId: skeleton.nodeId, groupId: skeletonGroup.groupId }, to: { kind: "node", nodeId: topbar.nodeId }, trigger: "顶栏布局", type: "nestedRelation" });
   createFlowEdge(flow, { from: { kind: "node", nodeId: navigation.nodeId }, to: { kind: "node", nodeId: pageA.nodeId }, trigger: longTrigger, type: "interaction" });
   createFlowEdge(flow, { from: { kind: "node", nodeId: pageA.nodeId }, to: { kind: "node", nodeId: popup.nodeId }, trigger: "打开确认", type: "interaction" });
   createFlowEdge(flow, { from: { kind: "node", nodeId: pageA.nodeId }, to: { kind: "node", nodeId: pageB.nodeId }, trigger: "查看详情", type: "interaction" });
@@ -276,6 +300,9 @@ test("Canvas auto layout previews hierarchy, lanes, spacing, and collision-free 
   assert.ok(layout.projectOverviewPosition.x < layout.appSurfacePositions.app_admin!.x);
   assert.ok(layout.appSurfacePositions.app_admin!.x < layout.nodePositions[skeleton.nodeId]!.x);
   assert.ok(layout.nodePositions[skeleton.nodeId]!.x < layout.nodePositions[navigation.nodeId]!.x);
+  assert.equal(layout.items.find((item) => item.id === navigation.nodeId)?.layer, layout.items.find((item) => item.id === subnavigation.nodeId)?.layer);
+  assert.equal(layout.items.find((item) => item.id === navigation.nodeId)?.layer, layout.items.find((item) => item.id === topbar.nodeId)?.layer);
+  assert.notEqual(layout.nodePositions[navigation.nodeId]!.y, layout.nodePositions[subnavigation.nodeId]!.y);
   assert.ok(layout.nodePositions[navigation.nodeId]!.x < layout.nodePositions[pageA.nodeId]!.x);
   assert.ok(layout.nodePositions[pageA.nodeId]!.x < layout.nodePositions[popup.nodeId]!.x);
   assert.ok(layout.nodePositions[pageB.nodeId]!.x > layout.nodePositions[pageA.nodeId]!.x);
@@ -592,20 +619,20 @@ test("Webview message parser rejects malformed messages before command dispatch"
     from: { kind: "appSurface", nodeId: "app_admin" },
     to: { kind: "node", nodeId: "node_b" },
     trigger: "进入",
-    edgeType: "navigate"
+    edgeType: "interaction"
   }), undefined);
   assert.deepEqual(parseWebviewMessage({
     type: "createEdge",
     from: { kind: "appSurface", nodeId: "app_admin", appId: "app_admin" },
     to: { kind: "node", nodeId: "node_b" },
     trigger: "进入",
-    edgeType: "navigate"
+    edgeType: "interaction"
   }), {
     type: "createEdge",
     from: { kind: "appSurface", nodeId: "app_admin", appId: "app_admin" },
     to: { kind: "node", nodeId: "node_b" },
     trigger: "进入",
-    edgeType: "navigate"
+    edgeType: "interaction"
   });
   assert.deepEqual(parseWebviewMessage({
     type: "saveAutoLayoutPositions",
@@ -666,7 +693,7 @@ test("Flow webview command dispatcher maps selection and edit messages", async (
     from: { kind: "node", nodeId: "node_a" },
     to: { kind: "node", nodeId: "node_b" },
     trigger: "进入下一页",
-    edgeType: "navigate"
+    edgeType: "interaction"
   }, dispatcher.dispatcher);
 
   assert.deepEqual(dispatcher.selection, {
@@ -698,7 +725,7 @@ test("Flow webview command dispatcher maps selection and edit messages", async (
           from: { kind: "node", nodeId: "node_a" },
           to: { kind: "node", nodeId: "node_b" },
           trigger: "进入下一页",
-          type: "navigate"
+          type: "interaction"
         }
       }]
     }

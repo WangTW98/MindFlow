@@ -12,6 +12,8 @@ export interface MindFlowEditorSnapshot {
 }
 
 export interface MindFlowEditorBridge {
+  createFlow?(title?: string): Promise<MindFlowEditorSnapshot>;
+  openFlow?(flowPath: string): Promise<MindFlowEditorSnapshot>;
   getOpenEditors(): Promise<MindFlowEditorSnapshot[]>;
   getActiveEditor(flowUri?: string): Promise<MindFlowEditorSnapshot>;
   setSelection(flowUri: string, selection: FlowSelectionPatch): Promise<MindFlowEditorSnapshot>;

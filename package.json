@@ -21,7 +21,6 @@
     "onCommand:mindflow.newFlow",
     "onCommand:mindflow.openFlow",
     "onCommand:mindflow.saveFlowAs",
-    "onCommand:mindflow.copyMcpConfig",
     "onCustomEditor:mindflow.productFlow",
     "onLanguage:mindflow",
     "onCommand:mindflow.validateFlowJson"
@@ -101,10 +100,6 @@
       {
         "command": "mindflow.validateFlowJson",
         "title": "MindFlow: Validate Flow JSON"
-      },
-      {
-        "command": "mindflow.copyMcpConfig",
-        "title": "MindFlow: Copy MCP Client Config"
       }
     ],
     "configuration": {

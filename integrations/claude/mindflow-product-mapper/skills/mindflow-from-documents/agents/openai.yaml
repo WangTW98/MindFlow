@@ -1,0 +1,4 @@
+interface:
+  display_name: "MindFlow From Documents"
+  short_description: "Analyze provided documents into MindFlow graph partitions"
+  default_prompt: "Analyze the provided documents into evidence-backed MindFlow task partitions without drawing before analysis synthesis completes."

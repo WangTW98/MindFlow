@@ -29,7 +29,7 @@ test("Project overview endpoint can create a normal persisted edge", () => {
     from: { kind: "projectOverview", nodeId: PROJECT_OVERVIEW_NODE_ID },
     to: { kind: "node", nodeId: target.nodeId },
     trigger: "进入项目主流程",
-    type: "navigate"
+    type: "interaction"
   });
 
   assert.equal(edge.fromNodeId, PROJECT_OVERVIEW_NODE_ID);
@@ -170,14 +170,25 @@ test("ensureAppSurfaceEntryEdges repairs missing app-surface entry links", () =>
   const result = ensureAppSurfaceEntryEdges(flow);
   assert.equal(result.addedEdgeIds.length, 4);
   assert.equal(flow.revision, revisionBeforeRepair + 1);
-  assertAppSurfaceEntryEdge(flow, "app_admin", "采购工作台");
-  assertAppSurfaceEntryEdge(flow, "app_supplier_portal", "供应商门户首页");
-  assertAppSurfaceEntryEdge(flow, "app_mobile_approval", "移动审批待办");
-  assertAppSurfaceEntryEdge(flow, "app_public_site", "采购公告列表");
+  assertAppSurfaceEntryEdge(flow, "app_admin", "管理后台骨架");
+  assertAppSurfaceEntryEdge(flow, "app_supplier_portal", "供应商门户骨架");
+  assertAppSurfaceEntryEdge(flow, "app_mobile_approval", "移动审批骨架");
+  assertAppSurfaceEntryEdge(flow, "app_public_site", "公开网站骨架");
   assert.equal(validateProductFlow(flow).valid, true);
 });
 
-test("Manual feature item outlet can connect to multiple target nodes", () => {
+test("ensureAppSurfaceEntryEdges does not guess when an app has zero or multiple skeletons", () => {
+  const flow = createEmptyProductFlow();
+  flow.appSurfaces = [{ appId: "app_admin", name: "管理后台", type: "admin", description: "后台", domainIds: [], roleIds: [] }];
+  createFlowNode(flow, { title: "工作台", pageType: "page", appSurfaceIds: ["app_admin"] });
+  assert.deepEqual(ensureAppSurfaceEntryEdges(flow).addedEdgeIds, []);
+
+  createFlowNode(flow, { title: "骨架 A", pageType: "skeleton", appSurfaceIds: ["app_admin"] });
+  createFlowNode(flow, { title: "骨架 B", pageType: "skeleton", appSurfaceIds: ["app_admin"] });
+  assert.deepEqual(ensureAppSurfaceEntryEdges(flow).addedEdgeIds, []);
+});
+
+test("Manual feature outlet allows only one interaction, auto-navigation, or status target", () => {
   const flow = createProcurementFlow();
   const compare = requireNodeByTitle(flow, "报价对比页");
   const approval = requireNodeByTitle(flow, "审批发起页");
@@ -193,8 +204,14 @@ test("Manual feature item outlet can connect to multiple target nodes", () => {
     groupId: group.groupId,
     itemId: item.itemId
   };
-  createFlowEdge(flow, { from, toNodeId: approval.nodeId, trigger: "生成比价报告后审批", type: "submit" });
-  createFlowEdge(flow, { from, toNodeId: plan.nodeId, trigger: "生成比价报告后回看计划", type: "navigate" });
+  const first = createFlowEdge(flow, { from, toNodeId: approval.nodeId, trigger: "生成比价报告后审批", type: "interaction" });
+  assert.throws(
+    () => createFlowEdge(flow, { from, toNodeId: plan.nodeId, trigger: "生成比价报告后回看计划", type: "autoNavigate" }),
+    /single-target limit/
+  );
+  createFlowEdge(flow, { from, toNodeId: plan.nodeId, trigger: "同步比价报告", type: "dataFlow" });
+  removeFlowEdge(flow, first.edgeId);
+  createFlowEdge(flow, { from, toNodeId: plan.nodeId, trigger: "回看采购计划", type: "interaction" });
 
   const sameOutletEdges = flow.edges.filter((edge) =>
     edge.status === "active" &&
@@ -203,9 +220,34 @@ test("Manual feature item outlet can connect to multiple target nodes", () => {
     edge.from.groupId === from.groupId &&
     edge.from.itemId === from.itemId
   );
-  assert.ok(sameOutletEdges.some((edge) => edge.toNodeId === approval.nodeId));
   assert.ok(sameOutletEdges.some((edge) => edge.toNodeId === plan.nodeId));
-  assert.ok(sameOutletEdges.length >= 2);
+  assert.equal(sameOutletEdges.filter((edge) => edge.type !== "dataFlow" && edge.type !== "nestedRelation").length, 1);
+});
+
+test("Manual save validation permits orphan nodes but rejects invalid navigation parents", () => {
+  const flow = createEmptyProductFlow();
+  const orphan = createFlowNode(flow, { title: "人工暂存页面", pageType: "page" });
+  assert.equal(validateProductFlow(flow).valid, true);
+
+  const skeleton = createFlowNode(flow, { title: "骨架", pageType: "skeleton" });
+  const navigation = createFlowNode(flow, { title: "导航", pageType: "navigation" });
+  const skeletonGroup = skeleton.featureGroups[0]!;
+  createFlowEdge(flow, {
+    from: { kind: "featureGroup", nodeId: skeleton.nodeId, groupId: skeletonGroup.groupId },
+    to: { kind: "node", nodeId: navigation.nodeId },
+    type: "nestedRelation"
+  });
+  assert.equal(validateProductFlow(flow).valid, true);
+
+  const orphanGroup = orphan.featureGroups[0]!;
+  createFlowEdge(flow, {
+    from: { kind: "featureGroup", nodeId: orphan.nodeId, groupId: orphanGroup.groupId },
+    to: { kind: "node", nodeId: navigation.nodeId },
+    type: "interaction"
+  });
+  const validation = validateProductFlow(flow);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((error) => error.includes("multiple active hierarchy parents")));
 });
 
 test("Manual target node inlet can accept multiple source outlets", () => {
@@ -222,13 +264,13 @@ test("Manual target node inlet can accept multiple source outlets", () => {
     from: { kind: "featureGroup", nodeId: inquiry.nodeId, groupId: inquiryGroup.groupId },
     toNodeId: compare.nodeId,
     trigger: "询价发布后进入报价对比",
-    type: "navigate"
+    type: "interaction"
   });
   createFlowEdge(flow, {
     from: { kind: "featureGroup", nodeId: supplierHome.nodeId, groupId: supplierGroup.groupId },
     toNodeId: compare.nodeId,
     trigger: "供应商报价汇总后进入报价对比",
-    type: "navigate"
+    type: "interaction"
   });
 
   const incomingEdges = flow.edges.filter((edge) => edge.status === "active" && edge.toNodeId === compare.nodeId);
@@ -249,7 +291,7 @@ test("Manual app surface card can be positioned and connected as a normal edge e
     from: { kind: "appSurface", nodeId: surface.appId, appId: surface.appId },
     to: { kind: "node", nodeId: target.nodeId },
     trigger: "从应用端进入页面",
-    type: "navigate"
+    type: "interaction"
   });
 
   assert.equal(surface.view?.position?.x, -420);
@@ -285,7 +327,7 @@ test("Manual edge details update endpoints and new edge category types", () => {
     from: { kind: "node", nodeId: inquiry.nodeId },
     toNodeId: compare.nodeId,
     trigger: "编辑连线详情",
-    type: "navigate"
+    type: "interaction"
   });
 
   updateFlowEdgeDetails(flow, edge.edgeId, {

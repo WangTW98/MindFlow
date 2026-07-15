@@ -1,0 +1,4 @@
+interface:
+  display_name: "MindFlow Task Orchestrator"
+  short_description: "Create and resume partitioned MindFlow analysis tasks"
+  default_prompt: "Create or resume a partitioned MindFlow task and continue from its recorded next action."

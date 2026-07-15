@@ -11,7 +11,7 @@ export function ensureAppSurfaceEntryEdges(flow: ProductFlow): EnsureAppSurfaceE
   const activeEdges = flow.edges.filter((edge) => edge.status === "active");
 
   for (const surface of flow.appSurfaces ?? []) {
-    const entryNode = selectEntryNodeForSurface(surface, activeNodes, activeEdges);
+    const entryNode = selectEntryNodeForSurface(surface, activeNodes);
     if (!entryNode) {
       continue;
     }
@@ -36,46 +36,11 @@ export function ensureAppSurfaceEntryEdges(flow: ProductFlow): EnsureAppSurfaceE
   return { addedEdgeIds };
 }
 
-function selectEntryNodeForSurface(surface: AppSurface, activeNodes: PageNode[], activeEdges: FlowEdge[]): PageNode | undefined {
-  const surfaceNodes = activeNodes.filter((node) => (node.appSurfaceIds ?? []).includes(surface.appId));
-  if (surfaceNodes.length === 0) {
-    return undefined;
-  }
-  const candidates = surfaceNodes.filter((node) => !hasSameSurfaceIncoming(node, surface.appId, activeNodes, activeEdges));
-  const pool = candidates.length > 0 ? candidates : surfaceNodes;
-  return [...pool].sort((left, right) => scoreEntryNode(surface, right) - scoreEntryNode(surface, left))[0];
-}
-
-function hasSameSurfaceIncoming(node: PageNode, appId: string, activeNodes: PageNode[], activeEdges: FlowEdge[]): boolean {
-  return activeEdges.some((edge) => {
-    if (edge.toNodeId !== node.nodeId || edge.from.kind === "appSurface") {
-      return false;
-    }
-    const fromNode = activeNodes.find((candidate) => candidate.nodeId === edge.fromNodeId);
-    return (fromNode?.appSurfaceIds ?? []).includes(appId);
-  });
-}
-
-function scoreEntryNode(surface: AppSurface, node: PageNode): number {
-  const text = `${node.title} ${node.pageType} ${node.purpose}`.toLowerCase();
-  let score = 0;
-  if (node.title.includes(surface.name)) {
-    score += 50;
-  }
-  if (/首页|主页|工作台|待办|列表|home|dashboard|workspace|inbox|entry/.test(text)) {
-    score += 40;
-  }
-  if (node.pageType === "home") {
-    score += 35;
-  } else if (node.pageType === "workspace") {
-    score += 30;
-  } else if (node.pageType === "list") {
-    score += 20;
-  }
-  if ((node.appSurfaceIds ?? []).length === 1) {
-    score += 10;
-  }
-  return score;
+function selectEntryNodeForSurface(surface: AppSurface, activeNodes: PageNode[]): PageNode | undefined {
+  const skeletons = activeNodes.filter((node) =>
+    node.pageType === "skeleton" && (node.appSurfaceIds ?? []).includes(surface.appId)
+  );
+  return skeletons.length === 1 ? skeletons[0] : undefined;
 }
 
 function createAppSurfaceEntryEdge(surface: AppSurface, node: PageNode): FlowEdge {
@@ -89,7 +54,7 @@ function createAppSurfaceEntryEdge(surface: AppSurface, node: PageNode): FlowEdg
     to: { kind: "node", nodeId: node.nodeId },
     action: trigger,
     trigger,
-    type: "navigate",
+    type: "nestedRelation",
     appSurfaceIds: [surface.appId],
     domainIds: mergeUnique(surface.domainIds, node.domainIds),
     roleIds: mergeUnique(surface.roleIds, node.roleIds)

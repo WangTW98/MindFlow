@@ -1,8 +1,21 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
 import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
-import { applyFlowOperation, applyFlowOperations } from "../src/product-flow/application/operations";
+import { applyFlowOperation, applyFlowOperations, repairFlowReferencesBeforeSave } from "../src/product-flow/application/operations";
+import { createFlowNode } from "../src/product-flow/domain/editing/graph";
 import { validateProductFlow } from "../src/product-flow/domain";
+
+test("save repair adds an app entry only for its unique skeleton", () => {
+  const flow = createEmptyProductFlow();
+  flow.appSurfaces = [{ appId: "app_admin", name: "管理后台", type: "admin", description: "后台", domainIds: [], roleIds: [] }];
+  const skeleton = createFlowNode(flow, { title: "后台骨架", pageType: "skeleton", appSurfaceIds: ["app_admin"] });
+
+  repairFlowReferencesBeforeSave(flow);
+
+  const entry = flow.edges.find((edge) => edge.from.kind === "appSurface");
+  assert.equal(entry?.to.nodeId, skeleton.nodeId);
+  assert.equal(entry?.type, "nestedRelation");
+});
 
 test("Flow operations edit root, taxonomy, nodes, app surfaces, and edges", () => {
   const flow = createEmptyProductFlow();
@@ -88,7 +101,7 @@ test("Flow operations edit root, taxonomy, nodes, app surfaces, and edges", () =
       from: { kind: "projectOverview", nodeId: "projectOverview" },
       to: { kind: "node", nodeId: created.node.nodeId },
       trigger: "进入工作台",
-      type: "navigate"
+      type: "interaction"
     }
   });
   assert.equal(edge.type, "edge.upsert");
@@ -96,7 +109,7 @@ test("Flow operations edit root, taxonomy, nodes, app surfaces, and edges", () =
     throw new Error("Expected edge.upsert result.");
   }
   assert.equal(edge.mode, "created");
-  assert.equal(edge.edge.type, "navigate");
+  assert.equal(edge.edge.type, "interaction");
 
   const duplicate = applyFlowOperation(flow, {
     type: "edge.upsert",
@@ -104,7 +117,7 @@ test("Flow operations edit root, taxonomy, nodes, app surfaces, and edges", () =
       from: { kind: "projectOverview", nodeId: "projectOverview" },
       to: { kind: "node", nodeId: created.node.nodeId },
       trigger: "更新入口",
-      type: "navigate"
+      type: "interaction"
     }
   });
   assert.equal(duplicate.type, "edge.upsert");
@@ -121,7 +134,7 @@ test("Flow operations edit root, taxonomy, nodes, app surfaces, and edges", () =
         from: { kind: "projectOverview", nodeId: "projectOverview" },
         to: { kind: "node", nodeId: created.node.nodeId },
         trigger: "冲突入口",
-        type: "submit"
+        type: "dataFlow"
       }
     }),
     /duplicate endpoints/

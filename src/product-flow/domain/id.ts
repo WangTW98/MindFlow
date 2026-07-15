@@ -53,7 +53,3 @@ export function makeFeatureItemId(name: string, seed: string): string {
 export function makeActionId(label: string, seed: string): string {
   return `act_${slugify(label, "action")}_${shortHash(seed, 6)}`;
 }
-
-export function stableKey(...parts: string[]): string {
-  return shortHash(parts.join("::"), 12);
-}

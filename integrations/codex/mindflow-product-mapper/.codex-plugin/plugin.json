@@ -1,0 +1,19 @@
+{
+  "name": "mindflow-product-mapper",
+  "version": "0.1.0",
+  "description": "Analyze documents or code in resumable partitions and author validated MindFlow canvases through the local VS Code extension.",
+  "author": {
+    "name": "MindFlow"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "MindFlow Product Mapper",
+    "shortDescription": "Map documents and code to resumable MindFlow canvases.",
+    "longDescription": "Adds a partitioned analysis workflow, strict MindFlow authoring skills, and automatic discovery of an active MindFlow VS Code MCP session.",
+    "developerName": "MindFlow",
+    "category": "Productivity",
+    "capabilities": ["skills", "mcp"],
+    "defaultPrompt": "Create or resume a MindFlow task, complete partitioned analysis and synthesis, then dry-run and generate the canvas in bounded validated batches."
+  },
+  "mcpServers": "./.mcp.json"
+}

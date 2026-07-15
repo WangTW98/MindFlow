@@ -2,14 +2,34 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import type { FlowSelectionPatch } from "../../../product-flow/domain/selection";
 import type { ProductFlow } from "../../../product-flow/domain";
+import { createEmptyProductFlow } from "../../../product-flow/domain/model/factory";
 import { parseProductFlowText } from "../../../product-flow/domain/serialization/codec";
 import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../../mcp/protocol/bridge";
 import { applyFlowDocumentEdit } from "../documents/flowDocumentService";
-import { flowDisplayName, normalizeFlowUri } from "../documents/flowUri";
+import { flowDisplayName, normalizeFlowUri, resolveInputFlowPath } from "../documents/flowUri";
+import { createUntitledMindFlowDocumentOptions } from "../documents/untitledMindFlowDocument";
+import { loadMindFlowFile } from "../documents/flowDocumentService";
+import { rememberUntitledFlow } from "../state/activeFlowState";
 import { FlowPanel } from "../editor/canvas/FlowPanel";
 
 export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
   public constructor(private readonly extensionUri: vscode.Uri) {}
+
+  public async createFlow(title?: string): Promise<MindFlowEditorSnapshot> {
+    const flow = createEmptyProductFlow(title?.trim() || undefined);
+    const document = await vscode.workspace.openTextDocument(createUntitledMindFlowDocumentOptions(flow));
+    rememberUntitledFlow(document.uri);
+    await vscode.commands.executeCommand("vscode.openWith", document.uri, FlowPanel.viewType);
+    return this.readSnapshot(document.uri, true);
+  }
+
+  public async openFlow(flowPath: string): Promise<MindFlowEditorSnapshot> {
+    const resolvedPath = resolveInputFlowPath(flowPath);
+    const flow = await loadMindFlowFile(resolvedPath);
+    const uri = vscode.Uri.file(resolvedPath);
+    FlowPanel.createOrShow(this.extensionUri, flow, uri);
+    return this.readSnapshot(uri, true);
+  }
 
   public async getOpenEditors(): Promise<MindFlowEditorSnapshot[]> {
     return Promise.all(FlowPanel.getOpenEditorSessions().map((session) => this.readSnapshot(session.uri, session.active)));

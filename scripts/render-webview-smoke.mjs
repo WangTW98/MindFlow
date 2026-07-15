@@ -101,11 +101,9 @@ function createSmokeFlow() {
     nodes: [
       {
         nodeId: "node_workbench",
-        stableKey: "smoke-workbench",
         status: "active",
-        version: 1,
         title: "运营工作台",
-        pageType: "workspace",
+        pageType: "page",
         appSurfaceIds: ["app_admin"],
         statusGroupId: "status_review",
         domainIds: ["domain_ops"],
@@ -130,8 +128,6 @@ function createSmokeFlow() {
         actions: [
           { actionId: "act_create", label: "新建按钮", type: "user", result: "进入新建页面。" }
         ],
-        states: [{ stateId: "state_default", name: "默认态", description: "正常加载。" }],
-        exceptions: [{ exceptionId: "ex_default", name: "异常处理", handling: "提示重试。" }],
         inputs: [],
         outputs: [],
         permissions: ["role_operator"],
@@ -139,11 +135,9 @@ function createSmokeFlow() {
       },
       {
         nodeId: "node_create",
-        stableKey: "smoke-create",
         status: "active",
-        version: 1,
         title: "配置新建页",
-        pageType: "form",
+        pageType: "page",
         appSurfaceIds: ["app_admin"],
         domainIds: ["domain_ops"],
         roleIds: ["role_operator"],
@@ -167,8 +161,6 @@ function createSmokeFlow() {
         actions: [
           { actionId: "act_submit", label: "提交按钮", type: "user", result: "提交配置。" }
         ],
-        states: [{ stateId: "state_form", name: "默认态", description: "表单可编辑。" }],
-        exceptions: [{ exceptionId: "ex_form", name: "校验失败", handling: "提示字段错误。" }],
         inputs: [],
         outputs: [],
         permissions: ["role_operator"],
@@ -185,7 +177,7 @@ function createSmokeFlow() {
         to: { kind: "node", nodeId: "node_workbench" },
         action: "进入后台",
         trigger: "进入后台",
-        type: "navigate",
+        type: "nestedRelation",
         appSurfaceIds: ["app_admin"],
         domainIds: ["domain_ops"],
         roleIds: ["role_operator"]

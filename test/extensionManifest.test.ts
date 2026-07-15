@@ -22,7 +22,7 @@ import { parseWebviewMessage } from "../src/platform/webview/protocol/flowWebvie
 import { MINDFLOW_STDIO_PROXY_RELATIVE_PATH } from "../src/platform/mcp/protocol/stdioProxyPath";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
-test("Extension manifest contributes standalone .mindflow editor, sidebar, and MCP config command", async () => {
+test("Extension manifest contributes standalone .mindflow editor, sidebar, and automatic MCP startup", async () => {
   const raw = await fs.readFile(path.join(process.cwd(), "package.json"), "utf8");
   const manifest = JSON.parse(raw) as {
     activationEvents?: string[];
@@ -56,8 +56,7 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and M
     "mindflow.newFlow",
     "mindflow.openFlow",
     "mindflow.saveFlowAs",
-    "mindflow.validateFlowJson",
-    "mindflow.copyMcpConfig"
+    "mindflow.validateFlowJson"
   ]);
   assert.equal(
     manifest.contributes?.keybindings?.some((item) => item.command === "mindflow.saveFlowAs" && item.mac === "cmd+s") ?? false,
@@ -69,5 +68,5 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and M
   const removedScriptPrefix = ["m", "c", "p"].join("") + ":";
   assert.equal(Object.keys(manifest.scripts ?? {}).some((script) => script.startsWith(removedScriptPrefix)), false);
   assert.equal(manifest.activationEvents?.includes("onStartupFinished"), true);
-  assert.equal(manifest.activationEvents?.includes("onCommand:mindflow.copyMcpConfig"), true);
+  assert.equal(manifest.activationEvents?.includes("onCommand:mindflow.copyMcpConfig"), false);
 });

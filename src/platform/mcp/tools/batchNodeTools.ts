@@ -3,7 +3,7 @@ import type { FlowOperation } from "../../../product-flow/application/operations
 import type { MindFlowEditorBridge } from "../protocol/bridge";
 import { batchSelectionPatch, resultNodes, snapshotToPayload } from "./payloads";
 import { readOptionalBoolean, readOptionalString, readOptionalStringArray, requireStringEither, stripUndefined } from "./readers";
-import { edgeTouchesAnyNode, nodeMatchesFilters, nodeUpsertOperations, readNodeDetailsPatch, readNodeKind, readRequiredPosition, readStatuses } from "./toolInputReaders";
+import { edgeTouchesAnyNode, nodeMatchesFilters, nodeUpsertOperations, readNodeDetailsPatch, readRequiredPosition, readStatuses } from "./toolInputReaders";
 import type { McpToolActions } from "./registry";
 import type { McpFlowEditRunner } from "./editRunner";
 
@@ -34,7 +34,7 @@ export function createBatchNodeToolActions(
       };
     },
     batchUpsertNodes: (input) => runner.batchEditNodes(input, (flow, items) => ({
-      operations: items.flatMap((item) => nodeUpsertOperations(flow, item, readNodeKind(item))),
+      operations: items.flatMap((item) => nodeUpsertOperations(flow, item)),
       result: (results) => ({ nodes: resultNodes(results) }),
       selection: (results) => batchSelectionPatch(resultNodes(results), true)
     })),

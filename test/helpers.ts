@@ -64,6 +64,23 @@ export function createProcurementFlow(options: { includeAppSurfaceEntryEdges?: b
     }
   ];
 
+  addNode(flow, "管理后台骨架", "skeleton", ["app_admin"], ["domain_plan", "domain_sourcing", "domain_contract_archive", "domain_admin"], ["role_buyer", "role_purchase_manager", "role_finance", "role_system_admin"], "承载管理后台顶栏、导航和内容区域。", [
+    ["左侧主导航", "navigation", "连接管理后台主导航。"],
+    ["内容区域", "content", "承载后台业务页面。"]
+  ]);
+  addNode(flow, "供应商门户骨架", "skeleton", ["app_supplier_portal"], ["domain_supplier", "domain_contract_archive"], ["role_supplier_sales", "role_supplier_admin"], "承载供应商门户品牌栏、任务导航和正文。", [
+    ["任务导航", "navigation", "连接供应商任务导航。"],
+    ["正文区域", "content", "承载供应商业务页面。"]
+  ]);
+  addNode(flow, "移动审批骨架", "skeleton", ["app_mobile_approval"], ["domain_mobile_approval"], ["role_purchase_manager", "role_finance", "role_general_manager"], "承载移动审批顶栏、内容和底部导航。", [
+    ["底部导航", "navigation", "连接移动底部导航。"],
+    ["内容区域", "content", "承载移动审批页面。"]
+  ]);
+  addNode(flow, "公开网站骨架", "skeleton", ["app_public_site"], ["domain_public"], ["role_guest_supplier"], "承载公开网站页头、导航、正文和页脚。", [
+    ["公开导航", "navigation", "连接公开网站导航。"],
+    ["正文区域", "content", "承载公开采购页面。"]
+  ]);
+
   const workbenchNode = addNode(flow, "采购工作台", "workspace", ["app_admin"], ["domain_plan", "domain_sourcing"], ["role_buyer"], "采购专员查看需求池、待处理计划、报价和审批状态。", [
     ["需求池列表", "table", "展示待采购需求。"],
     ["新建计划按钮", "button", "进入采购计划新建页。"],
@@ -149,22 +166,22 @@ export function createProcurementFlow(options: { includeAppSurfaceEntryEdges?: b
     };
   });
 
-  createFlowEdge(flow, { from: { kind: "node", nodeId: workbenchNode.nodeId }, toNodeId: planNode.nodeId, trigger: "新建采购计划", type: "create" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: planNode.nodeId }, toNodeId: inquiryNode.nodeId, trigger: "提交采购计划", type: "submit" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: inquiryNode.nodeId }, toNodeId: supplierHomeNode.nodeId, trigger: "发布询价", type: "submit" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: supplierHomeNode.nodeId }, toNodeId: quoteNode.nodeId, trigger: "进入报价", type: "navigate" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: quoteNode.nodeId }, toNodeId: compareNode.nodeId, trigger: "提交报价", type: "submit" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: compareNode.nodeId }, toNodeId: approvalStartNode.nodeId, trigger: "生成比价报告", type: "create" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: compareNode.nodeId }, toNodeId: planNode.nodeId, trigger: "回看采购计划", type: "navigate" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: approvalStartNode.nodeId }, toNodeId: mobileTodoNode.nodeId, trigger: "发起审批", type: "submit" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: mobileTodoNode.nodeId }, toNodeId: mobileDetailNode.nodeId, trigger: "查看审批详情", type: "navigate" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: mobileDetailNode.nodeId }, toNodeId: contractNode.nodeId, trigger: "审批通过", type: "approve" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: mobileDetailNode.nodeId }, toNodeId: inquiryNode.nodeId, trigger: "退回修改", type: "reject" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: contractNode.nodeId }, toNodeId: supplierContractNode.nodeId, trigger: "发送供应商确认", type: "submit" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: supplierContractNode.nodeId }, toNodeId: archiveNode.nodeId, trigger: "供应商确认", type: "submit" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: publicListNode.nodeId }, toNodeId: registerNode.nodeId, trigger: "提交注册", type: "create" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: registerNode.nodeId }, toNodeId: supplierReviewNode.nodeId, trigger: "注册申请提交", type: "submit" });
-  createFlowEdge(flow, { from: { kind: "node", nodeId: supplierReviewNode.nodeId }, toNodeId: supplierHomeNode.nodeId, trigger: "审核通过开通门户", type: "approve" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: workbenchNode.nodeId }, toNodeId: planNode.nodeId, trigger: "新建采购计划", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: planNode.nodeId }, toNodeId: inquiryNode.nodeId, trigger: "提交采购计划", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: inquiryNode.nodeId }, toNodeId: supplierHomeNode.nodeId, trigger: "发布询价", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: supplierHomeNode.nodeId }, toNodeId: quoteNode.nodeId, trigger: "进入报价", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: quoteNode.nodeId }, toNodeId: compareNode.nodeId, trigger: "提交报价", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: compareNode.nodeId }, toNodeId: approvalStartNode.nodeId, trigger: "生成比价报告", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: compareNode.nodeId }, toNodeId: planNode.nodeId, trigger: "回看采购计划", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: approvalStartNode.nodeId }, toNodeId: mobileTodoNode.nodeId, trigger: "发起审批", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: mobileTodoNode.nodeId }, toNodeId: mobileDetailNode.nodeId, trigger: "查看审批详情", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: mobileDetailNode.nodeId }, toNodeId: contractNode.nodeId, trigger: "审批通过", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: mobileDetailNode.nodeId }, toNodeId: inquiryNode.nodeId, trigger: "退回修改", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: contractNode.nodeId }, toNodeId: supplierContractNode.nodeId, trigger: "发送供应商确认", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: supplierContractNode.nodeId }, toNodeId: archiveNode.nodeId, trigger: "供应商确认", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: publicListNode.nodeId }, toNodeId: registerNode.nodeId, trigger: "提交注册", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: registerNode.nodeId }, toNodeId: supplierReviewNode.nodeId, trigger: "注册申请提交", type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: supplierReviewNode.nodeId }, toNodeId: supplierHomeNode.nodeId, trigger: "审核通过开通门户", type: "interaction" });
 
   if (options.includeAppSurfaceEntryEdges !== false) {
     ensureAppSurfaceEntryEdges(flow);
@@ -185,13 +202,22 @@ function addNode(
 ): PageNode {
   return createFlowNode(flow, {
     title,
-    pageType,
+    pageType: normalizePageType(pageType),
     appSurfaceIds,
     domainIds,
     roleIds,
     purpose,
     featureGroups: featureGroups(title, items)
   });
+}
+
+function normalizePageType(pageType: string): "skeleton" | "navigation" | "page" | "popup" | "component" {
+  if (pageType === "skeleton" || pageType === "navigation" || pageType === "page" || pageType === "popup" || pageType === "component") return pageType;
+  if (pageType === "layout" || pageType === "shell") return "skeleton";
+  if (pageType === "nav" || pageType === "menu") return "navigation";
+  if (pageType === "modal" || pageType === "dialog") return "popup";
+  if (pageType === "component" || pageType === "widget") return "component";
+  return "page";
 }
 
 function featureGroups(title: string, specs: Array<[string, string, string]>): FeatureGroup[] {
@@ -241,7 +267,7 @@ export function assertNoLegacyFields(flow: ProductFlow): void {
   }
   for (const node of flow.nodes) {
     const nodeRecord = node as unknown as Record<string, unknown>;
-    for (const key of ["sourceRefs", "artifacts", "createdByChangeSetId", "updatedByChangeSetId", "removedByChangeSetId", "confidence"]) {
+    for (const key of ["stableKey", "version", "replacementNodeIds", "states", "exceptions", "sourceRefs", "artifacts", "createdByChangeSetId", "updatedByChangeSetId", "removedByChangeSetId", "confidence"]) {
       assert.equal(key in nodeRecord, false, `Unexpected legacy node field ${key}`);
     }
   }
@@ -266,7 +292,12 @@ export function assertNoLegacyKeysInJson(json: string): void {
     "createdByChangeSetId",
     "updatedByChangeSetId",
     "removedByChangeSetId",
-    "confidence"
+    "confidence",
+    "stableKey",
+    "version",
+    "replacementNodeIds",
+    "states",
+    "exceptions"
   ]) {
     assert.equal(json.includes(`"${key}"`), false, `Serialized flow still contains ${key}`);
   }

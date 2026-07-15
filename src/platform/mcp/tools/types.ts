@@ -1,14 +1,16 @@
 import type { FlowSelectionPatch } from "../../../product-flow/domain/selection";
 import type { FlowOperation, FlowOperationResult } from "../../../product-flow/application/operations";
-import type { ProductFlow } from "../../../product-flow/domain";
+import { NODE_PAGE_TYPES, type NodePageType, type ProductFlow } from "../../../product-flow/domain";
 import type { McpToolResult } from "./registry";
 
-export const MCP_NODE_KINDS = ["layout", "navigation", "page", "popup", "component"] as const;
-export type McpNodeKind = typeof MCP_NODE_KINDS[number];
+export const MCP_NODE_PAGE_TYPES = NODE_PAGE_TYPES;
+export type McpNodePageType = NodePageType;
 
 export interface IdMaps {
   nodes: Map<string, string>;
   appSurfaces: Map<string, string>;
+  featureGroups?: Map<string, string>;
+  featureItems?: Map<string, string>;
 }
 
 export interface BuiltMcpEdit {

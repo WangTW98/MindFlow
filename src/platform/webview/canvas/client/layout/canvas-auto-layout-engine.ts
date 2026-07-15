@@ -490,10 +490,10 @@ function autoLayoutNormalizeEdgeType(type) {
   if (type === "statusChange") {
     return "statusChange";
   }
-  if (type === "autoNavigate" || type === "navigate" || type === "branch") {
+  if (type === "autoNavigate") {
     return "autoNavigate";
   }
-  if (type === "dataFlow" || type === "system") {
+  if (type === "dataFlow") {
     return "dataFlow";
   }
   return "interaction";

@@ -80,6 +80,7 @@
   overflow: hidden;
   color: var(--muted);
   line-height: 1.42;
+  white-space: pre-line;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
