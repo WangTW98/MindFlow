@@ -1,9 +1,5 @@
-// @ts-nocheck
-function readIdSelection(value, legacyValue) {
-  if (Array.isArray(value)) {
-    return uniqueStringIds(value);
-  }
-  return typeof legacyValue === "string" && legacyValue.trim() ? [legacyValue.trim()] : [];
+function readIdSelection(value) {
+  return Array.isArray(value) ? uniqueStringIds(value) : [];
 }
 
 function uniqueStringIds(value) {

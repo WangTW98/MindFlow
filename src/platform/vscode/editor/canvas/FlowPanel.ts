@@ -46,10 +46,12 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
 
   public static setSelection(flowUri: vscode.Uri | string, selection: FlowSelectionPatch): void {
     FlowPanel.selections.set(flowUri, selection);
+    FlowPanel.registry.applySelection(flowUri, FlowPanel.selections.get(flowUri));
   }
 
   public static updateSelection(flowUri: vscode.Uri | string, patch: FlowSelectionPatch): void {
     FlowPanel.selections.update(flowUri, patch);
+    FlowPanel.registry.applySelection(flowUri, FlowPanel.selections.get(flowUri));
   }
 
   public static getActiveFlowUri(): vscode.Uri | undefined {
@@ -58,6 +60,10 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
 
   public static getOpenEditorSessions(): OpenFlowEditorSession[] {
     return FlowPanel.registry.getOpenEditorSessions();
+  }
+
+  public static hasOpenEditor(flowUri: vscode.Uri): boolean {
+    return FlowPanel.registry.hasSession(flowUri);
   }
 
   private constructor(
@@ -106,8 +112,9 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
       changeListener.dispose();
       viewStateListener?.dispose();
       disposeListener.dispose();
-      FlowPanel.registry.remove(document.uri, session);
-      FlowPanel.selections.delete(document.uri);
+      if (FlowPanel.registry.remove(document.uri, session)) {
+        FlowPanel.selections.delete(document.uri);
+      }
     });
 
     session.renderFromDocument(document);

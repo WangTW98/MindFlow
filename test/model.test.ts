@@ -12,13 +12,13 @@ import { applyTaxonomyRequest } from "../src/product-flow/domain/editing/taxonom
 import { deleteAppSurface, pruneMissingAppSurfaceReferences } from "../src/product-flow/domain/editing/taxonomy/referenceCleanup";
 import { MINDFLOW_FILE_EXTENSION, MINDFLOW_LANGUAGE_ID, createUntitledMindFlowDocumentOptions, createUntitledMindFlowFileName } from "../src/platform/vscode/documents/untitledMindFlowDocument";
 import { EDGE_TYPES, validateProductFlow } from "../src/product-flow/domain";
-import { parseProductFlowText, serializeProductFlow } from "../src/product-flow/domain/serialization/codec";
+import { parseProductFlowText } from "../src/product-flow/domain/serialization/codec";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/product-flow/infrastructure/persistence/flowRepository";
 import { RecentFlowStore } from "../src/platform/vscode/state/recentFlows";
 import { recordEdgeDetailsRevision } from "../src/platform/vscode/editor/canvas/flowMessageOrdering";
 import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/platform/vscode/editor/canvas/webviewShellHtml";
 import { parseWebviewMessage } from "../src/platform/webview/protocol/flowWebviewMessages";
-import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
+import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
 test("real-provider fixture creates a valid ProductFlow with app-surface entry edges", () => {
   const flow = createProcurementFlow();
@@ -39,7 +39,6 @@ test("Empty ProductFlow starts as a valid blank canvas", () => {
   const validation = validateProductFlow(flow);
 
   assert.equal(validation.valid, true, validation.errors.join("\n"));
-  assert.equal(flow.schemaVersion, "2.0");
   assert.equal(flow.nodes.length, 0);
   assert.equal(flow.edges.length, 0);
   assert.equal(flow.projectOverview.summary, "Manually created blank MindFlow.");
@@ -78,6 +77,42 @@ test("ProductFlow validation rejects invalid enums and stale references", () => 
   assert.ok(validation.errors.some((error) => error.includes("references missing domain missing_domain")));
 });
 
+test("ProductFlow validation rejects empty required values and broken graph references", () => {
+  const flow = createEmptyProductFlow();
+  flow.title = "   ";
+  flow.createdAt = "not-an-iso-date";
+  const source = createFlowNode(flow, { title: "来源页" });
+  const removed = createFlowNode(flow, { title: "已删除页" });
+  removed.status = "removed";
+  removed.removedAt = new Date().toISOString();
+  source.replacementNodeIds = [source.nodeId, "missing_replacement"];
+  source.featureGroups[0]!.actions = [{
+    actionId: "action_missing_target",
+    label: "打开不存在页面",
+    type: "user",
+    targetNodeId: "missing_target"
+  }];
+  const edge = createFlowEdge(flow, {
+    from: { kind: "node", nodeId: source.nodeId },
+    to: { kind: "node", nodeId: removed.nodeId },
+    type: "interaction"
+  });
+  edge.domainIds = ["missing_domain"];
+  (source as unknown as Record<string, unknown>).obsoleteField = true;
+
+  const validation = validateProductFlow(flow);
+
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((error) => error.includes("title must be a non-empty string")));
+  assert.ok(validation.errors.some((error) => error.includes("createdAt must be a valid ISO date")));
+  assert.ok(validation.errors.some((error) => error.includes("replacementNodeIds cannot reference the node itself")));
+  assert.ok(validation.errors.some((error) => error.includes("missing_replacement")));
+  assert.ok(validation.errors.some((error) => error.includes("missing_target")));
+  assert.ok(validation.errors.some((error) => error.includes("references removed node")));
+  assert.ok(validation.errors.some((error) => error.includes("domainIds must be derived")));
+  assert.ok(validation.errors.some((error) => error.includes("obsoleteField is not supported")));
+});
+
 test("ProductFlow validation catches duplicate ids, invalid views, and endpoint references", () => {
   const flow = createEmptyProductFlow();
   flow.domains = [
@@ -112,20 +147,18 @@ test("ProductFlow validation catches duplicate ids, invalid views, and endpoint 
   assert.ok(validation.errors.some((error) => error.includes("nodes[0].view.position.y must be a number.")));
   assert.ok(validation.errors.some((error) => error.includes("edges[0].from.groupId references missing feature group missing_group")));
   assert.ok(validation.errors.some((error) => error.includes("edges[0].to.groupId references missing feature group missing_group")));
-  assert.ok(validation.warnings.some((warning) => warning.includes("nodes[0].statusGroupId references missing status group missing_status.")));
+  assert.ok(validation.errors.some((error) => error.includes("nodes[0].statusGroupId references missing status group missing_status.")));
 });
 
-test("Legacy ProductFlow missing projectOverview can be backfilled", () => {
+test("ProductFlow missing projectOverview is rejected without backfill", () => {
   const flow = createEmptyProductFlow();
   delete (flow as unknown as { projectOverview?: unknown }).projectOverview;
 
-  const result = ensureProjectOverview(flow);
   const validation = validateProductFlow(flow);
 
-  assert.equal(result.changed, true);
-  assert.equal(flow.projectOverview.summary, "Manually created blank MindFlow.");
-  assert.equal(flow.projectOverview.goal, "");
-  assert.equal(validation.valid, true, validation.errors.join("\n"));
+  assertThrows(() => ensureProjectOverview(flow), /projectOverview is required/);
+  assert.equal(validation.valid, false);
+  assert.equal("projectOverview" in flow, false);
 });
 
 test("Project overview details update local project metadata", () => {
@@ -156,35 +189,12 @@ test("Blank MindFlow creates valid untitled document content and a .mindflow fil
   assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
 
-test("ProductFlow codec migrates legacy generation fields to local v2", () => {
+test("ProductFlow codec rejects obsolete fields without rewriting input", () => {
   const legacy = createProcurementFlow();
   const legacyRecord = legacy as unknown as Record<string, unknown>;
-  const legacyNode = legacy.nodes[0] as unknown as Record<string, unknown>;
-  const legacyEdge = legacy.edges[0] as unknown as Record<string, unknown>;
-
-  legacyRecord.schemaVersion = "1.0";
   legacyRecord.sourceDocumentId = "samples/example-requirements.md";
-  legacyRecord.sourceSummary = "旧版文档摘要";
-  legacyRecord.projectOverview = { summary: "", goal: "" };
-  legacyRecord.artifacts = { prds: [], pencils: [] };
-  legacyRecord.changeHistory = [];
-  legacyRecord.syncState = { issues: [] };
-  legacyRecord.productDesignIssues = [{ issueId: "pdi_legacy", severity: "warning", title: "旧问题", description: "旧问题", prompt: "旧提示" }];
-  legacyRecord.openQuestions = ["旧问题"];
-  legacyNode.sourceRefs = [{ sourceId: "legacy", label: "legacy" }];
-  legacyNode.artifacts = { prdIds: ["prd_legacy"], pencilIds: ["pencil_legacy"] };
-  legacyNode.updatedByChangeSetId = "manual";
-  legacyNode.confidence = 1;
-  legacyEdge.sourceRefs = [{ sourceId: "legacy", label: "legacy" }];
-  legacyEdge.removedByChangeSetId = "manual";
-  legacyEdge.confidence = 1;
+  const original = `${JSON.stringify(legacyRecord, null, 2)}\n`;
 
-  const result = parseProductFlowText(`${JSON.stringify(legacyRecord, null, 2)}\n`, "legacy flow");
-
-  assert.equal(result.migrated, true);
-  assert.equal(result.flow.schemaVersion, "2.0");
-  assert.equal(result.flow.projectOverview.summary, "旧版文档摘要");
-  assert.equal(result.validation.valid, true);
-  assertNoLegacyFields(result.flow);
-  assertNoLegacyKeysInJson(serializeProductFlow(result.flow));
+  assertThrows(() => parseProductFlowText(original, "obsolete flow"), /sourceDocumentId/);
+  assert.equal(`${JSON.stringify(legacyRecord, null, 2)}\n`, original);
 });

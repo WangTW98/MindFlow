@@ -36,6 +36,30 @@ test("MindFlow MCP tool schema names match registered handlers", () => {
   }
 });
 
+test("MindFlow MCP rejects arguments that do not match the advertised schema", async () => {
+  const handlers = new MindFlowMcpToolHandlers(new FakeBridge(createEmptyProductFlow()));
+
+  await assert.rejects(
+    () => handlers.callTool("mindflow_move_node", { nodeId: "node_1", x: Number.NaN, y: 10 }),
+    /finite number/
+  );
+  await assert.rejects(
+    () => handlers.callTool("mindflow_remove_node", { unexpected: "node_1" }),
+    /not allowed/
+  );
+  await assert.rejects(
+    () => handlers.callTool("mindflow_upsert_edge", {
+      from: { kind: "mystery", nodeId: "node_1" },
+      to: { kind: "node", nodeId: "node_2" }
+    }),
+    /oneOf schema/
+  );
+  await assert.rejects(
+    () => handlers.callTool("mindflow_batch_move_nodes", { nodes: [] }),
+    /at least 1/
+  );
+});
+
 test("MindFlow MCP editor state returns complete selection and hydrated selected entities", async () => {
   const flow = createEmptyProductFlow();
   flow.domains = [{ domainId: "domain_ops", name: "运营", description: "运营域。" }];
@@ -105,6 +129,16 @@ test("MindFlow MCP can set and clear complete selection state", async () => {
 
   const cleared = await handlers.callTool("mindflow_clear_selection", {});
   assert.deepEqual(cleared.selection, emptyFlowSelection());
+});
+
+test("MindFlow MCP edit responses are compact unless the caller requests the full flow", async () => {
+  const handlers = new MindFlowMcpToolHandlers(new FakeBridge(createEmptyProductFlow()));
+  const compact = await handlers.callTool("mindflow_update_root", { title: "Compact" });
+  const expanded = await handlers.callTool("mindflow_update_root", { title: "Expanded", includeFlow: true });
+
+  assert.equal("flow" in compact, false);
+  assert.ok(compact.change);
+  assert.ok(expanded.flow);
 });
 
 test("MindFlow MCP covers root, app surface, taxonomy, typed nodes, and edges", async () => {

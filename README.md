@@ -37,7 +37,7 @@ These commands are registered for the custom editor webview and are used by the 
 
 MindFlow writes ProductFlow schema version `2.0`. The current format keeps local editor state only: project overview, app surfaces, domains, roles, status groups, nodes, edges, and canvas positions.
 
-Older `.mindflow` files that contain removed generation, artifact, history, or source-tracking fields are migrated when opened. Saving writes the local `2.0` shape.
+MindFlow accepts only the current `.mindflow` structure. Unsupported or obsolete fields are rejected and files are never migrated or rewritten automatically.
 
 ## MCP
 
@@ -67,8 +67,7 @@ Press F5 in VS Code to launch the extension host.
 
 ```bash
 npm install
-npm run compile
-node scripts/package-vsix.mjs
+npm run package
 code --install-extension mindflow-canvas-editor-0.1.0.vsix --force
 ```
 

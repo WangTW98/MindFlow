@@ -28,7 +28,9 @@ export function applyDomainRequest(flow: ProductFlow, request: TaxonomyRequest):
   const next: BusinessDomain = {
     domainId,
     name,
-    description: readString(item.description, "")
+    description: item.description === undefined
+      ? existing?.description ?? ""
+      : readString(item.description, existing?.description ?? "")
   };
   upsertById(flow.domains, (item) => item.domainId, next);
 }

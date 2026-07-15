@@ -1,5 +1,6 @@
 import type { ProductFlow } from "../..";
 import { nowIso } from "../../id";
+import { refreshAllFlowEdgeDerivedState } from "../graph/edges";
 import { applyAppSurfaceRequest } from "./appSurfaces";
 import { applyDomainRequest } from "./domains";
 import { applyRoleRequest } from "./roles";
@@ -25,6 +26,7 @@ export function applyTaxonomyRequest(flow: ProductFlow, request: TaxonomyRequest
     default:
       throw new Error(`Unsupported taxonomy kind: ${String(request.kind)}`);
   }
+  refreshAllFlowEdgeDerivedState(flow);
   flow.revision += 1;
   flow.updatedAt = nowIso();
 }

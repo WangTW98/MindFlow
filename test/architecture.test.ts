@@ -75,14 +75,15 @@ test("webview client source is TypeScript and bundle output is outside src", asy
   const clientRoot = path.join(root, "src", "platform", "webview", "canvas", "client");
   const clientFiles = await listFiles(clientRoot);
   const clientTsFiles = clientFiles.filter((filePath) => filePath.endsWith(".ts"));
-  const sourceOrder = await fs.readFile(path.join(root, "scripts", "canvas-client-source-order.mjs"), "utf8");
   const buildSource = await fs.readFile(path.join(root, "scripts", "build-webview.mjs"), "utf8");
+  const clientSource = await readSources(clientRoot);
 
   assert.ok(clientTsFiles.length > 0);
   assert.deepEqual(clientFiles.filter((filePath) => filePath.endsWith(".js")), []);
   assert.equal(await pathExists(path.join(root, "src", "platform", "webview", "canvas", "manifest.mjs")), false);
-  assert.ok(sourceOrder.includes("platform/webview/canvas/client/"));
-  assert.equal(sourceOrder.includes("adapters/webview/canvas/runtime"), false);
+  assert.equal(clientSource.includes("@ts-nocheck"), false);
+  assert.ok(buildSource.includes("listTypeScriptSources"));
+  assert.equal(buildSource.includes("canvas-client-source-order"), false);
   assert.ok(buildSource.includes("\"out\", \"webview\", \"canvas\""));
   assert.equal(buildSource.includes("src\", \"adapters\", \"webview\", \"canvas\", \"media\", \"dist\""), false);
 });

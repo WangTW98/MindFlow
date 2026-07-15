@@ -1,4 +1,3 @@
-// @ts-nocheck
 function toggleEdgeTypePicker(trigger) {
   const picker = trigger.closest(".edge-type-picker");
   if (!picker) {

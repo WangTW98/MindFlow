@@ -1,5 +1,6 @@
 import type { FlowOperation, TaxonomyRequest } from "../../../../product-flow/application/operations";
 import type { EdgeType, FlowEndpoint, ProductFlow } from "../../../../product-flow/domain";
+import type { FlowSelectionState } from "../../../../product-flow/domain/selection";
 
 export type WebviewMessage =
   | { type: "flow.operation"; operation: FlowOperation }
@@ -30,6 +31,11 @@ export type WebviewMessage =
   | { type: "updateEdgeDetails"; edgeId: string; revision?: number; patch: Record<string, unknown> }
   | { type: "removeEdge"; edgeId: string }
   | { type: "updateTaxonomy"; request: TaxonomyRequest };
+
+export type FlowWebviewHostMessage =
+  | { type: "selectionChanged"; selection: FlowSelectionState }
+  | { type: "flowChanged"; flow: ProductFlow }
+  | { type: "commandResult"; ok: boolean; message: string; flow?: ProductFlow };
 
 export interface WebviewPosition {
   x: number;

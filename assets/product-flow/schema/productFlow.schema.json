@@ -3,8 +3,8 @@
   "$id": "https://mindflow.local/schema/productFlow.schema.json",
   "title": "ProductFlow",
   "type": "object",
+  "additionalProperties": false,
   "required": [
-    "schemaVersion",
     "flowId",
     "revision",
     "title",
@@ -13,11 +13,12 @@
     "projectOverview",
     "domains",
     "roles",
+    "appSurfaces",
+    "statusGroups",
     "nodes",
     "edges"
   ],
   "properties": {
-    "schemaVersion": { "type": "string", "const": "2.0" },
     "flowId": { "type": "string" },
     "revision": { "type": "number" },
     "title": { "type": "string" },
@@ -79,6 +80,7 @@
     },
     "position": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["x", "y"],
       "properties": {
         "x": { "type": "number" },
@@ -87,12 +89,14 @@
     },
     "view": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "position": { "$ref": "#/$defs/position" }
       }
     },
     "projectOverview": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["summary", "goal"],
       "properties": {
         "summary": { "type": "string" },
@@ -102,6 +106,7 @@
     },
     "domain": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["domainId", "name", "description"],
       "properties": {
         "domainId": { "type": "string" },
@@ -111,6 +116,7 @@
     },
     "role": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["roleId", "name", "description", "domainIds"],
       "properties": {
         "roleId": { "type": "string" },
@@ -121,6 +127,7 @@
     },
     "appSurface": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["appId", "name", "type", "description", "domainIds", "roleIds"],
       "properties": {
         "appId": { "type": "string" },
@@ -137,6 +144,7 @@
     },
     "statusGroup": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["statusGroupId", "title", "color"],
       "properties": {
         "statusGroupId": { "type": "string" },
@@ -150,6 +158,7 @@
     },
     "featureItem": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["itemId", "name", "type", "description"],
       "properties": {
         "itemId": { "type": "string" },
@@ -162,6 +171,7 @@
     },
     "action": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["actionId", "label", "type"],
       "properties": {
         "actionId": { "type": "string" },
@@ -174,6 +184,7 @@
     },
     "featureGroup": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["groupId", "name", "type", "description", "items"],
       "properties": {
         "groupId": { "type": "string" },
@@ -190,20 +201,9 @@
         }
       }
     },
-    "element": {
-      "type": "object",
-      "required": ["elementId", "name", "type", "description"],
-      "properties": {
-        "elementId": { "type": "string" },
-        "name": { "type": "string" },
-        "type": { "type": "string" },
-        "description": { "type": "string" },
-        "dataBinding": { "type": "string" },
-        "required": { "type": "boolean" }
-      }
-    },
     "state": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["stateId", "name", "description"],
       "properties": {
         "stateId": { "type": "string" },
@@ -213,6 +213,7 @@
     },
     "exception": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["exceptionId", "name", "handling"],
       "properties": {
         "exceptionId": { "type": "string" },
@@ -222,6 +223,7 @@
     },
     "node": {
       "type": "object",
+      "additionalProperties": false,
       "required": [
         "nodeId",
         "stableKey",
@@ -229,11 +231,11 @@
         "version",
         "title",
         "pageType",
+        "appSurfaceIds",
         "domainIds",
         "roleIds",
         "purpose",
-        "elements",
-        "actions",
+        "featureGroups",
         "states",
         "exceptions",
         "inputs",
@@ -256,14 +258,6 @@
           "type": "array",
           "items": { "$ref": "#/$defs/featureGroup" }
         },
-        "elements": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/element" }
-        },
-        "actions": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/action" }
-        },
         "states": {
           "type": "array",
           "items": { "$ref": "#/$defs/state" }
@@ -281,22 +275,62 @@
       }
     },
     "endpoint": {
-      "type": "object",
-      "required": ["kind", "nodeId"],
-      "properties": {
-        "kind": {
-          "type": "string",
-          "enum": ["appSurface", "projectOverview", "node", "featureGroup", "featureItem"]
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "nodeId"],
+          "properties": {
+            "kind": { "const": "projectOverview" },
+            "nodeId": { "const": "projectOverview" }
+          }
         },
-        "nodeId": { "type": "string" },
-        "appId": { "type": "string" },
-        "groupId": { "type": "string" },
-        "itemId": { "type": "string" }
-      }
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "nodeId", "appId"],
+          "properties": {
+            "kind": { "const": "appSurface" },
+            "nodeId": { "type": "string", "minLength": 1 },
+            "appId": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "nodeId"],
+          "properties": {
+            "kind": { "const": "node" },
+            "nodeId": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "nodeId", "groupId"],
+          "properties": {
+            "kind": { "const": "featureGroup" },
+            "nodeId": { "type": "string", "minLength": 1 },
+            "groupId": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "nodeId", "groupId", "itemId"],
+          "properties": {
+            "kind": { "const": "featureItem" },
+            "nodeId": { "type": "string", "minLength": 1 },
+            "groupId": { "type": "string", "minLength": 1 },
+            "itemId": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
     },
     "edge": {
       "type": "object",
-      "required": ["edgeId", "status", "fromNodeId", "toNodeId", "action", "type", "domainIds", "roleIds"],
+      "additionalProperties": false,
+      "required": ["edgeId", "status", "fromNodeId", "toNodeId", "from", "to", "action", "type", "appSurfaceIds", "domainIds", "roleIds"],
       "properties": {
         "edgeId": { "type": "string" },
         "status": { "$ref": "#/$defs/entityStatus" },

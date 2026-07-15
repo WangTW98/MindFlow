@@ -1,4 +1,3 @@
-// @ts-nocheck
 function bindFeatureEditor() {
   const editor = document.getElementById("featureEditor");
   const addGroup = document.getElementById("addFeatureGroup");
@@ -109,7 +108,7 @@ function reorderFeatureSortRow(pointerY) {
     return;
   }
   const selector = featureDrag.kind === "group" ? ".feature-edit-group" : ".feature-edit-item";
-  const siblings = Array.from(featureDrag.container.querySelectorAll(`:scope > ${selector}`))
+  const siblings: any[] = Array.from(featureDrag.container.querySelectorAll(`:scope > ${selector}`))
     .filter((item) => item !== featureDrag.row);
   const before = siblings.find((item) => {
     const rect = item.getBoundingClientRect();

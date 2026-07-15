@@ -257,7 +257,7 @@ test("Manual app surface card can be positioned and connected as a normal edge e
   assert.equal(edge.fromNodeId, surface.appId);
   assert.equal(edge.toNodeId, target.nodeId);
   assert.equal(edge.from?.kind, "appSurface");
-  assert.equal(edge.from?.appId, surface.appId);
+  assert.equal(edge.from.kind === "appSurface" ? edge.from.appId : undefined, surface.appId);
   assert.ok(edge.appSurfaceIds?.includes(surface.appId));
   assert.equal(validateProductFlow(flow).valid, true);
 });
@@ -293,24 +293,23 @@ test("Manual edge details update endpoints and new edge category types", () => {
     to: { kind: "featureItem", nodeId: quote.nodeId, groupId: quoteGroup.groupId, itemId: quoteItem.itemId },
     trigger: "报价触发规则",
     type: "dataFlow",
-    condition: "报价数据同步后可流转",
-    appSurfaceIds: ["app_admin", "app_supplier_portal"],
-    domainIds: ["domain_sourcing", "domain_supplier"],
-    roleIds: ["role_buyer", "role_supplier_sales"]
+    condition: "报价数据同步后可流转"
   });
 
   const updated = flow.edges.find((candidate) => candidate.edgeId === edge.edgeId);
   assert.equal(updated?.fromNodeId, inquiry.nodeId);
   assert.equal(updated?.toNodeId, quote.nodeId);
   assert.equal(updated?.from?.kind, "featureGroup");
-  assert.equal(updated?.from?.groupId, inquiryGroup.groupId);
+  assert.equal(updated?.from.kind === "featureGroup" ? updated.from.groupId : undefined, inquiryGroup.groupId);
   assert.equal(updated?.to?.kind, "featureItem");
-  assert.equal(updated?.to?.itemId, quoteItem.itemId);
+  assert.equal(updated?.to.kind === "featureItem" ? updated.to.itemId : undefined, quoteItem.itemId);
   assert.equal(updated?.trigger, "报价触发规则");
   assert.equal(updated?.action, "报价触发规则");
   assert.equal(updated?.type, "dataFlow");
   assert.equal(updated?.condition, "报价数据同步后可流转");
-  assert.equal(updated?.appSurfaceIds?.join(","), "app_admin,app_supplier_portal");
+  assert.deepEqual(updated?.appSurfaceIds, Array.from(new Set([...(inquiry.appSurfaceIds ?? []), ...(quote.appSurfaceIds ?? [])])));
+  assert.deepEqual(updated?.domainIds, Array.from(new Set([...inquiry.domainIds, ...quote.domainIds])));
+  assert.deepEqual(updated?.roleIds, Array.from(new Set([...inquiry.roleIds, ...quote.roleIds])));
 
   updateFlowEdgeDetails(flow, edge.edgeId, { type: "statusChange" });
   assert.equal(updated?.type, "statusChange");
@@ -393,8 +392,9 @@ test("Manual node feature group edits preserve parent-child hierarchy and derive
   const updated = flow.nodes.find((candidate) => candidate.nodeId === node.nodeId);
   assert.equal(updated?.featureGroups?.length, 2);
   assert.equal(updated?.featureGroups?.[1]?.items[0]?.name, "提交按钮");
-  assert.ok(updated?.elements.some((element) => element.name === "供应商名称"));
-  assert.ok(updated?.actions.some((action) => action.label === "提交按钮"));
+  assert.ok(updated?.featureGroups.some((group) => group.items.some((item) => item.name === "供应商名称")));
+  assert.equal("elements" in (updated as unknown as Record<string, unknown>), false);
+  assert.equal("actions" in (updated as unknown as Record<string, unknown>), false);
 });
 
 test("Feature group normalization keeps malformed detail patches safe", () => {
@@ -452,11 +452,11 @@ test("Feature group normalization keeps malformed detail patches safe", () => {
   assert.equal(validateProductFlow(flow).valid, true);
 });
 
-test("Legacy node elements still derive feature groups for endpoint compatibility", () => {
+test("Node elements do not backfill missing feature groups", () => {
   const flow = createEmptyProductFlow();
   const node = createFlowNode(flow, { title: "旧元素页" });
-  delete node.featureGroups;
-  node.elements = [
+  delete (node as unknown as { featureGroups?: unknown }).featureGroups;
+  (node as unknown as Record<string, unknown>).elements = [
     {
       elementId: "element_primary",
       name: "主按钮",
@@ -468,10 +468,8 @@ test("Legacy node elements still derive feature groups for endpoint compatibilit
 
   const groups = deriveFeatureGroups(node);
 
-  assert.equal(groups.length, 1);
-  assert.equal(groups[0]?.name, "页面元素");
-  assert.equal(groups[0]?.items[0]?.name, "主按钮");
-  assert.equal(groups[0]?.items[0]?.required, true);
+  assert.deepEqual(groups, []);
+  assert.equal(validateProductFlow(flow).valid, false);
 });
 
 test("Manual node deletion removes the node and all connected edges", () => {

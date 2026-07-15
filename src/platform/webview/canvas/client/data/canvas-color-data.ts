@@ -1,9 +1,8 @@
-// @ts-nocheck
 function normalizeStatusGroupColor(color) {
   return /^#[0-9a-fA-F]{6}$/.test(String(color || "").trim()) ? String(color).trim() : "#6b7280";
 }
 
-function applyStatusGroupColorSwatches(root = document) {
+function applyStatusGroupColorSwatches(root: any = document) {
   root.querySelectorAll(".status-group-color-square[data-status-group-color]").forEach((swatch) => {
     const color = normalizeStatusGroupColor(swatch.dataset.statusGroupColor);
     swatch.style.backgroundColor = color;
@@ -11,7 +10,7 @@ function applyStatusGroupColorSwatches(root = document) {
   });
 }
 
-function applyEdgeTypeColorSwatches(root = document) {
+function applyEdgeTypeColorSwatches(root: any = document) {
   root.querySelectorAll(".edge-type-swatch[data-edge-type-color]").forEach((swatch) => {
     const color = String(swatch.dataset.edgeTypeColor || "").trim() || "var(--vscode-charts-blue, #3794ff)";
     swatch.style.background = color;

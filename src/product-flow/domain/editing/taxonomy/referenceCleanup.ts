@@ -1,4 +1,5 @@
 import type { FlowEdge, FlowEndpoint, ProductFlow } from "../..";
+import { refreshAllFlowEdgeDerivedState } from "../graph/edges";
 
 export interface DeleteAppSurfaceResult {
   removedEdgeIds: string[];
@@ -20,19 +21,20 @@ export function deleteAppSurface(flow: ProductFlow, appId: string): DeleteAppSur
     return true;
   });
 
+  refreshAllFlowEdgeDerivedState(flow);
+
   return { removedEdgeIds };
 }
 
 export function pruneMissingAppSurfaceReferences(flow: ProductFlow): DeleteAppSurfaceResult {
   const appSurfaceIds = new Set((flow.appSurfaces ?? []).map((surface) => surface.appId));
-  const nodeIds = new Set(flow.nodes.map((node) => node.nodeId));
   for (const node of flow.nodes) {
     node.appSurfaceIds = (node.appSurfaceIds ?? []).filter((id) => appSurfaceIds.has(id));
   }
 
   const removedEdgeIds: string[] = [];
   flow.edges = flow.edges.filter((edge) => {
-    if (edgeHasMissingAppSurfaceEndpoint(edge, appSurfaceIds, nodeIds)) {
+    if (edgeHasMissingAppSurfaceEndpoint(edge, appSurfaceIds)) {
       removedEdgeIds.push(edge.edgeId);
       return false;
     }
@@ -40,43 +42,28 @@ export function pruneMissingAppSurfaceReferences(flow: ProductFlow): DeleteAppSu
     return true;
   });
 
+  refreshAllFlowEdgeDerivedState(flow);
+
   return { removedEdgeIds };
 }
 
 function edgeReferencesAppSurfaceEndpoint(edge: FlowEdge, appId: string): boolean {
   return endpointReferencesAppSurface(edge.from, appId) ||
-    endpointReferencesAppSurface(edge.to, appId) ||
-    (!edge.from && edge.fromNodeId === appId) ||
-    (!edge.to && edge.toNodeId === appId);
+    endpointReferencesAppSurface(edge.to, appId);
 }
 
 function endpointReferencesAppSurface(endpoint: FlowEndpoint | undefined, appId: string): boolean {
-  return Boolean(endpoint && endpoint.kind === "appSurface" && (endpoint.appId ?? endpoint.nodeId) === appId);
+  return Boolean(endpoint && endpoint.kind === "appSurface" && endpoint.appId === appId);
 }
 
-function edgeHasMissingAppSurfaceEndpoint(edge: FlowEdge, appSurfaceIds: Set<string>, nodeIds: Set<string>): boolean {
+function edgeHasMissingAppSurfaceEndpoint(edge: FlowEdge, appSurfaceIds: Set<string>): boolean {
   return endpointReferencesMissingAppSurface(edge.from, appSurfaceIds) ||
-    endpointReferencesMissingAppSurface(edge.to, appSurfaceIds) ||
-    legacyEndpointReferencesMissingAppSurface(edge.from, edge.fromNodeId, appSurfaceIds, nodeIds) ||
-    legacyEndpointReferencesMissingAppSurface(edge.to, edge.toNodeId, appSurfaceIds, nodeIds);
+    endpointReferencesMissingAppSurface(edge.to, appSurfaceIds);
 }
 
 function endpointReferencesMissingAppSurface(endpoint: FlowEndpoint | undefined, appSurfaceIds: Set<string>): boolean {
   if (!endpoint || endpoint.kind !== "appSurface") {
     return false;
   }
-  const appId = endpoint.appId ?? endpoint.nodeId;
-  return !appSurfaceIds.has(appId);
-}
-
-function legacyEndpointReferencesMissingAppSurface(
-  endpoint: FlowEndpoint | undefined,
-  storageId: string,
-  appSurfaceIds: Set<string>,
-  nodeIds: Set<string>
-): boolean {
-  if (endpoint || nodeIds.has(storageId)) {
-    return false;
-  }
-  return storageId.startsWith("app_") && !appSurfaceIds.has(storageId);
+  return typeof endpoint.appId !== "string" || !appSurfaceIds.has(endpoint.appId);
 }

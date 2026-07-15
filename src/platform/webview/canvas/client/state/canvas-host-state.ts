@@ -1,4 +1,3 @@
-// @ts-nocheck
 const vscode = acquireVsCodeApi();
 const state = window.__MINDFLOW_STATE__;
 const app = requireElementById("app");

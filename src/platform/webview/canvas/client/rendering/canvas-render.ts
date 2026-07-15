@@ -1,4 +1,3 @@
-// @ts-nocheck
 function render() {
   const flow = state.flow;
   seedProjectOverviewPosition(flow);

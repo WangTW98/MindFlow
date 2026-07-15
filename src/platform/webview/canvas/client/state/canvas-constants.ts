@@ -1,4 +1,3 @@
-// @ts-nocheck
 const CARD_WIDTH = 300;
 const CARD_MIN_HEIGHT = 230;
 const PROJECT_OVERVIEW_NODE_ID = "projectOverview";

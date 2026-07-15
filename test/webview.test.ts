@@ -81,6 +81,16 @@ test("FlowPanel webview uses one bundled script instead of legacy multi-script e
   assert.equal(html.includes("media/events/canvas-bindings.js"), false);
 });
 
+test("Flow editor updates initialized webviews without replacing their HTML", async () => {
+  const [sessionSource, clientSource] = await Promise.all([
+    fs.readFile(path.join(process.cwd(), "src", "platform", "vscode", "editor", "canvas", "FlowEditorSession.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src", "platform", "webview", "canvas", "client", "data", "canvas-ui-state.ts"), "utf8")
+  ]);
+
+  assert.ok(sessionSource.includes('postMessage({ type: "flowChanged", flow })'));
+  assert.ok(clientSource.includes('message.type === "flowChanged"'));
+});
+
 test("Sidebar webview loads stylesheet from sidebar media", async () => {
   const [viewSource, htmlSource] = await Promise.all([
     fs.readFile(path.join(process.cwd(), "src", "platform", "vscode", "sidebar", "SidebarView.ts"), "utf8"),
@@ -577,9 +587,16 @@ test("Webview message parser rejects malformed messages before command dispatch"
   }), undefined);
   assert.equal(parseWebviewMessage({ type: "updateTaxonomy", request: { kind: "domain", action: "delete" } }), undefined);
 
-  assert.deepEqual(parseWebviewMessage({
+  assert.equal(parseWebviewMessage({
     type: "createEdge",
     from: { kind: "appSurface", nodeId: "app_admin" },
+    to: { kind: "node", nodeId: "node_b" },
+    trigger: "进入",
+    edgeType: "navigate"
+  }), undefined);
+  assert.deepEqual(parseWebviewMessage({
+    type: "createEdge",
+    from: { kind: "appSurface", nodeId: "app_admin", appId: "app_admin" },
     to: { kind: "node", nodeId: "node_b" },
     trigger: "进入",
     edgeType: "navigate"

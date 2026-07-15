@@ -1,4 +1,3 @@
-// @ts-nocheck
 function renderSelectionRelationsPanel(flow, selectedNode, selectedEdge) {
   const groups = getSelectionRelationGroups(flow, selectedNode, selectedEdge);
   if (!groups) {
@@ -80,9 +79,7 @@ function getSelectionRelationsForNode(flow, nodeId) {
 }
 
 function relationEndpointForEdge(edge, direction) {
-  const endpoint = direction === "from" ? edge.from : edge.to;
-  const fallbackNodeId = direction === "from" ? edge.fromNodeId : edge.toNodeId;
-  return endpoint || { kind: "node", nodeId: fallbackNodeId || "" };
+  return direction === "from" ? edge.from : edge.to;
 }
 
 function relationEndpointBelongsToNode(endpoint, nodeId) {
@@ -156,7 +153,7 @@ function relationProjectOverviewTitle(flow) {
   return String(flow.title || "项目概述").trim() || "项目概述";
 }
 
-function bindSelectionRelations(root = document) {
+function bindSelectionRelations(root: any = document) {
   const panel = root.matches?.(".selection-relations-panel")
     ? root
     : root.querySelector?.(".selection-relations-panel");

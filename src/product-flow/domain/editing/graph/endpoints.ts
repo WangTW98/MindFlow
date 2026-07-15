@@ -5,19 +5,26 @@ import { requireAppSurface, requireNode } from "./shared";
 
 export function normalizeEndpoint(endpoint: FlowEndpoint): FlowEndpoint {
   if (endpoint.kind === "appSurface") {
-    const appId = endpoint.appId ?? endpoint.nodeId;
+    if (!endpoint.appId) {
+      throw new Error("App surface endpoint requires appId.");
+    }
+    const appId = endpoint.appId;
     return {
       kind: "appSurface",
       nodeId: appId,
       appId
     };
   }
-  return {
-    kind: endpoint.kind,
-    nodeId: endpoint.nodeId,
-    groupId: endpoint.groupId,
-    itemId: endpoint.itemId
-  };
+  if (endpoint.kind === "featureItem") {
+    return { kind: endpoint.kind, nodeId: endpoint.nodeId, groupId: endpoint.groupId, itemId: endpoint.itemId };
+  }
+  if (endpoint.kind === "featureGroup") {
+    return { kind: endpoint.kind, nodeId: endpoint.nodeId, groupId: endpoint.groupId };
+  }
+  if (endpoint.kind === "projectOverview") {
+    return { kind: "projectOverview", nodeId: PROJECT_OVERVIEW_NODE_ID };
+  }
+  return { kind: "node", nodeId: endpoint.nodeId };
 }
 
 export function validateEndpoint(flow: ProductFlow, endpoint: FlowEndpoint): void {
@@ -28,7 +35,10 @@ export function validateEndpoint(flow: ProductFlow, endpoint: FlowEndpoint): voi
     return;
   }
   if (endpoint.kind === "appSurface") {
-    requireAppSurface(flow, endpoint.appId ?? endpoint.nodeId);
+    if (!endpoint.appId) {
+      throw new Error("App surface endpoint requires appId.");
+    }
+    requireAppSurface(flow, endpoint.appId);
     return;
   }
   const node = requireNode(flow, endpoint.nodeId);
@@ -58,7 +68,7 @@ function endpointLabel(flow: ProductFlow, endpoint: FlowEndpoint): string {
     return flow.title || "项目概述";
   }
   if (endpoint.kind === "appSurface") {
-    const appId = endpoint.appId ?? endpoint.nodeId;
+    const appId = endpoint.appId!;
     return flow.appSurfaces?.find((surface) => surface.appId === appId)?.name ?? appId;
   }
   if (endpoint.kind === "node") {
@@ -72,7 +82,7 @@ function endpointLabel(flow: ProductFlow, endpoint: FlowEndpoint): string {
 
 export function endpointStorageId(endpoint: FlowEndpoint): string {
   if (endpoint.kind === "appSurface") {
-    return endpoint.appId ?? endpoint.nodeId;
+    return endpoint.appId!;
   }
   if (endpoint.kind === "projectOverview") {
     return PROJECT_OVERVIEW_NODE_ID;
@@ -85,7 +95,7 @@ export function endpointAppSurfaceIds(flow: ProductFlow, endpoint: FlowEndpoint)
     return [];
   }
   if (endpoint.kind === "appSurface") {
-    return [endpoint.appId ?? endpoint.nodeId];
+    return [endpoint.appId!];
   }
   return requireNode(flow, endpoint.nodeId).appSurfaceIds ?? [];
 }
@@ -95,7 +105,7 @@ export function endpointDomainIds(flow: ProductFlow, endpoint: FlowEndpoint): st
     return [];
   }
   if (endpoint.kind === "appSurface") {
-    return requireAppSurface(flow, endpoint.appId ?? endpoint.nodeId).domainIds;
+    return requireAppSurface(flow, endpoint.appId!).domainIds;
   }
   return requireNode(flow, endpoint.nodeId).domainIds;
 }
@@ -105,14 +115,12 @@ export function endpointRoleIds(flow: ProductFlow, endpoint: FlowEndpoint): stri
     return [];
   }
   if (endpoint.kind === "appSurface") {
-    return requireAppSurface(flow, endpoint.appId ?? endpoint.nodeId).roleIds;
+    return requireAppSurface(flow, endpoint.appId!).roleIds;
   }
   return requireNode(flow, endpoint.nodeId).roleIds;
 }
 
 export function edgeReferencesNode(edge: FlowEdge, nodeId: string): boolean {
-  const from = edge.from ?? { kind: "node", nodeId: edge.fromNodeId };
-  const to = edge.to ?? { kind: "node", nodeId: edge.toNodeId };
-  return (from.kind !== "appSurface" && from.kind !== "projectOverview" && from.nodeId === nodeId) ||
-    (to.kind !== "appSurface" && to.kind !== "projectOverview" && to.nodeId === nodeId);
+  return (edge.from.kind !== "appSurface" && edge.from.kind !== "projectOverview" && edge.from.nodeId === nodeId) ||
+    (edge.to.kind !== "appSurface" && edge.to.kind !== "projectOverview" && edge.to.nodeId === nodeId);
 }

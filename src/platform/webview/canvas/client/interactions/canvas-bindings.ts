@@ -1,4 +1,3 @@
-// @ts-nocheck
 function bindEvents() {
   const canvas = document.getElementById("canvas");
   const edgeLayer = document.getElementById("edgeLayer");

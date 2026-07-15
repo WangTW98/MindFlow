@@ -1,5 +1,4 @@
-// @ts-nocheck
-function bindCanvasElements(root = document) {
+function bindCanvasElements(root: any = document) {
   const projectOverviewCards = root.matches?.(".project-overview-card")
     ? [root]
     : Array.from(root.querySelectorAll(".project-overview-card"));

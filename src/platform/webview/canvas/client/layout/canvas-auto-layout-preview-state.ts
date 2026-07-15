@@ -1,4 +1,3 @@
-// @ts-nocheck
 function autoLayoutCreatePreviewState(flow, layout) {
   return {
     signature: autoLayoutFlowSignature(flow),
@@ -222,14 +221,14 @@ function autoLayoutCopyPosition(value) {
 function autoLayoutEdgeSignature(edge) {
   return JSON.stringify([
     typeof edge.edgeId === "string" ? edge.edgeId : "",
-    autoLayoutEndpointSignature(edge.from, edge.fromNodeId),
-    autoLayoutEndpointSignature(edge.to, edge.toNodeId),
+    autoLayoutEndpointSignature(edge.from),
+    autoLayoutEndpointSignature(edge.to),
     autoLayoutEdgePriority(edge.type),
     String(edge.trigger || edge.action || "")
   ]);
 }
 
-function autoLayoutEndpointSignature(endpoint, fallbackNodeId) {
+function autoLayoutEndpointSignature(endpoint) {
   if (endpoint && typeof endpoint === "object" && !Array.isArray(endpoint)) {
     return [
       typeof endpoint.kind === "string" ? endpoint.kind : "",
@@ -239,5 +238,5 @@ function autoLayoutEndpointSignature(endpoint, fallbackNodeId) {
       typeof endpoint.itemId === "string" ? endpoint.itemId : ""
     ];
   }
-  return ["fallback", typeof fallbackNodeId === "string" ? fallbackNodeId : "", "", "", ""];
+  return ["invalid", "", "", "", ""];
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 function renderMultiSelect(id, label, options, idKey, labelKey, selected) {
   const selectedSet = new Set(selected || []);
   const size = Math.min(5, Math.max(2, options.length || 2));

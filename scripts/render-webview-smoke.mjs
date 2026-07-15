@@ -69,7 +69,6 @@ function renderHtml(state, styleFiles, cacheToken) {
 function createSmokeFlow() {
   const now = "2026-07-05T00:00:00.000Z";
   return {
-    schemaVersion: "2.0",
     flowId: "flow_smoke",
     revision: 1,
     title: "MindFlow Smoke",

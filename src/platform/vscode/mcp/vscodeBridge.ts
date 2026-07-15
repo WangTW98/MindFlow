@@ -5,7 +5,7 @@ import type { ProductFlow } from "../../../product-flow/domain";
 import { parseProductFlowText } from "../../../product-flow/domain/serialization/codec";
 import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../../mcp/protocol/bridge";
 import { applyFlowDocumentEdit } from "../documents/flowDocumentService";
-import { flowDisplayName, type FlowUriArgument } from "../documents/flowUri";
+import { flowDisplayName, normalizeFlowUri } from "../documents/flowUri";
 import { FlowPanel } from "../editor/canvas/FlowPanel";
 
 export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
@@ -17,7 +17,7 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
 
   public async getActiveEditor(flowUri?: string): Promise<MindFlowEditorSnapshot> {
     if (flowUri) {
-      return this.readSnapshot(resolveFlowUri(flowUri), false);
+      return this.readSnapshot(requireOpenFlowUri(flowUri), false);
     }
     const openEditors = FlowPanel.getOpenEditorSessions();
     const activeUri = FlowPanel.getActiveFlowUri() ?? openEditors.find((session) => session.active)?.uri ?? openEditors[0]?.uri;
@@ -28,13 +28,13 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
   }
 
   public async setSelection(flowUri: string, selection: FlowSelectionPatch): Promise<MindFlowEditorSnapshot> {
-    const uri = resolveFlowUri(flowUri);
+    const uri = requireOpenFlowUri(flowUri);
     FlowPanel.setSelection(uri, selection);
     return this.readSnapshot(uri, true);
   }
 
   public async applyFlowEdit(flowUri: string, flow: ProductFlow, selection?: FlowSelectionPatch, expectedRevision?: number): Promise<MindFlowEditorSnapshot> {
-    const uri = resolveFlowUri(flowUri);
+    const uri = requireOpenFlowUri(flowUri);
     if (selection) {
       FlowPanel.setSelection(uri, selection);
     }
@@ -44,6 +44,9 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
   }
 
   private async readSnapshot(uri: vscode.Uri, active: boolean): Promise<MindFlowEditorSnapshot> {
+    if (!FlowPanel.hasOpenEditor(uri)) {
+      throw new Error(`MindFlow MCP can only access an open MindFlow editor: ${uri.toString()}`);
+    }
     const document = await vscode.workspace.openTextDocument(uri);
     const { flow } = parseProductFlowText(document.getText(), `ProductFlow document ${flowDisplayName(document.uri)}`);
     return {
@@ -58,12 +61,10 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
   }
 }
 
-function resolveFlowUri(flowUri: Exclude<FlowUriArgument, undefined>): vscode.Uri {
-  if (typeof flowUri !== "string") {
-    return flowUri;
+function requireOpenFlowUri(flowUri: string): vscode.Uri {
+  const uri = normalizeFlowUri(flowUri);
+  if (!uri || !FlowPanel.hasOpenEditor(uri)) {
+    throw new Error(`MindFlow MCP can only access an open MindFlow editor: ${flowUri}`);
   }
-  if (path.isAbsolute(flowUri)) {
-    return vscode.Uri.file(flowUri);
-  }
-  return flowUri.includes(":") ? vscode.Uri.parse(flowUri) : vscode.Uri.file(flowUri);
+  return uri;
 }

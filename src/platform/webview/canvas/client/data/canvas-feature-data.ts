@@ -1,27 +1,5 @@
-// @ts-nocheck
 function getFeatureGroups(node) {
-  if (Array.isArray(node.featureGroups) && node.featureGroups.length > 0) {
-    return node.featureGroups;
-  }
-  if (!Array.isArray(node.elements) || node.elements.length === 0) {
-    return [];
-  }
-  return [
-    {
-      groupId: `group_legacy_${node.nodeId}`,
-      name: "页面元素",
-      type: "legacyElements",
-      description: "由页面元素字段兼容展示。",
-      items: node.elements.map((element) => ({
-        itemId: `item_legacy_${element.elementId}`,
-        name: element.name,
-        type: element.type,
-        description: element.description,
-        dataBinding: element.dataBinding,
-        required: element.required
-      }))
-    }
-  ];
+  return Array.isArray(node.featureGroups) ? node.featureGroups : [];
 }
 
 function getEntryAppSurfaceNames(flow, node) {

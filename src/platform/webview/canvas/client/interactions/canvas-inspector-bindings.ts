@@ -1,4 +1,3 @@
-// @ts-nocheck
 function bindProjectOverviewInspector(projectOverviewForm) {
   bindInlineTitleEditor("projectOverviewPanelTitle", "projectOverviewTitle", () => commitProjectOverviewDetailsChange({ immediate: true }));
   projectOverviewForm.addEventListener("submit", (event) => {

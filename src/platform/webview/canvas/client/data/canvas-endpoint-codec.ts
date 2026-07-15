@@ -1,10 +1,9 @@
-// @ts-nocheck
 function endpointFromButton(button) {
   if (button.dataset.originKind === "projectOverview") {
     return { kind: "projectOverview", nodeId: PROJECT_OVERVIEW_NODE_ID };
   }
   if (button.dataset.originKind === "appSurface") {
-    const appId = button.dataset.originAppId || button.dataset.originNodeId;
+    const appId = button.dataset.originAppId;
     return appId ? { kind: "appSurface", nodeId: appId, appId } : null;
   }
   if (button.dataset.originKind === "node") {
@@ -33,7 +32,7 @@ function endpointFromTargetButton(button) {
     return { kind: "projectOverview", nodeId: PROJECT_OVERVIEW_NODE_ID };
   }
   if (button.dataset.targetKind === "appSurface") {
-    const appId = button.dataset.targetAppId || button.dataset.targetNodeId;
+    const appId = button.dataset.targetAppId;
     return appId ? { kind: "appSurface", nodeId: appId, appId } : null;
   }
   const nodeId = button.dataset.targetNodeId;
@@ -124,7 +123,7 @@ function endpointEntityId(endpoint) {
   if (endpoint.kind === "projectOverview") {
     return PROJECT_OVERVIEW_NODE_ID;
   }
-  return endpoint.kind === "appSurface" ? endpoint.appId || endpoint.nodeId || "" : endpoint.nodeId || "";
+  return endpoint.kind === "appSurface" ? endpoint.appId || "" : endpoint.nodeId || "";
 }
 
 function endpointSearchText(parts) {

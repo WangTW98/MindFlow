@@ -111,8 +111,8 @@ function activeNodeLayerConstraints(flow: ProductFlow, nodeIds: Set<string>): Ar
 }
 
 function edgeToNodeConstraint(edge: FlowEdge, nodeIds: Set<string>): { fromNodeId?: string; toNodeId?: string } | undefined {
-  const fromNodeId = endpointNodeId(edge.from, nodeIds) ?? (nodeIds.has(edge.fromNodeId) ? edge.fromNodeId : undefined);
-  const toNodeId = endpointNodeId(edge.to, nodeIds) ?? (nodeIds.has(edge.toNodeId) ? edge.toNodeId : undefined);
+  const fromNodeId = endpointNodeId(edge.from, nodeIds);
+  const toNodeId = endpointNodeId(edge.to, nodeIds);
   if (!toNodeId || fromNodeId === toNodeId) {
     return undefined;
   }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 function collectMultiSelect(id) {
   const select = document.getElementById(id);
   return Array.from(select?.selectedOptions || []).map((option) => option.value);
@@ -54,7 +53,22 @@ function makeClientId(prefix) {
 }
 
 function handleHostMessage(message) {
-  if (!message || message.type !== "commandResult") {
+  if (!message) {
+    return;
+  }
+  if (message.type === "selectionChanged") {
+    applyHostSelection(message.selection);
+    persistUiState();
+    render();
+    return;
+  }
+  if (message.type === "flowChanged" && message.flow && typeof message.flow === "object") {
+    state.flow = message.flow;
+    resetLayoutCaches();
+    render();
+    return;
+  }
+  if (message.type !== "commandResult") {
     return;
   }
   const replacementFlow = message.flow && typeof message.flow === "object" ? message.flow : null;
@@ -127,13 +141,6 @@ function persistUiState() {
     autoLayoutPreviewState,
     taxonomyPanelsOpen,
     taxonomySelection,
-    selectedProjectOverview,
-    selectedNodeId,
-    selectedNodeIds,
-    selectedAppSurfaceId,
-    selectedDomainId,
-    selectedRoleId,
-    selectedStatusGroupId,
     nodeSearch,
     leftPanelCollapsed,
     viewportInitializedFor,

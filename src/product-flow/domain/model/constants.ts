@@ -24,5 +24,3 @@ export type AppSurfaceType = typeof APP_SURFACE_TYPES[number];
 
 export const FLOW_ENDPOINT_KINDS = ["appSurface", "projectOverview", "node", "featureGroup", "featureItem"] as const;
 export type FlowEndpointKind = typeof FLOW_ENDPOINT_KINDS[number];
-
-export const CURRENT_SCHEMA_VERSION = "2.0";

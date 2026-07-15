@@ -1,4 +1,3 @@
-// @ts-nocheck
 let connectingFrom = persisted.connectingFrom || null;
 let connectionDrag = null;
 let connectionDropTarget = null;

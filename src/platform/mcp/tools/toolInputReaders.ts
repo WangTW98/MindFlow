@@ -89,10 +89,7 @@ export function readUpsertEdgeInput(input: Record<string, unknown>, flow: Produc
     trigger: readStringPatch(input, "trigger") ?? readStringPatch(input, "action"),
     action: readStringPatch(input, "action"),
     type: readMcpEdgeType(input, existing?.type),
-    condition: readStringPatch(input, "condition"),
-    appSurfaceIds: readOptionalStringArray(input, "appSurfaceIds"),
-    domainIds: readOptionalStringArray(input, "domainIds"),
-    roleIds: readOptionalStringArray(input, "roleIds")
+    condition: readStringPatch(input, "condition")
   });
 }
 
@@ -221,7 +218,10 @@ function readEndpoint(value: unknown, maps: IdMaps): FlowEndpoint | undefined {
   if (kind === "featureItem") {
     return { kind: "featureItem", nodeId, groupId: requireString(value, "groupId"), itemId: requireString(value, "itemId") };
   }
-  return { kind: "node", nodeId };
+  if (kind === "node") {
+    return { kind: "node", nodeId };
+  }
+  throw new Error(`Unsupported endpoint kind: ${kind}.`);
 }
 
 function readMcpEdgeType(input: Record<string, unknown>, fallback?: EdgeType): EdgeType {
@@ -276,8 +276,7 @@ function endpointReferencesAnyNode(endpoint: FlowEndpoint, nodeIds: Set<string>)
 }
 
 function edgeEndpoint(edge: FlowEdge, side: "from" | "to"): FlowEndpoint {
-  const endpoint = side === "from" ? edge.from : edge.to;
-  return endpoint ?? { kind: "node", nodeId: side === "from" ? edge.fromNodeId : edge.toNodeId };
+  return side === "from" ? edge.from : edge.to;
 }
 
 function isEdgeTypeValue(value: string): value is EdgeType {

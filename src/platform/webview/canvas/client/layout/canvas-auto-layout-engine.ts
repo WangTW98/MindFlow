@@ -1,4 +1,3 @@
-// @ts-nocheck
 const AUTO_LAYOUT_SHARED_LANE_ID = "__shared";
 const AUTO_LAYOUT_ROOT_WIDTH = 340;
 const AUTO_LAYOUT_ROOT_HEIGHT = 260;
@@ -31,7 +30,7 @@ const AUTO_LAYOUT_EDGE_TYPE_PRIORITIES = {
 };
 const AUTO_LAYOUT_UNCONNECTED_PRIORITY = Number.POSITIVE_INFINITY;
 
-function autoLayoutComputePreview(flow, measurements = {}) {
+function autoLayoutComputePreview(flow, measurements: any = {}) {
   const activeNodes = (Array.isArray(flow?.nodes) ? flow.nodes : []).filter((node) => node.status !== "removed");
   const activeEdges = (Array.isArray(flow?.edges) ? flow.edges : []).filter((edge) => edge.status === "active");
   const appSurfaces = Array.isArray(flow?.appSurfaces) ? flow.appSurfaces : [];
@@ -42,7 +41,7 @@ function autoLayoutComputePreview(flow, measurements = {}) {
   const projectOverviewSize = autoLayoutMeasuredSize(measurements.projectOverview, AUTO_LAYOUT_ROOT_WIDTH, AUTO_LAYOUT_ROOT_HEIGHT);
   const lanePlans = context.lanes.map((lane) => autoLayoutCreateLanePlan(lane, activeEdges, context.nodeOriginalIndex, measurements));
   const maxLayerWidthSpan = lanePlans.reduce((maxWidth, plan) => {
-    const layerWidth = Array.from(plan.layerLayouts.values()).reduce((maxLayerWidth, layout) => Math.max(maxLayerWidth, layout.widthSpan), 0);
+    const layerWidth = (Array.from(plan.layerLayouts.values()) as any[]).reduce((maxLayerWidth: number, layout: any) => Math.max(maxLayerWidth, layout.widthSpan), 0);
     return Math.max(maxWidth, plan.appSize?.width || 0, layerWidth);
   }, projectOverviewSize.width);
   const columnGap = Math.max(AUTO_LAYOUT_MIN_COLUMN_GAP, maxLayerWidthSpan + estimatedMaxEdgeLabelWidth + 96);
@@ -228,9 +227,9 @@ function autoLayoutMeasuredSize(value, fallbackWidth, fallbackHeight) {
 
 function autoLayoutOrderLaneNodesFromGraph(nodes, graphEdges, nodeOriginalIndex) {
   const byId = new Map(nodes.map((node) => [node.nodeId, node]));
-  const outgoing = new Map(nodes.map((node) => [node.nodeId, []]));
-  const indegree = new Map(nodes.map((node) => [node.nodeId, 0]));
-  const incomingPriority = new Map(nodes.map((node) => [node.nodeId, AUTO_LAYOUT_UNCONNECTED_PRIORITY]));
+  const outgoing = new Map<string, any[]>(nodes.map((node) => [node.nodeId, []]));
+  const indegree = new Map<string, number>(nodes.map((node) => [node.nodeId, 0]));
+  const incomingPriority = new Map<string, number>(nodes.map((node) => [node.nodeId, AUTO_LAYOUT_UNCONNECTED_PRIORITY]));
 
   for (const edge of graphEdges) {
     outgoing.get(edge.fromId)?.push(edge);
@@ -273,8 +272,8 @@ function autoLayoutOrderLaneNodesFromGraph(nodes, graphEdges, nodeOriginalIndex)
 }
 
 function autoLayoutAssignNodeLayers(orderedNodes, graphEdges) {
-  const layers = new Map(orderedNodes.map((node) => [node.nodeId, 2]));
-  const outgoing = new Map(orderedNodes.map((node) => [node.nodeId, []]));
+  const layers = new Map<string, number>(orderedNodes.map((node) => [node.nodeId, 2]));
+  const outgoing = new Map<string, any[]>(orderedNodes.map((node) => [node.nodeId, []]));
   for (const edge of graphEdges) {
     outgoing.get(edge.fromId)?.push(edge);
   }
@@ -290,8 +289,8 @@ function autoLayoutAssignNodeLayers(orderedNodes, graphEdges) {
 function autoLayoutBuildLaneGraphEdges(nodeIds, activeEdges, nodeOriginalIndex) {
   const strongestByPair = new Map();
   activeEdges.forEach((edge, index) => {
-    const fromId = autoLayoutEdgeNodeId(edge.from, edge.fromNodeId);
-    const toId = autoLayoutEdgeNodeId(edge.to, edge.toNodeId);
+    const fromId = autoLayoutEdgeNodeId(edge.from);
+    const toId = autoLayoutEdgeNodeId(edge.to);
     if (!fromId || !toId || fromId === toId || !nodeIds.has(fromId) || !nodeIds.has(toId)) {
       return;
     }
@@ -472,11 +471,11 @@ function autoLayoutIncomingGraphParentY(nodeId, nodePositions, graphEdges) {
   return parentYs.length > 0 ? Math.round(parentYs.reduce((sum, y) => sum + y, 0) / parentYs.length) : Number.POSITIVE_INFINITY;
 }
 
-function autoLayoutEdgeNodeId(endpoint, fallbackNodeId) {
+function autoLayoutEdgeNodeId(endpoint) {
   if (endpoint && endpoint.kind !== "appSurface" && endpoint.kind !== "projectOverview" && typeof endpoint.nodeId === "string") {
     return endpoint.nodeId;
   }
-  return typeof fallbackNodeId === "string" ? fallbackNodeId : "";
+  return "";
 }
 
 

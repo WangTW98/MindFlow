@@ -1,4 +1,3 @@
-// @ts-nocheck
 let projectOverviewDetailsSaveTimer = null;
 let nodeDetailsSaveTimer = null;
 let appSurfaceDetailsSaveTimer = null;

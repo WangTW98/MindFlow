@@ -1,4 +1,3 @@
-// @ts-nocheck
 function renderAppSurfaceSourceCards(flow) {
   return (flow.appSurfaces || []).map((surface, index) => renderAppSurfaceSourceCard(surface, index)).join("");
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 function renderLucideIcon(name) {
   const icons = {
     "panel-left-close": '<rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path>',

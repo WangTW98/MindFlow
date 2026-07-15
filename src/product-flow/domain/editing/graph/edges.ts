@@ -4,7 +4,6 @@ import { edgeReferencesNode, endpointAppSurfaceIds, endpointDomainIds, endpointR
 import {
   markFlowEdgeRemoved,
   mergeUnique,
-  normalizeStringArray,
   requireEdge,
   requireEdgeType,
   requireNode,
@@ -71,17 +70,24 @@ export function updateFlowEdgeDetails(flow: ProductFlow, edgeId: string, patch: 
   if (patch.condition !== undefined) {
     edge.condition = patch.condition.trim() || undefined;
   }
-  if (patch.appSurfaceIds !== undefined) {
-    edge.appSurfaceIds = normalizeStringArray(patch.appSurfaceIds);
-  }
-  if (patch.domainIds !== undefined) {
-    edge.domainIds = normalizeStringArray(patch.domainIds);
-  }
-  if (patch.roleIds !== undefined) {
-    edge.roleIds = normalizeStringArray(patch.roleIds);
-  }
+  refreshFlowEdgeDerivedState(flow, edge);
   touchFlow(flow);
   return edge;
+}
+
+export function refreshFlowEdgeDerivedState(flow: ProductFlow, edge: FlowEdge): FlowEdge {
+  edge.fromNodeId = endpointStorageId(edge.from);
+  edge.toNodeId = endpointStorageId(edge.to);
+  edge.appSurfaceIds = mergeUnique(endpointAppSurfaceIds(flow, edge.from), endpointAppSurfaceIds(flow, edge.to));
+  edge.domainIds = mergeUnique(endpointDomainIds(flow, edge.from), endpointDomainIds(flow, edge.to));
+  edge.roleIds = mergeUnique(endpointRoleIds(flow, edge.from), endpointRoleIds(flow, edge.to));
+  return edge;
+}
+
+export function refreshAllFlowEdgeDerivedState(flow: ProductFlow): void {
+  for (const edge of flow.edges) {
+    refreshFlowEdgeDerivedState(flow, edge);
+  }
 }
 
 export function removeFlowEdge(flow: ProductFlow, edgeId: string): FlowEdge {

@@ -1,0 +1,68 @@
+import { strict as assert } from "node:assert";
+import test from "node:test";
+import type * as vscode from "vscode";
+import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
+import { emptyFlowSelection, type FlowSelectionState } from "../src/product-flow/domain/selection";
+import { FlowEditorRegistry, type RenderableFlowEditorSession } from "../src/platform/vscode/editor/FlowEditorRegistry";
+
+test("FlowEditorRegistry keeps multiple panels for one document and broadcasts selection", () => {
+  const registry = new FlowEditorRegistry();
+  const uri = fakeUri("file:///workspace/test.mindflow");
+  const document = { uri } as vscode.TextDocument;
+  const first = new FakeSession();
+  const second = new FakeSession();
+
+  registry.register(uri, document, first);
+  registry.register(uri, document, second);
+  registry.setActive(uri);
+  const selection: FlowSelectionState = { ...emptyFlowSelection(), selectedNodeId: "node_a", selectedNodeIds: ["node_a"] };
+  registry.applySelection(uri, selection);
+
+  assert.equal(registry.getOpenEditorSessions().length, 1);
+  assert.equal(registry.hasSession(uri), true);
+  assert.deepEqual(first.selections, [selection]);
+  assert.deepEqual(second.selections, [selection]);
+  assert.equal(registry.remove(uri, first), false);
+  assert.equal(registry.hasSession(uri), true);
+  assert.equal(registry.remove(uri, second), true);
+  assert.equal(registry.hasSession(uri), false);
+});
+
+test("FlowEditorRegistry renders all panels and reveals only the first", () => {
+  const registry = new FlowEditorRegistry();
+  const uri = fakeUri("file:///workspace/test.mindflow");
+  const document = { uri } as vscode.TextDocument;
+  const first = new FakeSession();
+  const second = new FakeSession();
+  const flow = createEmptyProductFlow();
+
+  registry.register(uri, document, first);
+  registry.register(uri, document, second);
+
+  assert.equal(registry.renderSession(uri, flow), true);
+  assert.equal(first.renderCount, 1);
+  assert.equal(second.renderCount, 1);
+  assert.equal(first.revealCount + second.revealCount, 1);
+});
+
+class FakeSession implements RenderableFlowEditorSession {
+  public readonly selections: FlowSelectionState[] = [];
+  public renderCount = 0;
+  public revealCount = 0;
+
+  public renderWithFallback(): void {
+    this.renderCount += 1;
+  }
+
+  public applySelection(selection: FlowSelectionState): void {
+    this.selections.push(selection);
+  }
+
+  public reveal(): void {
+    this.revealCount += 1;
+  }
+}
+
+function fakeUri(value: string): vscode.Uri {
+  return { toString: () => value } as vscode.Uri;
+}

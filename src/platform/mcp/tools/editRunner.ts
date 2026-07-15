@@ -25,7 +25,12 @@ export class McpFlowEditRunner {
         : { results: applied.results.map(operationPayload) };
     const selection = built.selection?.(applied.results) ?? applied.selection;
     const next = await this.bridge.applyFlowEdit(snapshot.uri, applied.flow, selection, expectedRevision);
-    return { editor: snapshotToPayload(next), result, flow: next.flow };
+    return {
+      editor: snapshotToPayload(next),
+      result,
+      change: { operationCount: applied.results.length, revision: next.flow.revision },
+      ...(readOptionalBoolean(input, "includeFlow") === true ? { flow: next.flow } : {})
+    };
   }
 
   public async batchEditNodes(
@@ -49,7 +54,8 @@ export class McpFlowEditRunner {
           dryRun: true,
           issues: [],
           result,
-          flow: applied.flow
+          change: { operationCount: applied.results.length, revision: applied.flow.revision },
+          ...(readOptionalBoolean(input, "includeFlow") === true ? { flow: applied.flow } : {})
         };
       }
       const next = await this.bridge.applyFlowEdit(snapshot.uri, applied.flow, built.selection?.(applied.results) ?? applied.selection, expectedRevision);
@@ -59,7 +65,8 @@ export class McpFlowEditRunner {
         dryRun: false,
         issues: [],
         result,
-        flow: next.flow
+        change: { operationCount: applied.results.length, revision: next.flow.revision },
+        ...(readOptionalBoolean(input, "includeFlow") === true ? { flow: next.flow } : {})
       };
     } catch (error) {
       return {

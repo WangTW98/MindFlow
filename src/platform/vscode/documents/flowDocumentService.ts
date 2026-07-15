@@ -9,6 +9,7 @@ import { nowIso } from "../../../product-flow/domain/id";
 import { getRememberedFlowPath, getRememberedFlowUri, rememberCurrentFlowUri } from "../state/activeFlowState";
 import { enqueueFlowDocumentEdit } from "./flowEditQueue";
 import {
+  assertWorkspaceMindFlowUri,
   createFlowRepository,
   flowDisplayName,
   getWorkspaceMindFlowDirectoryUri,
@@ -66,11 +67,12 @@ export async function pickMindFlowFile(): Promise<string | undefined> {
       "All Files": ["*"]
     }
   });
-  return picked?.[0]?.fsPath;
+  return picked?.[0] ? assertWorkspaceMindFlowUri(picked[0]).fsPath : undefined;
 }
 
 export async function loadMindFlowFile(flowPath: string): Promise<ProductFlow> {
-  return new FlowRepository(path.dirname(flowPath)).load(flowPath);
+  const normalizedPath = assertWorkspaceMindFlowUri(vscode.Uri.file(flowPath)).fsPath;
+  return new FlowRepository(path.dirname(normalizedPath)).load(normalizedPath);
 }
 
 export function showError(prefix: string, error: unknown): void {
@@ -106,7 +108,7 @@ async function resolveCurrentFlowUri(sourceUri?: FlowUriArgument): Promise<vscod
   if (!flowUri) {
     throw new Error("No MindFlow file exists. Create or open a MindFlow file first.");
   }
-  return flowUri;
+  return flowUri.scheme === "untitled" ? flowUri : assertWorkspaceMindFlowUri(flowUri);
 }
 
 async function chooseOrLatestFlowUri(): Promise<vscode.Uri | undefined> {

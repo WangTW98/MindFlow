@@ -1,31 +1,9 @@
-import type { FeatureGroup, FeatureItem, PageAction, PageElement, PageNode } from "../..";
-import { makeActionId, makeElementId, makeFeatureGroupId, makeFeatureItemId } from "../../id";
+import type { FeatureGroup, FeatureItem, PageAction, PageNode } from "../..";
+import { makeActionId, makeFeatureGroupId, makeFeatureItemId } from "../../id";
 import { isRecord, normalizeStringArray, sanitizeText } from "./shared";
 
 export function deriveFeatureGroups(node: PageNode): FeatureGroup[] {
-  const normalized = normalizeFeatureGroups(node.featureGroups, node.nodeId);
-  if (normalized.length > 0) {
-    return normalized;
-  }
-  if (node.elements.length === 0) {
-    return [];
-  }
-  return [
-    {
-      groupId: makeFeatureGroupId("页面元素", `${node.nodeId}:legacy-elements`),
-      name: "页面元素",
-      type: "legacyElements",
-      description: "由旧版页面元素字段兼容生成。",
-      items: node.elements.map((element) => ({
-        itemId: makeFeatureItemId(element.name, `${node.nodeId}:${element.elementId}`),
-        name: element.name,
-        type: element.type,
-        description: element.description,
-        dataBinding: element.dataBinding,
-        required: element.required
-      }))
-    }
-  ];
+  return normalizeFeatureGroups(node.featureGroups, node.nodeId);
 }
 
 export function normalizeFeatureGroups(value: unknown, nodeId: string): FeatureGroup[] {
@@ -78,34 +56,6 @@ function normalizeAction(action: Record<string, unknown>, nodeId: string, groupI
     preconditions: normalizeStringArray(action.preconditions),
     result: typeof action.result === "string" ? action.result : undefined
   };
-}
-
-export function featureGroupsToElements(nodeId: string, groups: FeatureGroup[]): PageElement[] {
-  return groups.flatMap((group) =>
-    group.items.map((item) => ({
-      elementId: makeElementId(item.name, `${nodeId}:${group.groupId}:${item.itemId}`),
-      name: item.name,
-      type: item.type,
-      description: item.description,
-      dataBinding: item.dataBinding,
-      required: item.required
-    }))
-  );
-}
-
-export function featureGroupsToActions(nodeId: string, groups: FeatureGroup[]): PageAction[] {
-  const explicit = groups.flatMap((group) => group.actions ?? []);
-  const inferred = groups.flatMap((group) =>
-    group.items
-      .filter((item) => /button|按钮|action|submit|reset|create|delete/i.test(item.type) || /按钮$/.test(item.name))
-      .map((item) => ({
-        actionId: makeActionId(item.name, `${nodeId}:${group.groupId}:${item.itemId}`),
-        label: item.name,
-        type: "user",
-        result: item.description
-      }))
-  );
-  return [...explicit, ...inferred];
 }
 
 export function defaultFeatureGroups(nodeId: string): FeatureGroup[] {

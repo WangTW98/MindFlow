@@ -1,4 +1,3 @@
-// @ts-nocheck
 function refreshCanvasAndNodeList() {
   const flow = state.flow;
   seedProjectOverviewPosition(flow);

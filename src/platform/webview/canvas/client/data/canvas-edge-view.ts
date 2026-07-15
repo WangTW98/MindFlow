@@ -1,4 +1,3 @@
-// @ts-nocheck
 function scheduleDrawEdges() {
   if (framePending) {
     return;
@@ -82,8 +81,8 @@ function nodeBelongsToAppSurface(node, appId) {
 }
 
 function renderEdge(edge) {
-  const fromEndpoint = edge.from || { kind: "node", nodeId: edge.fromNodeId };
-  const toEndpoint = edge.to || { kind: "node", nodeId: edge.toNodeId };
+  const fromEndpoint = edge.from;
+  const toEndpoint = edge.to;
   const from = getEndpointScreenPoint(fromEndpoint, "from");
   const to = getEndpointScreenPoint(toEndpoint, "to") || getEndpointScreenPoint({ kind: "node", nodeId: edge.toNodeId }, "to");
   if (!from || !to) {

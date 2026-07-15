@@ -1,4 +1,3 @@
-// @ts-nocheck
 function getAvailableDomains(flow) {
   if (appFilters.length === 0) {
     return flow.domains;
@@ -60,8 +59,8 @@ function isNodeRelated(node) {
 }
 
 function isEdgeRelated(edge) {
-  const fromEndpoint = edge.from || { kind: "node", nodeId: edge.fromNodeId };
-  const toEndpoint = edge.to || { kind: "node", nodeId: edge.toNodeId };
+  const fromEndpoint = edge.from;
+  const toEndpoint = edge.to;
   const endpointAppIds = [...endpointAppSurfaceIds(fromEndpoint), ...endpointAppSurfaceIds(toEndpoint)];
   const endpointDomainIds = [...endpointDomainSelectionIds(fromEndpoint), ...endpointDomainSelectionIds(toEndpoint)];
   const endpointRoleIds = [...endpointRoleSelectionIds(fromEndpoint), ...endpointRoleSelectionIds(toEndpoint)];

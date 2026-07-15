@@ -1,7 +1,6 @@
-// @ts-nocheck
-let appFilters = readIdSelection(persisted.appFilters, persisted.appFilter);
-let domainFilters = readIdSelection(persisted.domainFilters, persisted.domainFilter);
-let roleFilters = readIdSelection(persisted.roleFilters, persisted.roleFilter);
+let appFilters = readIdSelection(persisted.appFilters);
+let domainFilters = readIdSelection(persisted.domainFilters);
+let roleFilters = readIdSelection(persisted.roleFilters);
 let taxonomySelection = readTaxonomySelection(persisted.taxonomySelection);
 selectedAppSurfaceId ||= taxonomySelection.appSurface;
 selectedDomainId ||= taxonomySelection.domain;

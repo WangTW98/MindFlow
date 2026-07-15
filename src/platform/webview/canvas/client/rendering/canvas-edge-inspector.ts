@@ -1,4 +1,3 @@
-// @ts-nocheck
 function renderEdgeInspector(flow, edge) {
   const selectedType = normalizeEdgeTypeForSelect(edge.type);
   const triggerRule = edge.trigger || edge.action || "";
@@ -12,15 +11,13 @@ function renderEdgeInspector(flow, edge) {
         ${renderIconButton("closeInspector", "关闭详情", "x")}
       </header>
       <input id="edgeTriggerRule" type="hidden" value="${escapeAttr(triggerRule)}">
-      ${renderEndpointPicker("edgeFromEndpoint", "起点", flow, edge.from || { kind: "node", nodeId: edge.fromNodeId }, true)}
-      ${renderEndpointPicker("edgeToEndpoint", "终点", flow, edge.to || { kind: "node", nodeId: edge.toNodeId }, false)}
+      ${renderEndpointPicker("edgeFromEndpoint", "起点", flow, edge.from, true)}
+      ${renderEndpointPicker("edgeToEndpoint", "终点", flow, edge.to, false)}
       ${renderEdgeTypePicker(selectedType)}
       <label>条件描述
         <textarea id="edgeCondition" rows="3">${escapeHtml(edge.condition || "")}</textarea>
       </label>
-      ${renderTagMultiSelect("edgeAppSurfaceIds", "应用端", flow.appSurfaces || [], "appId", "name", edge.appSurfaceIds || [])}
-      ${renderTagMultiSelect("edgeDomainIds", "业务域", flow.domains, "domainId", "name", edge.domainIds || [])}
-      ${renderTagMultiSelect("edgeRoleIds", "角色", flow.roles, "roleId", "name", edge.roleIds || [])}
+      <p class="field-hint">应用端、业务域和角色由连线端点自动派生。</p>
       <p class="form-error" id="edgeFormError"></p>
     </form>
   `;

@@ -1,4 +1,3 @@
-// @ts-nocheck
 function requireElementById(id) {
   const element = document.getElementById(id);
   if (!element) {

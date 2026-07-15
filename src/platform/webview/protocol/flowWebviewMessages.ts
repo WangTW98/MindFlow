@@ -263,9 +263,6 @@ function readEdgeUpsertInput(value: unknown): UpsertEdgeOperationInput | undefin
     trigger: readOptionalString(value, "trigger"),
     action: readOptionalString(value, "action"),
     ...(type ? { type } : {}),
-    condition: readOptionalString(value, "condition"),
-    appSurfaceIds: readOptionalStringArray(value, "appSurfaceIds"),
-    domainIds: readOptionalStringArray(value, "domainIds"),
-    roleIds: readOptionalStringArray(value, "roleIds")
+    condition: readOptionalString(value, "condition")
   };
 }

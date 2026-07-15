@@ -1,4 +1,3 @@
-// @ts-nocheck
 function renderNodeCard(flow, node) {
   const related = isNodeRelated(node);
   const groups = getFeatureGroups(node);

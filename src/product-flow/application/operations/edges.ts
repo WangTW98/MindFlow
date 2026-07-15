@@ -47,10 +47,7 @@ function upsertEdgeInFlow(flow: ProductFlow, input: UpsertEdgeOperationInput): {
     trigger: input.trigger ?? input.action,
     action: input.action,
     type,
-    condition: input.condition,
-    appSurfaceIds: input.appSurfaceIds,
-    domainIds: input.domainIds,
-    roleIds: input.roleIds
+    condition: input.condition
   });
   if (conflict) {
     if (conflict.type !== type) {
@@ -68,15 +65,6 @@ function upsertEdgeInFlow(flow: ProductFlow, input: UpsertEdgeOperationInput): {
     type,
     condition: patch.condition
   });
-  const detailPatch: UpdateEdgeDetailsInput = stripUndefined({
-    condition: patch.condition,
-    appSurfaceIds: patch.appSurfaceIds,
-    domainIds: patch.domainIds,
-    roleIds: patch.roleIds
-  });
-  if (Object.keys(detailPatch).length > 0) {
-    updateFlowEdgeDetails(flow, edge.edgeId, detailPatch);
-  }
   return { edge, mode: "created" };
 }
 
@@ -90,10 +78,12 @@ function findSameEndpointEdge(flow: ProductFlow, from: FlowEndpoint, to: FlowEnd
 }
 
 function edgeEndpoint(edge: FlowEdge, side: "from" | "to"): FlowEndpoint {
-  const endpoint = side === "from" ? edge.from : edge.to;
-  return endpoint ?? { kind: "node", nodeId: side === "from" ? edge.fromNodeId : edge.toNodeId };
+  return side === "from" ? edge.from : edge.to;
 }
 
 function endpointKey(endpoint: FlowEndpoint): string {
-  return [endpoint.kind, endpoint.nodeId, endpoint.appId ?? "", endpoint.groupId ?? "", endpoint.itemId ?? ""].join("|");
+  const appId = endpoint.kind === "appSurface" ? endpoint.appId : "";
+  const groupId = endpoint.kind === "featureGroup" || endpoint.kind === "featureItem" ? endpoint.groupId : "";
+  const itemId = endpoint.kind === "featureItem" ? endpoint.itemId : "";
+  return [endpoint.kind, endpoint.nodeId, appId, groupId, itemId].join("|");
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 function renderAppSurfaceTypePicker(surfaceType) {
   const selected = getAppSurfaceTypeOption(surfaceType);
   return `

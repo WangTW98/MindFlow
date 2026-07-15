@@ -1,4 +1,3 @@
-// @ts-nocheck
 function handleContextMenu(event) {
   const canvas = document.getElementById("canvas");
   if (!canvas || !canvas.contains(event.target)) {

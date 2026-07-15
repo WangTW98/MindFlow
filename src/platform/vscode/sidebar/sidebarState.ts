@@ -37,11 +37,23 @@ export async function createSidebarState(options: SidebarStateOptions): Promise<
     await options.recentFlows.replace(seededRecords);
     recentRecords = options.recentFlows.get();
   }
-  const flows = await Promise.all((recentRecords ?? []).map((record) => toFlowItem(workspaceRoot, record)));
+  const existingRecords = await filterExistingFlowRecords(recentRecords ?? []);
+  if (existingRecords.length !== (recentRecords ?? []).length) {
+    await options.recentFlows.replace(existingRecords);
+  }
+  const flows = await Promise.all(existingRecords.map((record) => toFlowItem(workspaceRoot, record)));
   flows.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
   return {
     flows
   };
+}
+
+async function filterExistingFlowRecords(records: RecentFlowRecord[]): Promise<RecentFlowRecord[]> {
+  const checks = await Promise.all(records.map(async (record) => {
+    const stats = await fs.stat(record.absolutePath).catch(() => undefined);
+    return stats?.isFile() && path.extname(record.absolutePath).toLowerCase() === ".mindflow" ? record : undefined;
+  }));
+  return checks.filter((record): record is RecentFlowRecord => Boolean(record));
 }
 
 async function getGlobalRecentRecords(

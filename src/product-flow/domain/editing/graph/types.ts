@@ -42,9 +42,6 @@ export interface UpdateEdgeDetailsInput {
   action?: string;
   type?: EdgeType;
   condition?: string;
-  appSurfaceIds?: string[];
-  domainIds?: string[];
-  roleIds?: string[];
 }
 
 export interface RemoveNodeResult {

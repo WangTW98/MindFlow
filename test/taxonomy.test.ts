@@ -109,6 +109,39 @@ test("Taxonomy updates keep only known domain and role references", () => {
   assert.equal(validateProductFlow(flow).valid, true);
 });
 
+test("Taxonomy partial updates preserve omitted fields and explicit arrays can clear references", () => {
+  const flow = createEmptyProductFlow();
+  flow.domains = [{ domainId: "domain_ops", name: "运营", description: "原业务域描述" }];
+  flow.roles = [{ roleId: "role_ops", name: "运营角色", description: "原角色描述", domainIds: ["domain_ops"] }];
+  flow.appSurfaces = [{
+    appId: "app_admin",
+    name: "管理后台",
+    type: "admin",
+    description: "原应用端描述",
+    domainIds: ["domain_ops"],
+    roleIds: ["role_ops"]
+  }];
+
+  applyTaxonomyRequest(flow, { kind: "domain", action: "update", id: "domain_ops", item: { name: "运营中心" } });
+  applyTaxonomyRequest(flow, { kind: "role", action: "update", id: "role_ops", item: { name: "运营负责人" } });
+  applyTaxonomyRequest(flow, { kind: "appSurface", action: "update", id: "app_admin", item: { name: "运营后台" } });
+
+  assert.equal(flow.domains[0]?.description, "原业务域描述");
+  assert.equal(flow.roles[0]?.description, "原角色描述");
+  assert.deepEqual(flow.roles[0]?.domainIds, ["domain_ops"]);
+  assert.equal(flow.appSurfaces[0]?.type, "admin");
+  assert.equal(flow.appSurfaces[0]?.description, "原应用端描述");
+  assert.deepEqual(flow.appSurfaces[0]?.domainIds, ["domain_ops"]);
+  assert.deepEqual(flow.appSurfaces[0]?.roleIds, ["role_ops"]);
+
+  applyTaxonomyRequest(flow, { kind: "role", action: "update", id: "role_ops", item: { domainIds: [] } });
+  applyTaxonomyRequest(flow, { kind: "appSurface", action: "update", id: "app_admin", item: { domainIds: [], roleIds: [] } });
+  assert.deepEqual(flow.roles[0]?.domainIds, []);
+  assert.deepEqual(flow.appSurfaces[0]?.domainIds, []);
+  assert.deepEqual(flow.appSurfaces[0]?.roleIds, []);
+  assert.equal(validateProductFlow(flow).valid, true);
+});
+
 test("Deleting an app surface removes connected edge endpoints and keeps the flow valid", () => {
   const flow = createProcurementFlow();
   const surface = flow.appSurfaces?.find((item) => item.appId === "app_supplier_portal") ?? flow.appSurfaces?.[0];
@@ -168,6 +201,6 @@ test("Pruning app surface references removes stale connected card edges before v
 
   assert.ok(result.removedEdgeIds.includes(connectedEdge.edgeId));
   assert.equal(flow.edges.some((edge) => edge.edgeId === connectedEdge.edgeId), false);
-  assert.equal(flow.edges.some((edge) => edge.from?.appId === surface.appId), false);
+  assert.equal(flow.edges.some((edge) => edge.from.kind === "appSurface" && edge.from.appId === surface.appId), false);
   assert.equal(validation.valid, true, validation.errors.join("\n"));
 });

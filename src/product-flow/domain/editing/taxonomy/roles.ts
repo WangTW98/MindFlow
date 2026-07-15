@@ -26,8 +26,12 @@ export function applyRoleRequest(flow: ProductFlow, request: TaxonomyRequest): v
   const next: UserRole = {
     roleId,
     name,
-    description: readString(item.description, ""),
-    domainIds: knownOnly(readStringArray(item.domainIds), new Set(flow.domains.map((domain) => domain.domainId)))
+    description: item.description === undefined
+      ? existing?.description ?? ""
+      : readString(item.description, existing?.description ?? ""),
+    domainIds: item.domainIds === undefined
+      ? [...(existing?.domainIds ?? [])]
+      : knownOnly(readStringArray(item.domainIds), new Set(flow.domains.map((domain) => domain.domainId)))
   };
   upsertById(flow.roles, (item) => item.roleId, next);
 }

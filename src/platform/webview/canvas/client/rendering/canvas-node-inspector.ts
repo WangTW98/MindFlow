@@ -1,4 +1,3 @@
-// @ts-nocheck
 function renderNodeInspector(flow, node) {
   return `
     <form class="details-form" id="nodeDetailsForm" data-inspector-key="${escapeAttr(inspectorScrollKey("node", node.nodeId))}">

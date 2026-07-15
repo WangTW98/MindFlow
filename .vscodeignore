@@ -1,8 +1,10 @@
 .git/**
+.gitignore
 .codegraph/**
 .vscode/**
 .npm-cache/**
 node_modules/**
+out-test/**
 test/**
 scripts/**
 samples/**
@@ -22,4 +24,6 @@ assets/**
 !assets/webview/sidebar/media/**
 out/**/*.map
 plan.md
+todo.md
+tsconfig*.json
 *.vsix

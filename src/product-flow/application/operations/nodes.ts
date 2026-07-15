@@ -74,9 +74,9 @@ function createConnectedNode(flow: ProductFlow, request: CreateConnectedNodeOper
     ? request.from.kind === "appSurface" ? undefined : flow.nodes.find((node) => node.nodeId === request.from?.nodeId)
     : request.to?.kind === "appSurface" ? undefined : flow.nodes.find((node) => node.nodeId === request.to?.nodeId);
   const relatedAppSurfaceIds = request.from?.kind === "appSurface"
-    ? [request.from.appId ?? request.from.nodeId]
+    ? [request.from.appId!]
     : request.to?.kind === "appSurface"
-      ? [request.to.appId ?? request.to.nodeId]
+      ? [request.to.appId!]
       : relatedNode?.appSurfaceIds;
   const node = createFlowNode(flow, {
     x: request.x,

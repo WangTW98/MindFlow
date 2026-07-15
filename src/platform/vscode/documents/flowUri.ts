@@ -3,11 +3,12 @@ import * as vscode from "vscode";
 import { createMindFlowFileName } from "../../../product-flow/domain/model/fileNaming";
 import type { ProductFlow } from "../../../product-flow/domain";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../../../product-flow/infrastructure/persistence/flowRepository";
+import { isPathInsideWorkspace, normalizeWorkspaceRelativeDirectory } from "./workspacePathPolicy";
 
 export type FlowUriArgument = vscode.Uri | string | undefined;
 
 export function isMindFlowDocument(document: vscode.TextDocument): boolean {
-  return isRealMindFlowUri(document.uri) && path.extname(document.uri.fsPath) === ".mindflow";
+  return isRealMindFlowUri(document.uri) && path.extname(document.uri.fsPath).toLowerCase() === FLOW_FILE_EXTENSION;
 }
 
 export function isRealMindFlowUri(uri: vscode.Uri): boolean {
@@ -18,13 +19,25 @@ export function normalizeFlowUri(flowUri: FlowUriArgument): vscode.Uri | undefin
   if (!flowUri) {
     return undefined;
   }
-  if (typeof flowUri !== "string") {
-    return flowUri;
+  const uri = typeof flowUri === "string" ? uriFromString(flowUri) : flowUri;
+  if (uri.scheme === "untitled") {
+    return uri;
   }
-  if (path.isAbsolute(flowUri)) {
-    return vscode.Uri.file(flowUri);
+  return assertWorkspaceMindFlowUri(uri);
+}
+
+export function assertWorkspaceMindFlowUri(uri: vscode.Uri): vscode.Uri {
+  if (!isRealMindFlowUri(uri)) {
+    throw new Error("MindFlow only supports local file URIs inside an open workspace folder.");
   }
-  return flowUri.includes(":") ? vscode.Uri.parse(flowUri) : vscode.Uri.file(flowUri);
+  if (path.extname(uri.fsPath).toLowerCase() !== FLOW_FILE_EXTENSION) {
+    throw new Error(`MindFlow file must use the ${FLOW_FILE_EXTENSION} extension.`);
+  }
+  const folder = workspaceFolderForUri(uri);
+  if (!folder || !isPathInsideWorkspace(folder.uri.fsPath, uri.fsPath)) {
+    throw new Error(`MindFlow file is outside the open workspace: ${uri.fsPath}`);
+  }
+  return uri;
 }
 
 export function flowDisplayName(flowUri: vscode.Uri): string {
@@ -36,49 +49,73 @@ export function ensureMindFlowExtension(filePath: string): string {
 }
 
 export function resolveInputFlowPath(flowPath: string): string {
-  if (path.isAbsolute(flowPath)) {
-    return flowPath;
-  }
-  const workspaceRoot = getWorkspaceRootIfAvailable();
-  return path.join(workspaceRoot ?? process.cwd(), flowPath);
+  const uri = path.isAbsolute(flowPath)
+    ? vscode.Uri.file(flowPath)
+    : vscode.Uri.file(path.join(getWorkspaceRoot(), flowPath));
+  return assertWorkspaceMindFlowUri(uri).fsPath;
 }
 
 export function getDefaultSaveUri(flow: ProductFlow, flowUri: vscode.Uri): vscode.Uri | undefined {
   if (isRealMindFlowUri(flowUri)) {
-    return vscode.Uri.file(ensureMindFlowExtension(flowUri.fsPath));
+    return assertWorkspaceMindFlowUri(vscode.Uri.file(ensureMindFlowExtension(flowUri.fsPath)));
   }
-  const workspaceRoot = getWorkspaceRootIfAvailable();
-  if (!workspaceRoot) {
+  const folder = preferredWorkspaceFolder();
+  if (!folder) {
     return undefined;
   }
-  const flowDirectory = getConfiguredFlowDirectory();
-  return vscode.Uri.file(path.join(workspaceRoot, flowDirectory, createMindFlowFileName(flow)));
+  const flowDirectory = getConfiguredFlowDirectory(folder.uri);
+  return vscode.Uri.file(path.join(folder.uri.fsPath, flowDirectory, createMindFlowFileName(flow)));
 }
 
-export function createFlowRepository(): FlowRepository {
-  return new FlowRepository(getWorkspaceRoot(), getConfiguredFlowDirectory());
+export function createFlowRepository(resource?: vscode.Uri): FlowRepository {
+  const folder = resource ? workspaceFolderForUri(resource) : preferredWorkspaceFolder();
+  if (!folder) {
+    throw new Error("MindFlow requires an open workspace folder.");
+  }
+  return new FlowRepository(folder.uri.fsPath, getConfiguredFlowDirectory(folder.uri));
 }
 
-export function getWorkspaceRootIfAvailable(): string | undefined {
-  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+export function getWorkspaceRootIfAvailable(resource?: vscode.Uri): string | undefined {
+  return (resource ? workspaceFolderForUri(resource) : preferredWorkspaceFolder())?.uri.fsPath;
 }
 
-export function getWorkspaceRoot(): string {
-  const workspaceRoot = getWorkspaceRootIfAvailable();
+export function getWorkspaceRoot(resource?: vscode.Uri): string {
+  const workspaceRoot = getWorkspaceRootIfAvailable(resource);
   if (!workspaceRoot) {
     throw new Error("MindFlow requires an open workspace folder.");
   }
   return workspaceRoot;
 }
 
-export function getWorkspaceMindFlowDirectoryUri(): vscode.Uri | undefined {
-  const workspaceRoot = getWorkspaceRootIfAvailable();
-  if (!workspaceRoot) {
+export function getWorkspaceMindFlowDirectoryUri(resource?: vscode.Uri): vscode.Uri | undefined {
+  const folder = resource ? workspaceFolderForUri(resource) : preferredWorkspaceFolder();
+  if (!folder) {
     return undefined;
   }
-  return vscode.Uri.file(path.join(workspaceRoot, getConfiguredFlowDirectory()));
+  return vscode.Uri.file(path.join(folder.uri.fsPath, getConfiguredFlowDirectory(folder.uri)));
 }
 
-function getConfiguredFlowDirectory(): string {
-  return vscode.workspace.getConfiguration("mindflow.storage").get<string>("flowDirectory", ".mindflow/flows");
+function uriFromString(value: string): vscode.Uri {
+  if (path.isAbsolute(value)) {
+    return vscode.Uri.file(value);
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+    return vscode.Uri.parse(value);
+  }
+  const root = getWorkspaceRoot();
+  return vscode.Uri.file(path.join(root, value));
+}
+
+function preferredWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
+  const activeUri = vscode.window.activeTextEditor?.document.uri;
+  return (activeUri ? workspaceFolderForUri(activeUri) : undefined) ?? vscode.workspace.workspaceFolders?.[0];
+}
+
+function workspaceFolderForUri(uri: vscode.Uri): vscode.WorkspaceFolder | undefined {
+  return vscode.workspace.getWorkspaceFolder?.(uri) ?? vscode.workspace.workspaceFolders?.find((folder) => isPathInsideWorkspace(folder.uri.fsPath, uri.fsPath));
+}
+
+function getConfiguredFlowDirectory(resource: vscode.Uri): string {
+  const configured = vscode.workspace.getConfiguration("mindflow.storage", resource).get<string>("flowDirectory", ".mindflow/flows");
+  return normalizeWorkspaceRelativeDirectory(configured);
 }

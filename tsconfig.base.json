@@ -15,8 +15,6 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "sourceMap": false,
-    "typeRoots": [
-      "./src/platform/vscode/types"
-    ]
+    "types": ["node", "vscode"]
   }
 }

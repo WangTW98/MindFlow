@@ -1,4 +1,3 @@
-// @ts-nocheck
 function startConnectionDrag(event, direction, endpoint, button) {
   if (event.button !== 0) {
     return;

@@ -16,8 +16,8 @@ export function ensureAppSurfaceEntryEdges(flow: ProductFlow): EnsureAppSurfaceE
       continue;
     }
     const hasEntryEdge = activeEdges.some((edge) =>
-      edge.from?.kind === "appSurface" &&
-      (edge.from.appId ?? edge.from.nodeId) === surface.appId &&
+      edge.from.kind === "appSurface" &&
+      edge.from.appId === surface.appId &&
       edge.toNodeId === entryNode.nodeId
     );
     if (hasEntryEdge) {
@@ -48,7 +48,7 @@ function selectEntryNodeForSurface(surface: AppSurface, activeNodes: PageNode[],
 
 function hasSameSurfaceIncoming(node: PageNode, appId: string, activeNodes: PageNode[], activeEdges: FlowEdge[]): boolean {
   return activeEdges.some((edge) => {
-    if (edge.toNodeId !== node.nodeId || edge.from?.kind === "appSurface") {
+    if (edge.toNodeId !== node.nodeId || edge.from.kind === "appSurface") {
       return false;
     }
     const fromNode = activeNodes.find((candidate) => candidate.nodeId === edge.fromNodeId);

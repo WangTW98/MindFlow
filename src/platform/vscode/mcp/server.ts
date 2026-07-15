@@ -14,6 +14,8 @@ export interface MindFlowMcpSession {
   endpoint: string;
   port: number;
   token: string;
+  pid: number;
+  createdAt: string;
   sessionPath: string;
   stdioCommand: string;
   stdioArgs: string[];
@@ -22,44 +24,26 @@ export interface MindFlowMcpSession {
 export class MindFlowMcpServerManager implements vscode.Disposable {
   private server: http.Server | undefined;
   private session: MindFlowMcpSession | undefined;
+  private startPromise: Promise<void> | undefined;
   private startError: string | undefined;
+  private disposed = false;
+  private readonly protocols = new Map<string, MindFlowMcpProtocol>();
 
   public constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly bridge: MindFlowEditorBridge
   ) {}
 
-  public async start(): Promise<void> {
+  public start(): Promise<void> {
     if (this.server || this.session) {
-      return;
+      return Promise.resolve();
     }
-    try {
-      const token = randomUUID();
-      const protocol = new MindFlowMcpProtocol(new MindFlowMcpToolHandlers(this.bridge));
-      const server = http.createServer((request, response) => {
-        void this.handleHttpRequest(protocol, token, request, response);
+    if (!this.startPromise) {
+      this.startPromise = this.startInternal().finally(() => {
+        this.startPromise = undefined;
       });
-      const port = await listen(server);
-      const sessionPath = this.sessionPath();
-      const endpoint = `http://127.0.0.1:${port}/mcp`;
-      const stdioBridgePath = path.join(this.context.extensionUri.fsPath, MINDFLOW_STDIO_PROXY_RELATIVE_PATH);
-      const session: MindFlowMcpSession = {
-        endpoint,
-        port,
-        token,
-        sessionPath,
-        stdioCommand: "node",
-        stdioArgs: [stdioBridgePath]
-      };
-      await fs.mkdir(path.dirname(sessionPath), { recursive: true });
-      await fs.writeFile(sessionPath, `${JSON.stringify(session, null, 2)}\n`, "utf8");
-      this.server = server;
-      this.session = session;
-      this.startError = undefined;
-    } catch (error) {
-      this.startError = error instanceof Error ? error.message : String(error);
-      console.warn(`MindFlow MCP server failed to start: ${this.startError}`);
     }
+    return this.startPromise;
   }
 
   public async copyClientConfig(): Promise<void> {
@@ -82,14 +66,60 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
   }
 
   public dispose(): void {
+    this.disposed = true;
     const server = this.server;
     this.server = undefined;
     this.session = undefined;
+    this.protocols.clear();
     server?.close();
+    void fs.rm(path.dirname(this.sessionPath()), { recursive: true, force: true });
+  }
+
+  private async startInternal(): Promise<void> {
+    let server: http.Server | undefined;
+    try {
+      if (this.disposed) {
+        throw new Error("MindFlow MCP server manager has been disposed.");
+      }
+      const token = randomUUID();
+      server = http.createServer((request, response) => {
+        void this.handleHttpRequest(token, request, response);
+      });
+      const port = await listen(server);
+      if (this.disposed) {
+        server.close();
+        return;
+      }
+      const sessionPath = this.sessionPath();
+      const endpoint = `http://127.0.0.1:${port}/mcp`;
+      const stdioBridgePath = path.join(this.context.extensionUri.fsPath, MINDFLOW_STDIO_PROXY_RELATIVE_PATH);
+      const session: MindFlowMcpSession = {
+        endpoint,
+        port,
+        token,
+        pid: process.pid,
+        createdAt: new Date().toISOString(),
+        sessionPath,
+        stdioCommand: "node",
+        stdioArgs: [stdioBridgePath]
+      };
+      await writeSessionFile(sessionPath, session);
+      if (this.disposed) {
+        server.close();
+        await fs.rm(path.dirname(sessionPath), { recursive: true, force: true });
+        return;
+      }
+      this.server = server;
+      this.session = session;
+      this.startError = undefined;
+    } catch (error) {
+      server?.close();
+      this.startError = error instanceof Error ? error.message : String(error);
+      console.warn(`MindFlow MCP server failed to start: ${this.startError}`);
+    }
   }
 
   private async handleHttpRequest(
-    protocol: MindFlowMcpProtocol,
     token: string,
     request: http.IncomingMessage,
     response: http.ServerResponse
@@ -104,6 +134,7 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
     }
     try {
       const body = await readBody(request);
+      const protocol = this.protocolForRequest(request);
       const result = await protocol.handle(JSON.parse(body));
       if (result === undefined) {
         response.statusCode = 202;
@@ -125,7 +156,33 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
   }
 
   private sessionPath(): string {
-    return path.join(this.context.globalStorageUri.fsPath, "mcp-session.json");
+    return path.join(this.context.globalStorageUri.fsPath, "mcp", "session.json");
+  }
+
+  private protocolForRequest(request: http.IncomingMessage): MindFlowMcpProtocol {
+    const header = request.headers?.["x-mindflow-mcp-client"];
+    const rawClientId = Array.isArray(header) ? header[0] : header;
+    const clientId = typeof rawClientId === "string" && rawClientId.trim() ? rawClientId.trim().slice(0, 128) : "direct";
+    const existing = this.protocols.get(clientId);
+    if (existing) {
+      return existing;
+    }
+    const protocol = new MindFlowMcpProtocol(new MindFlowMcpToolHandlers(this.bridge));
+    this.protocols.set(clientId, protocol);
+    return protocol;
+  }
+}
+
+async function writeSessionFile(sessionPath: string, session: MindFlowMcpSession): Promise<void> {
+  const directory = path.dirname(sessionPath);
+  const temporaryPath = `${sessionPath}.${process.pid}.${randomUUID()}.tmp`;
+  await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+  try {
+    await fs.writeFile(temporaryPath, `${JSON.stringify(session, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+    await fs.rename(temporaryPath, sessionPath);
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true });
+    throw error;
   }
 }
 

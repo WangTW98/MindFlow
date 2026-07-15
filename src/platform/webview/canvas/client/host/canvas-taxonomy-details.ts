@@ -1,4 +1,3 @@
-// @ts-nocheck
 function cancelPendingTaxonomyDetailsSave(kind) {
   if (kind === "appSurface") {
     clearTimeout(appSurfaceDetailsSaveTimer);

@@ -18,10 +18,18 @@ export function applyAppSurfaceRequest(flow: ProductFlow, request: TaxonomyReque
   const next: AppSurface = {
     appId,
     name,
-    type: normalizeSurfaceType(readString(item.type, "other")),
-    description: readString(item.description, ""),
-    domainIds: knownOnly(readStringArray(item.domainIds), new Set(flow.domains.map((domain) => domain.domainId))),
-    roleIds: knownOnly(readStringArray(item.roleIds), new Set(flow.roles.map((role) => role.roleId))),
+    type: item.type === undefined
+      ? existing?.type ?? "other"
+      : normalizeSurfaceType(readString(item.type, existing?.type ?? "other")),
+    description: item.description === undefined
+      ? existing?.description ?? ""
+      : readString(item.description, existing?.description ?? ""),
+    domainIds: item.domainIds === undefined
+      ? [...(existing?.domainIds ?? [])]
+      : knownOnly(readStringArray(item.domainIds), new Set(flow.domains.map((domain) => domain.domainId))),
+    roleIds: item.roleIds === undefined
+      ? [...(existing?.roleIds ?? [])]
+      : knownOnly(readStringArray(item.roleIds), new Set(flow.roles.map((role) => role.roleId))),
     view: existing?.view
   };
   upsertById(flow.appSurfaces, (item) => item.appId, next);

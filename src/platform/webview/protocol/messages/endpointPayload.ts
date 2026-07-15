@@ -11,7 +11,10 @@ export function readEndpoint(value: unknown): FlowEndpoint | undefined {
     return undefined;
   }
   if (value.kind === "appSurface") {
-    const appId = readOptionalString(value, "appId") ?? nodeId;
+    const appId = readOptionalString(value, "appId");
+    if (!appId || appId !== nodeId) {
+      return undefined;
+    }
     return { kind: "appSurface", nodeId: appId, appId };
   }
   if (value.kind === "projectOverview") {
@@ -25,12 +28,13 @@ export function readEndpoint(value: unknown): FlowEndpoint | undefined {
   if (value.kind === "featureItem" && (!groupId || !itemId)) {
     return undefined;
   }
-  return {
-    kind: value.kind,
-    nodeId,
-    ...(groupId ? { groupId } : {}),
-    ...(itemId ? { itemId } : {})
-  };
+  if (value.kind === "featureItem") {
+    return { kind: value.kind, nodeId, groupId: groupId!, itemId: itemId! };
+  }
+  if (value.kind === "featureGroup") {
+    return { kind: value.kind, nodeId, groupId: groupId! };
+  }
+  return { kind: "node", nodeId };
 }
 
 export function readOptionalEdgeType(obj: Record<string, unknown>, key: string): EdgeType | false | undefined {

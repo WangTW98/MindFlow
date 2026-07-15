@@ -1,4 +1,3 @@
-// @ts-nocheck
 function renderFloatingTaxonomyControls() {
   const panelButtonId = leftPanelCollapsed ? "expandLeftPanel" : "collapseLeftPanel";
   const panelButtonLabel = leftPanelCollapsed ? "展开左侧栏" : "收起左侧栏";

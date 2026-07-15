@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import * as ts from "typescript";
 import type { FeatureGroup, PageNode, ProductFlow } from "../src/product-flow/domain";
 import { ensureAppSurfaceEntryEdges } from "../src/product-flow/domain/editing/layout/appSurfaceEntryEdges";
 import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
@@ -421,7 +422,7 @@ export function assertNoAutoLayoutOverlap(items: AutoLayoutItem[]): void {
     for (let otherIndex = index + 1; otherIndex < items.length; otherIndex += 1) {
       const right = items[otherIndex];
       assert.ok(right);
-      const overlaps = left.x - margin < right.x + right.width + margin &&
+      const overlaps: boolean = left.x - margin < right.x + right.width + margin &&
         left.x + left.width + margin > right.x - margin &&
         left.y - margin < right.y + right.height + margin &&
         left.y + left.height + margin > right.y - margin;
@@ -437,8 +438,11 @@ async function readWebviewRuntimeFiles(files: Array<[string, string]>): Promise<
 
 async function readWebviewRuntimeFile(directory: string, fileName: string): Promise<string> {
   const sourceFileName = fileName.replace(/\.js$/, ".ts");
-  return fs.readFile(
+  const source = await fs.readFile(
     path.join(process.cwd(), "src", "platform", "webview", "canvas", "client", directory, sourceFileName),
     "utf8"
   );
+  return ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2020 }
+  }).outputText;
 }

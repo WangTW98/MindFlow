@@ -1,4 +1,3 @@
-// @ts-nocheck
 const INITIAL_VIEWPORT_FIT_PADDING = 72;
 
 function seedProjectOverviewPosition(flow) {

@@ -9,18 +9,23 @@ export interface McpToolDefinition {
 const nodeKinds = ["layout", "navigation", "page", "popup", "component"];
 const nodePageTypes = ["skeleton", "navigation", "page", "popup", "component"];
 
-const flowUriProperty = { flowUri: { type: "string", description: "Optional editor URI/path. Defaults to the active MindFlow editor." } };
+const flowUriProperty = {
+  flowUri: { type: "string", description: "Optional editor URI/path. Defaults to the active MindFlow editor." },
+  includeFlow: { type: "boolean", description: "Include the complete flow in the response. Defaults to false." }
+};
 
 const emptyInput = objectSchema({}, []);
 
-const endpointSchema = objectSchema({
-  kind: { type: "string", enum: ["root", ...FLOW_ENDPOINT_KINDS] },
-  nodeId: { type: "string" },
-  id: { type: "string" },
-  appId: { type: "string" },
-  groupId: { type: "string" },
-  itemId: { type: "string" }
-}, ["kind"]);
+const endpointSchema = {
+  oneOf: [
+    objectSchema({ kind: { type: "string", enum: ["root"] } }, ["kind"]),
+    objectSchema({ kind: { type: "string", enum: ["projectOverview"] } }, ["kind"]),
+    objectSchema({ kind: { type: "string", enum: ["appSurface"] }, appId: { type: "string" } }, ["kind", "appId"]),
+    objectSchema({ kind: { type: "string", enum: ["node"] }, nodeId: { type: "string" } }, ["kind", "nodeId"]),
+    objectSchema({ kind: { type: "string", enum: ["featureGroup"] }, nodeId: { type: "string" }, groupId: { type: "string" } }, ["kind", "nodeId", "groupId"]),
+    objectSchema({ kind: { type: "string", enum: ["featureItem"] }, nodeId: { type: "string" }, groupId: { type: "string" }, itemId: { type: "string" } }, ["kind", "nodeId", "groupId", "itemId"])
+  ]
+};
 
 const featureItemSchema = objectSchema({
   itemId: { type: "string" },
@@ -152,7 +157,7 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
   tool("mindflow_upsert_page_node", "Create or update a page node with pageType page.", objectSchema(typedNodeProperties)),
   tool("mindflow_upsert_popup_node", "Create or update a popup node with pageType popup.", objectSchema(typedNodeProperties)),
   tool("mindflow_upsert_component_node", "Create or update a component node with pageType component.", objectSchema(typedNodeProperties)),
-  tool("mindflow_update_node", "Update an existing node card.", objectSchema(typedNodeProperties, [])),
+  tool("mindflow_update_node", "Update an existing node card.", identifiedObjectSchema(typedNodeProperties, ["nodeId", "id"])),
   tool("mindflow_move_node", "Move a node card.", positionSchema({ nodeId: { type: "string" }, id: { type: "string" } })),
   tool("mindflow_remove_node", "Soft-remove a node and its active incident edges.", idSchema(["nodeId", "id"])),
   tool("mindflow_upsert_edge", "Create or update an edge between explicit endpoints.", objectSchema({
@@ -165,11 +170,8 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
     action: { type: "string" },
     type: { type: "string", enum: [...EDGE_TYPES] },
     edgeType: { type: "string", enum: [...EDGE_TYPES] },
-    condition: { type: "string" },
-    appSurfaceIds: stringArray(),
-    domainIds: stringArray(),
-    roleIds: stringArray()
-  })),
+    condition: { type: "string" }
+  }, [], [{ required: ["edgeId"] }, { required: ["id"] }, { required: ["from", "to"] }])),
   tool("mindflow_remove_edge", "Soft-remove an edge.", idSchema(["edgeId", "id"])),
   tool("mindflow_batch_get_nodes", "Query nodes by ids, page types, app surfaces, domains, roles, status, or current selection.", objectSchema({
     ...flowUriProperty,
@@ -201,12 +203,13 @@ function tool(name: string, description: string, inputSchema: Record<string, unk
   return { name, description, inputSchema };
 }
 
-function objectSchema(properties: Record<string, unknown>, required: string[] = []): Record<string, unknown> {
+function objectSchema(properties: Record<string, unknown>, required: string[] = [], anyOf: Record<string, unknown>[] = []): Record<string, unknown> {
   return {
     type: "object",
     additionalProperties: false,
     properties,
-    ...(required.length > 0 ? { required } : {})
+    ...(required.length > 0 ? { required } : {}),
+    ...(anyOf.length > 0 ? { anyOf } : {})
   };
 }
 
@@ -215,19 +218,21 @@ function stringArray(): Record<string, unknown> {
 }
 
 function idSchema(keys: string[]): Record<string, unknown> {
-  return objectSchema({
+  return identifiedObjectSchema({
     ...flowUriProperty,
     ...Object.fromEntries(keys.map((key) => [key, { type: "string" }]))
-  });
+  }, keys);
 }
 
 function positionSchema(extra: Record<string, unknown> = {}): Record<string, unknown> {
-  return objectSchema({
+  const properties = {
     ...flowUriProperty,
     ...extra,
     x: { type: "number" },
     y: { type: "number" }
-  }, ["x", "y"]);
+  };
+  const identifierKeys = Object.keys(extra);
+  return objectSchema(properties, ["x", "y"], identifierKeys.length > 0 ? identifierKeys.map((key) => ({ required: [key] })) : []);
 }
 
 function batchNodesSchema(itemProperties: Record<string, unknown>): Record<string, unknown> {
@@ -236,5 +241,9 @@ function batchNodesSchema(itemProperties: Record<string, unknown>): Record<strin
     dryRun: { type: "boolean" },
     nodes: { type: "array", minItems: 1, items: objectSchema(itemProperties) },
     items: { type: "array", minItems: 1, items: objectSchema(itemProperties) }
-  });
+  }, [], [{ required: ["nodes"] }, { required: ["items"] }]);
+}
+
+function identifiedObjectSchema(properties: Record<string, unknown>, keys: string[]): Record<string, unknown> {
+  return objectSchema(properties, [], keys.map((key) => ({ required: [key] })));
 }

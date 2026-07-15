@@ -1,4 +1,3 @@
-// @ts-nocheck
 function filterEndpointOptions(input) {
   const picker = input.closest(".endpoint-picker");
   if (!picker) {

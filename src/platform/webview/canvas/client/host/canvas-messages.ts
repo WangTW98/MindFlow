@@ -1,4 +1,3 @@
-// @ts-nocheck
 function postWebviewMessage(message) {
   vscode.postMessage(hostMessageFromClientMessage(message));
 }

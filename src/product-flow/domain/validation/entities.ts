@@ -1,8 +1,19 @@
 import { APP_SURFACE_TYPES, EDGE_TYPES } from "../model/constants";
 import { isAppSurfaceType, isEdgeType } from "../model/guards";
-import { validateActions, validateElements, validateExceptions, validateFeatureGroups, validateOptionalViewPosition, validateStates } from "./collections";
+import { validateExceptions, validateFeatureGroups, validateOptionalViewPosition, validateStates } from "./collections";
 import { appSurfaceIdsFromFlow, checkEndpoint, isAppSurfaceEndpoint, isProjectOverviewEndpoint } from "./endpoints";
-import { isRecord, requireArray, requireString, requireStringArray, validateEntityStatus, validateReferences } from "./primitives";
+import {
+  isRecord,
+  rejectUnknownKeys,
+  requireArray,
+  requireIsoDateString,
+  requireNonEmptyString,
+  requirePositiveInteger,
+  requireString,
+  requireStringArray,
+  validateEntityStatus,
+  validateReferences
+} from "./primitives";
 
 export interface NodeValidationIndex {
   nodeIds: Set<string>;
@@ -11,7 +22,8 @@ export interface NodeValidationIndex {
 
 export function validateProjectOverview(flow: Record<string, unknown>, errors: string[]): void {
   if (isRecord(flow.projectOverview)) {
-    requireString(flow.projectOverview, "summary", errors, "projectOverview");
+    rejectUnknownKeys(flow.projectOverview, ["summary", "goal", "view"], "projectOverview", errors);
+    requireNonEmptyString(flow.projectOverview, "summary", errors, "projectOverview");
     requireString(flow.projectOverview, "goal", errors, "projectOverview");
     validateOptionalViewPosition(flow.projectOverview.view, "projectOverview.view", errors);
   }
@@ -25,8 +37,9 @@ export function validateDomains(flow: Record<string, unknown>, errors: string[])
       errors.push(`domains[${index}] must be an object.`);
       continue;
     }
-    requireString(domain, "domainId", errors, `domains[${index}]`);
-    requireString(domain, "name", errors, `domains[${index}]`);
+    rejectUnknownKeys(domain, ["domainId", "name", "description"], `domains[${index}]`, errors);
+    requireNonEmptyString(domain, "domainId", errors, `domains[${index}]`);
+    requireNonEmptyString(domain, "name", errors, `domains[${index}]`);
     requireString(domain, "description", errors, `domains[${index}]`);
     if (typeof domain.domainId === "string") {
       if (domainIds.has(domain.domainId)) {
@@ -46,8 +59,9 @@ export function validateRoles(flow: Record<string, unknown>, domainIds: Set<stri
       errors.push(`roles[${index}] must be an object.`);
       continue;
     }
-    requireString(role, "roleId", errors, `roles[${index}]`);
-    requireString(role, "name", errors, `roles[${index}]`);
+    rejectUnknownKeys(role, ["roleId", "name", "description", "domainIds"], `roles[${index}]`, errors);
+    requireNonEmptyString(role, "roleId", errors, `roles[${index}]`);
+    requireNonEmptyString(role, "name", errors, `roles[${index}]`);
     requireString(role, "description", errors, `roles[${index}]`);
     const roleDomainIds = requireStringArray(role, "domainIds", errors, `roles[${index}]`);
     validateReferences(roleDomainIds, domainIds, `roles[${index}].domainIds`, "domain", errors);
@@ -71,29 +85,27 @@ export function validateNodes(flow: Record<string, unknown>, domainIds: Set<stri
       errors.push(`nodes[${index}] must be an object.`);
       continue;
     }
-    requireString(node, "nodeId", errors, `nodes[${index}]`);
-    requireString(node, "stableKey", errors, `nodes[${index}]`);
-    requireString(node, "status", errors, `nodes[${index}]`);
+    rejectUnknownKeys(node, [
+      "nodeId", "stableKey", "status", "version", "title", "pageType", "appSurfaceIds", "statusGroupId",
+      "domainIds", "roleIds", "purpose", "featureGroups", "states", "exceptions",
+      "inputs", "outputs", "permissions", "replacementNodeIds", "removedAt", "view"
+    ], `nodes[${index}]`, errors);
+    requireNonEmptyString(node, "nodeId", errors, `nodes[${index}]`);
+    requireNonEmptyString(node, "stableKey", errors, `nodes[${index}]`);
+    requireNonEmptyString(node, "status", errors, `nodes[${index}]`);
     validateEntityStatus(node.status, `nodes[${index}].status`, errors);
-    requireNumberFromRecord(node, "version", errors, `nodes[${index}]`);
-    requireString(node, "title", errors, `nodes[${index}]`);
-    requireString(node, "pageType", errors, `nodes[${index}]`);
-    const nodeAppSurfaceIds = "appSurfaceIds" in node ? requireStringArray(node, "appSurfaceIds", errors, `nodes[${index}]`) : [];
+    requirePositiveInteger(node, "version", errors, `nodes[${index}]`);
+    requireNonEmptyString(node, "title", errors, `nodes[${index}]`);
+    requireNonEmptyString(node, "pageType", errors, `nodes[${index}]`);
+    const nodeAppSurfaceIds = requireStringArray(node, "appSurfaceIds", errors, `nodes[${index}]`);
     validateReferences(nodeAppSurfaceIds, appSurfaceIds, `nodes[${index}].appSurfaceIds`, "app surface", errors);
-    if ("appSurfaceIds" in node) {
-      requireArray(node, "appSurfaceIds", errors, `nodes[${index}]`);
-    }
     const nodeDomainIds = requireStringArray(node, "domainIds", errors, `nodes[${index}]`);
     const nodeRoleIds = requireStringArray(node, "roleIds", errors, `nodes[${index}]`);
     validateReferences(nodeDomainIds, domainIds, `nodes[${index}].domainIds`, "domain", errors);
     validateReferences(nodeRoleIds, roleIds, `nodes[${index}].roleIds`, "role", errors);
-    requireString(node, "purpose", errors, `nodes[${index}]`);
-    if ("featureGroups" in node) {
-      requireArray(node, "featureGroups", errors, `nodes[${index}]`);
-      validateFeatureGroups(node.featureGroups, `nodes[${index}].featureGroups`, errors);
-    }
-    validateElements(node.elements, `nodes[${index}].elements`, errors);
-    validateActions(node.actions, `nodes[${index}].actions`, errors);
+    requireNonEmptyString(node, "purpose", errors, `nodes[${index}]`);
+    requireArray(node, "featureGroups", errors, `nodes[${index}]`);
+    validateFeatureGroups(node.featureGroups, `nodes[${index}].featureGroups`, errors);
     validateStates(node.states, `nodes[${index}].states`, errors);
     validateExceptions(node.exceptions, `nodes[${index}].exceptions`, errors);
     requireStringArray(node, "inputs", errors, `nodes[${index}]`);
@@ -104,7 +116,7 @@ export function validateNodes(flow: Record<string, unknown>, domainIds: Set<stri
       requireStringArray(node, "replacementNodeIds", errors, `nodes[${index}]`);
     }
     if ("removedAt" in node) {
-      requireString(node, "removedAt", errors, `nodes[${index}]`);
+      requireIsoDateString(node, "removedAt", errors, `nodes[${index}]`);
     }
     validateOptionalViewPosition(node.view, `nodes[${index}].view`, errors);
     if (typeof node.nodeId === "string") {
@@ -128,9 +140,10 @@ export function validateAppSurfaces(flow: Record<string, unknown>, domainIds: Se
       errors.push(`appSurfaces[${index}] must be an object.`);
       continue;
     }
-    requireString(surface, "appId", errors, `appSurfaces[${index}]`);
-    requireString(surface, "name", errors, `appSurfaces[${index}]`);
-    requireString(surface, "type", errors, `appSurfaces[${index}]`);
+    rejectUnknownKeys(surface, ["appId", "name", "type", "description", "domainIds", "roleIds", "view"], `appSurfaces[${index}]`, errors);
+    requireNonEmptyString(surface, "appId", errors, `appSurfaces[${index}]`);
+    requireNonEmptyString(surface, "name", errors, `appSurfaces[${index}]`);
+    requireNonEmptyString(surface, "type", errors, `appSurfaces[${index}]`);
     if (!isAppSurfaceType(surface.type)) {
       errors.push(`appSurfaces[${index}].type must be ${APP_SURFACE_TYPES.join(", ")}.`);
     }
@@ -160,8 +173,9 @@ export function validateStatusGroups(flow: Record<string, unknown>, errors: stri
       errors.push(`statusGroups[${index}] must be an object.`);
       continue;
     }
-    requireString(group, "statusGroupId", errors, `statusGroups[${index}]`);
-    requireString(group, "title", errors, `statusGroups[${index}]`);
+    rejectUnknownKeys(group, ["statusGroupId", "title", "description", "color"], `statusGroups[${index}]`, errors);
+    requireNonEmptyString(group, "statusGroupId", errors, `statusGroups[${index}]`);
+    requireNonEmptyString(group, "title", errors, `statusGroups[${index}]`);
     if ("description" in group) {
       requireString(group, "description", errors, `statusGroups[${index}]`);
     }
@@ -179,15 +193,44 @@ export function validateStatusGroups(flow: Record<string, unknown>, errors: stri
   return statusGroupIds;
 }
 
-export function validateNodeStatusGroups(flow: Record<string, unknown>, statusGroupIds: Set<string>, errors: string[], warnings: string[]): void {
+export function validateNodeStatusGroups(flow: Record<string, unknown>, statusGroupIds: Set<string>, errors: string[]): void {
   const nodes = Array.isArray(flow.nodes) ? flow.nodes : [];
   for (const [index, node] of nodes.entries()) {
     if (!isRecord(node) || node.statusGroupId === undefined) {
       continue;
     }
-    requireString(node, "statusGroupId", errors, `nodes[${index}]`);
+    requireNonEmptyString(node, "statusGroupId", errors, `nodes[${index}]`);
     if (typeof node.statusGroupId === "string" && node.statusGroupId && !statusGroupIds.has(node.statusGroupId)) {
-      warnings.push(`nodes[${index}].statusGroupId references missing status group ${node.statusGroupId}.`);
+      errors.push(`nodes[${index}].statusGroupId references missing status group ${node.statusGroupId}.`);
+    }
+  }
+}
+
+export function validateNodeReferences(flow: Record<string, unknown>, nodeIndex: NodeValidationIndex, errors: string[]): void {
+  const nodes = Array.isArray(flow.nodes) ? flow.nodes : [];
+  for (const [index, node] of nodes.entries()) {
+    if (!isRecord(node)) {
+      continue;
+    }
+    const nodeId = typeof node.nodeId === "string" ? node.nodeId : "";
+    if (Array.isArray(node.replacementNodeIds)) {
+      for (const replacementId of node.replacementNodeIds) {
+        if (typeof replacementId !== "string") {
+          continue;
+        }
+        if (replacementId === nodeId) {
+          errors.push(`nodes[${index}].replacementNodeIds cannot reference the node itself.`);
+        } else if (!nodeIndex.nodeIds.has(replacementId)) {
+          errors.push(`nodes[${index}].replacementNodeIds references missing node ${replacementId}.`);
+        }
+      }
+    }
+    if (Array.isArray(node.featureGroups)) {
+      for (const [groupIndex, group] of node.featureGroups.entries()) {
+        if (isRecord(group)) {
+          validateActionTargets(group.actions, `nodes[${index}].featureGroups[${groupIndex}].actions`, nodeIndex, errors);
+        }
+      }
     }
   }
 }
@@ -207,32 +250,34 @@ export function validateEdges(
       errors.push(`edges[${index}] must be an object.`);
       continue;
     }
-    requireString(edge, "edgeId", errors, `edges[${index}]`);
-    requireString(edge, "status", errors, `edges[${index}]`);
+    rejectUnknownKeys(edge, [
+      "edgeId", "status", "fromNodeId", "toNodeId", "from", "to", "action", "trigger", "type", "condition",
+      "appSurfaceIds", "domainIds", "roleIds", "removedAt"
+    ], `edges[${index}]`, errors);
+    requireNonEmptyString(edge, "edgeId", errors, `edges[${index}]`);
+    requireNonEmptyString(edge, "status", errors, `edges[${index}]`);
     validateEntityStatus(edge.status, `edges[${index}].status`, errors);
-    requireString(edge, "fromNodeId", errors, `edges[${index}]`);
-    requireString(edge, "toNodeId", errors, `edges[${index}]`);
-    requireString(edge, "action", errors, `edges[${index}]`);
+    requireNonEmptyString(edge, "fromNodeId", errors, `edges[${index}]`);
+    requireNonEmptyString(edge, "toNodeId", errors, `edges[${index}]`);
+    requireNonEmptyString(edge, "action", errors, `edges[${index}]`);
     if (edge.trigger !== undefined) {
       requireString(edge, "trigger", errors, `edges[${index}]`);
     }
-    requireString(edge, "type", errors, `edges[${index}]`);
+    requireNonEmptyString(edge, "type", errors, `edges[${index}]`);
     if (!isEdgeType(edge.type)) {
       errors.push(`edges[${index}].type must be ${EDGE_TYPES.join(", ")}.`);
     }
     if (edge.condition !== undefined) {
       requireString(edge, "condition", errors, `edges[${index}]`);
     }
-    if (edge.appSurfaceIds !== undefined) {
-      const edgeAppSurfaceIds = requireStringArray(edge, "appSurfaceIds", errors, `edges[${index}]`);
-      validateReferences(edgeAppSurfaceIds, appSurfaceIds, `edges[${index}].appSurfaceIds`, "app surface", errors);
-    }
+    const edgeAppSurfaceIds = requireStringArray(edge, "appSurfaceIds", errors, `edges[${index}]`);
+    validateReferences(edgeAppSurfaceIds, appSurfaceIds, `edges[${index}].appSurfaceIds`, "app surface", errors);
     const edgeDomainIds = requireStringArray(edge, "domainIds", errors, `edges[${index}]`);
     const edgeRoleIds = requireStringArray(edge, "roleIds", errors, `edges[${index}]`);
     validateReferences(edgeDomainIds, domainIds, `edges[${index}].domainIds`, "domain", errors);
     validateReferences(edgeRoleIds, roleIds, `edges[${index}].roleIds`, "role", errors);
     if (edge.removedAt !== undefined) {
-      requireString(edge, "removedAt", errors, `edges[${index}]`);
+      requireIsoDateString(edge, "removedAt", errors, `edges[${index}]`);
     }
     if (typeof edge.edgeId === "string") {
       if (edgeIds.has(edge.edgeId)) {
@@ -240,19 +285,125 @@ export function validateEdges(
       }
       edgeIds.add(edge.edgeId);
     }
-    if (typeof edge.fromNodeId === "string" && !isProjectOverviewEndpoint(edge.from, edge.fromNodeId) && !isAppSurfaceEndpoint(edge.from, edge.fromNodeId) && !nodeIndex.nodeIds.has(edge.fromNodeId)) {
+    if (typeof edge.fromNodeId === "string" && !isProjectOverviewEndpoint(edge.from) && !isAppSurfaceEndpoint(edge.from) && !nodeIndex.nodeIds.has(edge.fromNodeId)) {
       errors.push(`Edge ${edge.edgeId ?? index} references missing fromNodeId ${edge.fromNodeId}`);
     }
-    if (typeof edge.toNodeId === "string" && !isProjectOverviewEndpoint(edge.to, edge.toNodeId) && !isAppSurfaceEndpoint(edge.to, edge.toNodeId) && !nodeIndex.nodeIds.has(edge.toNodeId)) {
+    if (typeof edge.toNodeId === "string" && !isProjectOverviewEndpoint(edge.to) && !isAppSurfaceEndpoint(edge.to) && !nodeIndex.nodeIds.has(edge.toNodeId)) {
       errors.push(`Edge ${edge.edgeId ?? index} references missing toNodeId ${edge.toNodeId}`);
     }
     checkEndpoint(edge.from, `edges[${index}].from`, nodeIndex.nodeIds, nodeIndex.nodesById, appSurfaceIds, errors);
     checkEndpoint(edge.to, `edges[${index}].to`, nodeIndex.nodeIds, nodeIndex.nodesById, appSurfaceIds, errors);
+    validateEdgeConsistency(flow, edge, index, nodeIndex, errors);
   }
 }
 
-function requireNumberFromRecord(obj: Record<string, unknown>, key: string, errors: string[], path?: string): void {
-  if (typeof obj[key] !== "number" || !Number.isFinite(obj[key])) {
-    errors.push(`${path ? `${path}.` : ""}${key} must be a number.`);
+function validateActionTargets(value: unknown, path: string, nodeIndex: NodeValidationIndex, errors: string[]): void {
+  if (!Array.isArray(value)) {
+    return;
   }
+  for (const [index, action] of value.entries()) {
+    if (!isRecord(action) || action.targetNodeId === undefined || typeof action.targetNodeId !== "string") {
+      continue;
+    }
+    const target = nodeIndex.nodesById.get(action.targetNodeId);
+    if (!target) {
+      errors.push(`${path}[${index}].targetNodeId references missing node ${action.targetNodeId}.`);
+    } else if (target.status === "removed") {
+      errors.push(`${path}[${index}].targetNodeId references removed node ${action.targetNodeId}.`);
+    }
+  }
+}
+
+function validateEdgeConsistency(
+  flow: Record<string, unknown>,
+  edge: Record<string, unknown>,
+  index: number,
+  nodeIndex: NodeValidationIndex,
+  errors: string[]
+): void {
+  const fromId = endpointStorageId(edge.from);
+  const toId = endpointStorageId(edge.to);
+  if (fromId && edge.fromNodeId !== fromId) {
+    errors.push(`edges[${index}].fromNodeId must match the from endpoint.`);
+  }
+  if (toId && edge.toNodeId !== toId) {
+    errors.push(`edges[${index}].toNodeId must match the to endpoint.`);
+  }
+
+  if (edge.status === "active") {
+    for (const [side, endpoint] of [["from", edge.from], ["to", edge.to]] as const) {
+      if (!isRecord(endpoint) || endpoint.kind === "appSurface" || endpoint.kind === "projectOverview") {
+        continue;
+      }
+      const node = typeof endpoint.nodeId === "string" ? nodeIndex.nodesById.get(endpoint.nodeId) : undefined;
+      if (node?.status === "removed") {
+        errors.push(`edges[${index}].${side} references removed node ${String(endpoint.nodeId)}.`);
+      }
+    }
+  }
+
+  validateDerivedEdgeField(flow, edge, index, "appSurfaceIds", nodeIndex, errors);
+  validateDerivedEdgeField(flow, edge, index, "domainIds", nodeIndex, errors);
+  validateDerivedEdgeField(flow, edge, index, "roleIds", nodeIndex, errors);
+}
+
+function endpointStorageId(value: unknown): string | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  if (value.kind === "projectOverview") {
+    return "projectOverview";
+  }
+  if (value.kind === "appSurface") {
+    return typeof value.appId === "string" ? value.appId : undefined;
+  }
+  return typeof value.nodeId === "string" ? value.nodeId : undefined;
+}
+
+function validateDerivedEdgeField(
+  flow: Record<string, unknown>,
+  edge: Record<string, unknown>,
+  index: number,
+  field: "appSurfaceIds" | "domainIds" | "roleIds",
+  nodeIndex: NodeValidationIndex,
+  errors: string[]
+): void {
+  const expected = uniqueStrings([
+    ...endpointTaxonomyIds(flow, edge.from, field, nodeIndex),
+    ...endpointTaxonomyIds(flow, edge.to, field, nodeIndex)
+  ]);
+  const actual = Array.isArray(edge[field]) ? uniqueStrings(edge[field].filter((item): item is string => typeof item === "string")) : [];
+  if (!sameStringSet(actual, expected)) {
+    errors.push(`edges[${index}].${field} must be derived from the edge endpoints.`);
+  }
+}
+
+function endpointTaxonomyIds(
+  flow: Record<string, unknown>,
+  endpoint: unknown,
+  field: "appSurfaceIds" | "domainIds" | "roleIds",
+  nodeIndex: NodeValidationIndex
+): string[] {
+  if (!isRecord(endpoint) || endpoint.kind === "projectOverview") {
+    return [];
+  }
+  if (endpoint.kind === "appSurface") {
+    const appId = typeof endpoint.appId === "string" ? endpoint.appId : "";
+    if (field === "appSurfaceIds") {
+      return appId ? [appId] : [];
+    }
+    const surfaces = Array.isArray(flow.appSurfaces) ? flow.appSurfaces : [];
+    const surface = surfaces.find((item) => isRecord(item) && item.appId === appId);
+    return surface && Array.isArray(surface[field]) ? surface[field].filter((item): item is string => typeof item === "string") : [];
+  }
+  const node = typeof endpoint.nodeId === "string" ? nodeIndex.nodesById.get(endpoint.nodeId) : undefined;
+  return node && Array.isArray(node[field]) ? node[field].filter((item): item is string => typeof item === "string") : [];
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+function sameStringSet(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value) => right.includes(value));
 }

@@ -1,4 +1,4 @@
-import type { AppSurfaceType, EdgeType, EntityStatus, FlowEndpointKind } from "./constants";
+import type { AppSurfaceType, EdgeType, EntityStatus } from "./constants";
 
 export interface BusinessDomain {
   domainId: string;
@@ -44,15 +44,6 @@ export interface ProductStatusGroup {
   title: string;
   description?: string;
   color: string;
-}
-
-export interface PageElement {
-  elementId: string;
-  name: string;
-  type: string;
-  description: string;
-  dataBinding?: string;
-  required?: boolean;
 }
 
 export interface PageAction {
@@ -101,14 +92,12 @@ export interface PageNode {
   version: number;
   title: string;
   pageType: string;
-  appSurfaceIds?: string[];
+  appSurfaceIds: string[];
   statusGroupId?: string;
   domainIds: string[];
   roleIds: string[];
   purpose: string;
-  featureGroups?: FeatureGroup[];
-  elements: PageElement[];
-  actions: PageAction[];
+  featureGroups: FeatureGroup[];
   states: PageState[];
   exceptions: PageException[];
   inputs: string[];
@@ -124,33 +113,31 @@ export interface PageNode {
   };
 }
 
-export interface FlowEndpoint {
-  kind: FlowEndpointKind;
-  nodeId: string;
-  appId?: string;
-  groupId?: string;
-  itemId?: string;
-}
+export type FlowEndpoint =
+  | { kind: "projectOverview"; nodeId: "projectOverview" }
+  | { kind: "appSurface"; nodeId: string; appId: string }
+  | { kind: "node"; nodeId: string }
+  | { kind: "featureGroup"; nodeId: string; groupId: string }
+  | { kind: "featureItem"; nodeId: string; groupId: string; itemId: string };
 
 export interface FlowEdge {
   edgeId: string;
   status: EntityStatus;
   fromNodeId: string;
   toNodeId: string;
-  from?: FlowEndpoint;
-  to?: FlowEndpoint;
+  from: FlowEndpoint;
+  to: FlowEndpoint;
   action: string;
   trigger?: string;
   type: EdgeType;
   condition?: string;
-  appSurfaceIds?: string[];
+  appSurfaceIds: string[];
   domainIds: string[];
   roleIds: string[];
   removedAt?: string;
 }
 
 export interface ProductFlow {
-  schemaVersion: string;
   flowId: string;
   revision: number;
   title: string;
@@ -159,8 +146,8 @@ export interface ProductFlow {
   projectOverview: ProjectOverview;
   domains: BusinessDomain[];
   roles: UserRole[];
-  appSurfaces?: AppSurface[];
-  statusGroups?: ProductStatusGroup[];
+  appSurfaces: AppSurface[];
+  statusGroups: ProductStatusGroup[];
   nodes: PageNode[];
   edges: FlowEdge[];
 }

@@ -119,15 +119,19 @@
     }
   },
   "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "clean": "node -e \"require('node:fs').rmSync('out',{recursive:true,force:true})\"",
     "build:webview": "node scripts/build-webview.mjs",
     "smoke:webview": "node scripts/render-webview-smoke.mjs",
-    "compile": "npm run build:webview && tsc -p ./",
-    "typecheck": "npm run build:webview && tsc -p ./ --noEmit && tsc -p ./tsconfig.test.json --noEmit",
+    "compile": "npm run clean && npm run build:webview && tsc -p ./",
+    "typecheck": "npm run build:webview && tsc -p ./ --noEmit && tsc -p ./tsconfig.webview.json && tsc -p ./tsconfig.test.json --noEmit",
     "watch": "npm run build:webview && tsc -watch -p ./",
-    "package": "node scripts/package-vsix.mjs",
+    "package": "vsce package --no-dependencies",
     "test": "node scripts/run-tests.mjs"
   },
   "devDependencies": {
+    "@types/node": "20.16.1",
+    "@types/vscode": "1.92.0",
     "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.1",
     "typescript": "5.5.4"

@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as vscode from "vscode";
 import type { ProductFlow } from "../../../../product-flow/domain";
 import { serializeProductFlow } from "../../../../product-flow/domain/serialization/codec";
+import { enqueueFlowDocumentEdit } from "../../documents/flowEditQueue";
 
 export interface RenderableDocumentText {
   text: string;
@@ -23,10 +24,17 @@ export function readRenderableDocumentText(document: vscode.TextDocument, fallba
 }
 
 export async function replaceDocumentText(document: vscode.TextDocument, text: string): Promise<boolean> {
-  const edit = new vscode.WorkspaceEdit();
-  const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
-  edit.replace(document.uri, fullRange, text);
-  return vscode.workspace.applyEdit(edit);
+  const expectedVersion = document.version;
+  return enqueueFlowDocumentEdit(document.uri.toString(), async () => {
+    const latest = await vscode.workspace.openTextDocument(document.uri);
+    if (expectedVersion !== undefined && latest.version !== undefined && latest.version !== expectedVersion) {
+      return false;
+    }
+    const edit = new vscode.WorkspaceEdit();
+    const fullRange = new vscode.Range(latest.positionAt(0), latest.positionAt(latest.getText().length));
+    edit.replace(latest.uri, fullRange, text);
+    return vscode.workspace.applyEdit(edit);
+  });
 }
 
 function createHydratedDocumentText(document: vscode.TextDocument, fallbackFlow?: ProductFlow): string | undefined {

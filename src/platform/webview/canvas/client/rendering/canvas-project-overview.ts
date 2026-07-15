@@ -1,4 +1,3 @@
-// @ts-nocheck
 function renderProjectOverviewCard(flow) {
   const overview = getProjectOverview(flow);
   const summary = overview.summary || "暂无项目综述";

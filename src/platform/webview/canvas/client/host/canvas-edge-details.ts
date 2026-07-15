@@ -1,4 +1,3 @@
-// @ts-nocheck
 function submitEdgeDetails(options = {}) {
   if (!selectedEdgeId) {
     return;
@@ -28,8 +27,8 @@ function submitEdgeDetails(options = {}) {
 
 function collectEdgeDetailsPatch() {
   const edge = state.flow.edges.find((item) => item.edgeId === selectedEdgeId);
-  const fallbackFrom = edge?.from || (edge?.fromNodeId ? { kind: "node", nodeId: edge.fromNodeId } : undefined);
-  const fallbackTo = edge?.to || (edge?.toNodeId ? { kind: "node", nodeId: edge.toNodeId } : undefined);
+  const fallbackFrom = edge?.from;
+  const fallbackTo = edge?.to;
   const fromInput = requireElementById("edgeFromEndpoint");
   const toInput = requireElementById("edgeToEndpoint");
   const edgeTypeInput = requireElementById("edgeType");
@@ -38,10 +37,7 @@ function collectEdgeDetailsPatch() {
     from: parseEndpointValue(fromInput.dataset.endpointValue, fallbackFrom),
     to: parseEndpointValue(toInput.dataset.endpointValue, fallbackTo),
     type: edgeTypeInput.dataset.edgeTypeValue || "interaction",
-    condition: requireInputValue("edgeCondition"),
-    appSurfaceIds: collectTagMultiSelect("edgeAppSurfaceIds"),
-    domainIds: collectTagMultiSelect("edgeDomainIds"),
-    roleIds: collectTagMultiSelect("edgeRoleIds")
+    condition: requireInputValue("edgeCondition")
   };
 }
 
@@ -71,9 +67,6 @@ function applyEdgeDetailsLocally(edgeId, patch) {
   edge.action = edge.trigger;
   edge.type = patch.type;
   edge.condition = patch.condition.trim() || undefined;
-  edge.appSurfaceIds = patch.appSurfaceIds;
-  edge.domainIds = patch.domainIds;
-  edge.roleIds = patch.roleIds;
   const title = document.getElementById("edgePanelTitle");
   const titleInput = document.getElementById("edgeTriggerRule");
   if (title && title.dataset.inlineEditing !== "true") {
@@ -114,20 +107,11 @@ function reconcilePendingEdgeDetailsSaves() {
 }
 
 function edgeDetailsPatchMatches(edge, patch) {
-  const from = edge.from || { kind: "node", nodeId: edge.fromNodeId };
-  const to = edge.to || { kind: "node", nodeId: edge.toNodeId };
+  const from = edge.from;
+  const to = edge.to;
   return endpointKey(from) === endpointKey(patch.from) &&
     endpointKey(to) === endpointKey(patch.to) &&
     String(edge.trigger || edge.action || "") === String(patch.trigger || "").trim() &&
     normalizeEdgeTypeForSelect(edge.type) === normalizeEdgeTypeForSelect(patch.type) &&
-    String(edge.condition || "") === String(patch.condition || "").trim() &&
-    sameStringSet(edge.appSurfaceIds || [], patch.appSurfaceIds || []) &&
-    sameStringSet(edge.domainIds || [], patch.domainIds || []) &&
-    sameStringSet(edge.roleIds || [], patch.roleIds || []);
-}
-
-function sameStringSet(left, right) {
-  const leftValues = [...new Set((left || []).filter(Boolean))].sort();
-  const rightValues = [...new Set((right || []).filter(Boolean))].sort();
-  return leftValues.length === rightValues.length && leftValues.every((value, index) => value === rightValues[index]);
+    String(edge.condition || "") === String(patch.condition || "").trim();
 }

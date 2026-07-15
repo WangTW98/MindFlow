@@ -1,4 +1,3 @@
-// @ts-nocheck
 function bindInlineTitleEditor(titleId, inputId, commit) {
   const title = document.getElementById(titleId);
   const input = document.getElementById(inputId);

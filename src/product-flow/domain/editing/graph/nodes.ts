@@ -1,6 +1,7 @@
 import type { AppSurface, PageNode, ProductFlow } from "../..";
 import { makeNodeId, nowIso, stableKey } from "../../id";
-import { defaultFeatureGroups, featureGroupsToActions, featureGroupsToElements, normalizeFeatureGroups } from "./featureGroups";
+import { defaultFeatureGroups, normalizeFeatureGroups } from "./featureGroups";
+import { refreshAllFlowEdgeDerivedState } from "./edges";
 import { normalizeStringArray, requireAppSurface, requireNode, sanitizeText, touchFlow, uniqueNodeId } from "./shared";
 import type { CreateNodeInput, UpdateNodeDetailsInput } from "./types";
 
@@ -12,8 +13,6 @@ export function createFlowNode(flow: ProductFlow, input: CreateNodeInput = {}): 
   const nodeId = uniqueNodeId(flow, makeNodeId(title, seed));
   const featureGroups = normalizeFeatureGroups(input.featureGroups, nodeId);
   const groups = featureGroups.length > 0 ? featureGroups : defaultFeatureGroups(nodeId);
-  const elements = featureGroupsToElements(nodeId, groups);
-  const actions = featureGroupsToActions(nodeId, groups);
   const hasExplicitPosition = Number.isFinite(input.x) || Number.isFinite(input.y);
   const node: PageNode = {
     nodeId,
@@ -27,8 +26,6 @@ export function createFlowNode(flow: ProductFlow, input: CreateNodeInput = {}): 
     roleIds: normalizeStringArray(input.roleIds),
     purpose,
     featureGroups: groups,
-    elements,
-    actions,
     states: [{ stateId: `state_${stableKey(nodeId, "default")}`, name: "默认态", description: "页面加载并可正常操作。" }],
     exceptions: [{ exceptionId: `ex_${stableKey(nodeId, "manual")}`, name: "异常处理", handling: "按业务规则提示用户并支持重试。" }],
     inputs: [],
@@ -89,10 +86,9 @@ export function updateFlowNodeDetails(flow: ProductFlow, nodeId: string, patch: 
   }
   if (patch.featureGroups !== undefined) {
     node.featureGroups = normalizeFeatureGroups(patch.featureGroups, node.nodeId);
-    node.elements = featureGroupsToElements(node.nodeId, node.featureGroups);
-    node.actions = featureGroupsToActions(node.nodeId, node.featureGroups);
   }
   node.version += 1;
+  refreshAllFlowEdgeDerivedState(flow);
   touchFlow(flow);
   return node;
 }

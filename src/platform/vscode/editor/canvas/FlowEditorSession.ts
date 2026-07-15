@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
 import { applyFlowOperations, type FlowOperation } from "../../../../product-flow/application/operations";
 import type { ProductFlow } from "../../../../product-flow/domain";
-import { parseProductFlowText, serializeProductFlow, tryParseProductFlowText } from "../../../../product-flow/domain/serialization/codec";
+import { parseProductFlowText, tryParseProductFlowText } from "../../../../product-flow/domain/serialization/codec";
 import { editCurrentFlowDocument } from "../../documents/flowDocumentService";
 import { chooseFresherFlow } from "./flowDocument";
 import { dispatchFlowWebviewMessage, type FlowWebviewApplyOptions } from "./flowCommandDispatcher";
 import { readRenderableDocumentText, replaceDocumentText as applyDocumentTextReplacement } from "./flowDocumentText";
 import type { FlowEditorSelectionController } from "./flowSelectionController";
+import type { FlowSelectionState } from "../../../../product-flow/domain/selection";
 import { createFlowWebviewState } from "./flowWebviewState";
 import {
   FLOW_WEBVIEW_SCRIPT_FILES,
@@ -20,6 +21,7 @@ import { parseWebviewMessage, type WebviewMessage } from "../../../webview/proto
 
 export class FlowEditorSession {
   private flow: ProductFlow | undefined;
+  private hasRenderedHtml = false;
   private messageQueue: Promise<void> = Promise.resolve();
   private readonly latestEdgeDetailsRevisions = new Map<string, number>();
 
@@ -56,10 +58,7 @@ export class FlowEditorSession {
       }
       const result = parseProductFlowText(text, "ProductFlow");
       this.flow = result.flow;
-      if (result.migrated) {
-        void this.replaceDocumentText(document, serializeProductFlow(this.flow));
-      }
-      this.renderFlow(this.flow);
+      this.publishFlow(this.flow);
     } catch (error) {
       this.renderError(error instanceof Error ? error.message : String(error));
     }
@@ -73,15 +72,19 @@ export class FlowEditorSession {
       }
       const documentFlow = tryParseProductFlowText(renderable.text);
       this.flow = documentFlow ? chooseFresherFlow(documentFlow, fallbackFlow) : fallbackFlow;
-      this.renderFlow(this.flow);
+      this.publishFlow(this.flow);
     } catch {
       this.flow = fallbackFlow;
-      this.renderFlow(fallbackFlow);
+      this.publishFlow(fallbackFlow);
     }
   }
 
   public reveal(): void {
     this.panel.reveal(vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One);
+  }
+
+  public applySelection(selection: FlowSelectionState): void {
+    void this.panel.webview.postMessage({ type: "selectionChanged", selection });
   }
 
   private async replaceDocumentText(document: vscode.TextDocument, text: string): Promise<void> {
@@ -133,7 +136,11 @@ export class FlowEditorSession {
     });
   }
 
-  private renderFlow(flow: ProductFlow): void {
+  private publishFlow(flow: ProductFlow): void {
+    if (this.hasRenderedHtml) {
+      void this.panel.webview.postMessage({ type: "flowChanged", flow });
+      return;
+    }
     const selection = this.selectionController.getSelection(this.document.uri);
     this.panel.webview.html = createFlowWebviewHtml({
       cspSource: this.panel.webview.cspSource,
@@ -142,14 +149,17 @@ export class FlowEditorSession {
       scriptUris: FLOW_WEBVIEW_SCRIPT_FILES.map((fileName) => this.outUri("webview", "canvas", fileName)),
       initialState: createFlowWebviewState(flow, this.document, selection)
     });
+    this.hasRenderedHtml = true;
   }
 
   private renderError(message: string): void {
     this.panel.webview.html = createFlowErrorHtml(message, getNonce());
+    this.hasRenderedHtml = false;
   }
 
   private renderRestorePending(): void {
     this.panel.webview.html = createFlowRestorePendingHtml(getNonce());
+    this.hasRenderedHtml = false;
   }
 
   private assetUri(...segments: string[]): string {

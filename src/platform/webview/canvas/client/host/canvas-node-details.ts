@@ -1,4 +1,3 @@
-// @ts-nocheck
 function submitNodeDetails(event) {
   event?.preventDefault();
   commitNodeDetailsChange({ immediate: true });

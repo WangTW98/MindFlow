@@ -1,4 +1,3 @@
-// @ts-nocheck
 function autoLayoutApplyCanvasPreview() {
   const layout = autoLayoutComputePreview(state.flow, autoLayoutCollectMeasurements());
   autoLayoutPreviewState = null;

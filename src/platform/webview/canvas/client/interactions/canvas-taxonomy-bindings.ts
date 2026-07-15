@@ -1,4 +1,3 @@
-// @ts-nocheck
 function bindTaxonomyPanelToggles(root = document) {
   root.querySelectorAll("[data-taxonomy-toggle]").forEach((button) => {
     button.addEventListener("click", (event) => {
@@ -32,7 +31,7 @@ function closeAllTaxonomyPanels() {
   return true;
 }
 
-function bindTaxonomyControls(root = document) {
+function bindTaxonomyControls(root: any = document) {
   root.querySelectorAll(".taxonomy-filter-checkbox").forEach((checkbox) => {
     checkbox.addEventListener("change", (event) => {
       event.stopPropagation();
@@ -243,9 +242,7 @@ function removeTaxonomyItemLocally(flow, kind, id) {
 
 function edgeReferencesAppSurfaceEndpoint(edge, appId) {
   return endpointReferencesAppSurface(edge.from, appId) ||
-    endpointReferencesAppSurface(edge.to, appId) ||
-    (!edge.from && edge.fromNodeId === appId) ||
-    (!edge.to && edge.toNodeId === appId);
+    endpointReferencesAppSurface(edge.to, appId);
 }
 
 function endpointReferencesAppSurface(endpoint, appId) {

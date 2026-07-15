@@ -1,4 +1,3 @@
-// @ts-nocheck
 function startNodeDrag(event) {
   startCardDrag(event, "node");
 }
