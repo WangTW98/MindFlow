@@ -4,14 +4,17 @@ import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
 import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../src/platform/mcp/protocol/bridge";
 import { mindflowMcpContractHash } from "../src/platform/mcp/protocol/contractHash";
 import { MINDFLOW_MCP_CONTRACT_VERSION } from "../src/platform/mcp/protocol/globalToolSchemas";
 import { MindFlowMcpProtocol } from "../src/platform/mcp/protocol/jsonRpcProtocol";
+import { MINDFLOW_LATEST_MCP_PROTOCOL_VERSION } from "../src/platform/mcp/protocol/protocolVersion";
 import { isMcpStdioMessageWithinLimit, MAX_MCP_MESSAGE_BYTES, MindFlowGlobalRouter } from "../src/platform/mcp/runtime/globalRouter";
 import { MindFlowMcpToolHandlers } from "../src/platform/mcp/tools";
 import { emptyFlowSelection, type FlowSelectionPatch } from "../src/product-flow/domain/selection";
+import { MINDFLOW_VERSION } from "../src/shared/version";
 
 test("MCP protocol validates JSON-RPC and initialization lifecycle", async () => {
   const flow = createEmptyProductFlow();
@@ -27,9 +30,9 @@ test("MCP protocol validates JSON-RPC and initialization lifecycle", async () =>
     jsonrpc: "2.0",
     id: 3,
     method: "initialize",
-    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test", version: "1" } }
+    params: { protocolVersion: MINDFLOW_LATEST_MCP_PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "test", version: "1" } }
   });
-  assert.equal((initialized?.result as Record<string, unknown>).protocolVersion, "2024-11-05");
+  assert.equal((initialized?.result as Record<string, unknown>).protocolVersion, MINDFLOW_LATEST_MCP_PROTOCOL_VERSION);
   assert.equal(await protocol.handle({ jsonrpc: "2.0", method: "notifications/initialized" }), undefined);
 
   const tools = await protocol.handle({ jsonrpc: "2.0", id: 4, method: "tools/list" });
@@ -37,6 +40,38 @@ test("MCP protocol validates JSON-RPC and initialization lifecycle", async () =>
 
   const missing = await protocol.handle({ jsonrpc: "2.0", id: 5, method: "missing/method" });
   assert.equal(readErrorCode(missing), -32601);
+});
+
+test("MCP protocol preserves the compatible legacy version and falls back to latest", async () => {
+  for (const [requested, expected] of [
+    ["2024-11-05", "2024-11-05"],
+    ["2099-01-01", MINDFLOW_LATEST_MCP_PROTOCOL_VERSION]
+  ]) {
+    const protocol = new MindFlowMcpProtocol(new MindFlowMcpToolHandlers(new TestBridge(createEmptyProductFlow())));
+    const initialized = await protocol.handle({
+      jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: requested }
+    });
+    assert.equal((initialized?.result as Record<string, unknown>).protocolVersion, expected);
+  }
+});
+
+test("global MCP Router negotiates current, legacy, and unsupported protocol versions", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-router-negotiation-"));
+  try {
+    for (const [requested, expected] of [
+      [MINDFLOW_LATEST_MCP_PROTOCOL_VERSION, MINDFLOW_LATEST_MCP_PROTOCOL_VERSION],
+      ["2024-11-05", "2024-11-05"],
+      ["2099-01-01", MINDFLOW_LATEST_MCP_PROTOCOL_VERSION]
+    ]) {
+      const router = new MindFlowGlobalRouter(directory);
+      const initialized = await router.handle({
+        jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: requested }
+      });
+      assert.equal((initialized?.result as Record<string, unknown>).protocolVersion, expected);
+    }
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("global MCP Router enforces its stdio limit on each complete message", () => {
@@ -52,12 +87,17 @@ test("global MCP Router discovers a live host and aggregates its editors", async
   const flow = createEmptyProductFlow("Router Test");
   const bridge = new TestBridge(flow, flowPath);
   const backendProtocol = new MindFlowMcpProtocol(new MindFlowMcpToolHandlers(bridge));
+  const backendClientVersions: unknown[] = [];
   const server = http.createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk) => chunks.push(chunk));
     request.on("end", async () => {
       assert.equal(request.headers.authorization, `Bearer ${token}`);
       const payload = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+      if (payload.method === "initialize") {
+        const params = payload.params as Record<string, unknown>;
+        backendClientVersions.push((params.clientInfo as Record<string, unknown>).version);
+      }
       const result = await backendProtocol.handle(payload);
       if (result === undefined) {
         response.statusCode = 202;
@@ -102,6 +142,7 @@ test("global MCP Router discovers a live host and aggregates its editors", async
     assert.equal(editor.hostId, "host-a");
     assert.equal(editor.hostName, "VS Code Window");
     assert.equal("workspaceName" in editor, false);
+    assert.deepEqual(backendClientVersions, [MINDFLOW_VERSION]);
 
     const externalPath = path.join(os.tmpdir(), "mindflow-external", "external.mindflow");
     const opened = await router.handle({
@@ -241,13 +282,17 @@ test("global MCP Router uses recent focus, accepts hostId override, and routes b
 
 test("global MCP Router rejects modifying a flow opened by multiple hosts", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-duplicate-router-"));
-  const sharedFlowPath = path.join(os.tmpdir(), "mindflow-shared", "shared.mindflow");
+  const sharedDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-shared-"));
+  const sharedFlowPath = path.join(sharedDirectory, "shared.mindflow");
+  const sharedAliasPath = path.join(sharedDirectory, "shared-alias.mindflow");
   const backends: http.Server[] = [];
   try {
+    await fs.writeFile(sharedFlowPath, "{}", "utf8");
+    await fs.symlink(sharedFlowPath, sharedAliasPath);
     for (let index = 0; index < 2; index += 1) {
       const token = `duplicate-token-${index}`;
       const protocol = new MindFlowMcpProtocol(new MindFlowMcpToolHandlers(
-        new TestBridge(createEmptyProductFlow(`Duplicate ${index}`), sharedFlowPath)
+        new TestBridge(createEmptyProductFlow(`Duplicate ${index}`), index === 0 ? sharedFlowPath : sharedAliasPath)
       ));
       const server = http.createServer((request, response) => {
         const chunks: Buffer[] = [];
@@ -277,7 +322,7 @@ test("global MCP Router rejects modifying a flow opened by multiple hosts", asyn
 
     const router = new MindFlowGlobalRouter(directory);
     await initializeRouter(router);
-    const flowUri = new URL(`file://${sharedFlowPath}`).toString();
+    const flowUri = pathToFileURL(sharedFlowPath).toString();
     const explicitRead = await router.handle({
       jsonrpc: "2.0", id: 20, method: "tools/call",
       params: { name: "mindflow_get_editor_state", arguments: { flowUri, hostId: "duplicate-1" } }
@@ -292,6 +337,7 @@ test("global MCP Router rejects modifying a flow opened by multiple hosts", asyn
   } finally {
     await Promise.all(backends.map(close));
     await fs.rm(directory, { recursive: true, force: true });
+    await fs.rm(sharedDirectory, { recursive: true, force: true });
   }
 });
 
@@ -327,7 +373,7 @@ function readErrorMessage(response: Record<string, unknown> | undefined): string
 }
 
 async function initializeRouter(router: MindFlowGlobalRouter): Promise<void> {
-  await router.handle({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05" } });
+  await router.handle({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: MINDFLOW_LATEST_MCP_PROTOCOL_VERSION } });
   await router.handle({ jsonrpc: "2.0", method: "notifications/initialized" });
 }
 

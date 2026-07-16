@@ -5,6 +5,7 @@ import * as path from "node:path";
 import * as readline from "node:readline";
 import test from "node:test";
 import { MAX_MCP_MESSAGE_BYTES } from "../src/platform/mcp/runtime/globalRouter";
+import { MINDFLOW_LATEST_MCP_PROTOCOL_VERSION } from "../src/platform/mcp/protocol/protocolVersion";
 
 test("packaged global Router speaks newline-delimited MCP over a real stdio process", async () => {
   const child = spawn(process.execPath, [path.join(process.cwd(), "out", "mcp-runtime", "mindflow-mcp-router.cjs")], {
@@ -15,11 +16,11 @@ test("packaged global Router speaks newline-delimited MCP over a real stdio proc
   try {
     writeRequest(child, {
       jsonrpc: "2.0", id: 1, method: "initialize",
-      params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "process-test", version: "1" } }
+      params: { protocolVersion: MINDFLOW_LATEST_MCP_PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "process-test", version: "1" } }
     });
     const initialized = await responses.next();
     assert.equal(initialized.value?.id, 1);
-    assert.equal((initialized.value?.result as Record<string, unknown>).protocolVersion, "2024-11-05");
+    assert.equal((initialized.value?.result as Record<string, unknown>).protocolVersion, MINDFLOW_LATEST_MCP_PROTOCOL_VERSION);
     const manifest = JSON.parse(await fs.readFile(path.join(process.cwd(), "package.json"), "utf8"));
     assert.equal(((initialized.value?.result as Record<string, unknown>).serverInfo as Record<string, unknown>).version, manifest.version);
 

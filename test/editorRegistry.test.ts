@@ -1,5 +1,9 @@
 import { strict as assert } from "node:assert";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import type * as vscode from "vscode";
 import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
 import { emptyFlowSelection, type FlowSelectionState } from "../src/product-flow/domain/selection";
@@ -45,6 +49,29 @@ test("FlowEditorRegistry renders all panels and reveals only the first", () => {
   assert.equal(first.revealCount + second.revealCount, 1);
 });
 
+test("FlowEditorRegistry treats a symlink alias as the same open editor", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-editor-key-"));
+  try {
+    const physicalPath = path.join(directory, "physical.mindflow");
+    const aliasPath = path.join(directory, "alias.mindflow");
+    await fs.writeFile(physicalPath, "{}", "utf8");
+    await fs.symlink(physicalPath, aliasPath);
+    const registry = new FlowEditorRegistry();
+    const physicalUri = fileUri(physicalPath);
+    const aliasUri = fileUri(aliasPath);
+    const document = { uri: physicalUri } as vscode.TextDocument;
+    const session = new FakeSession();
+
+    registry.register(physicalUri, document, session);
+    assert.equal(registry.hasSession(aliasUri), true);
+    assert.equal(registry.getOpenFlowUri(aliasUri)?.toString(), physicalUri.toString());
+    assert.equal(registry.revealSession(aliasUri), true);
+    assert.equal(session.revealCount, 1);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
 class FakeSession implements RenderableFlowEditorSession {
   public readonly selections: FlowSelectionState[] = [];
   public renderCount = 0;
@@ -65,4 +92,8 @@ class FakeSession implements RenderableFlowEditorSession {
 
 function fakeUri(value: string): vscode.Uri {
   return { toString: () => value } as vscode.Uri;
+}
+
+function fileUri(value: string): vscode.Uri {
+  return { scheme: "file", fsPath: value, toString: () => pathToFileURL(value).toString() } as vscode.Uri;
 }

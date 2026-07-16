@@ -5,6 +5,7 @@ import * as path from "node:path";
 import test from "node:test";
 import { mindflowMcpCompatibilityDescriptor, mindflowMcpContractHash } from "../src/platform/mcp/protocol/contractHash";
 import { MINDFLOW_MCP_CONTRACT_VERSION } from "../src/platform/mcp/protocol/globalToolSchemas";
+import { MINDFLOW_SUPPORTED_MCP_PROTOCOL_VERSIONS } from "../src/platform/mcp/protocol/protocolVersion";
 import { discoverMindFlowSessions, MINDFLOW_SESSION_STALE_AFTER_MS } from "../src/platform/mcp/runtime/sessionRegistry";
 
 test("host discovery accepts empty-window hosts and rejects legacy workspace records", async () => {
@@ -44,6 +45,7 @@ test("MCP compatibility descriptor contains only versioned wire fields", () => {
   assert.equal(text.includes("description"), false);
   assert.equal(text.includes("annotations"), false);
   assert.equal(descriptor.contractVersion, MINDFLOW_MCP_CONTRACT_VERSION);
+  assert.deepEqual(descriptor.protocolVersions, MINDFLOW_SUPPORTED_MCP_PROTOCOL_VERSIONS);
 });
 
 test("host discovery rejects stale and implausibly future heartbeats even when the pid is alive", async () => {

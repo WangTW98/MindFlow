@@ -9,8 +9,7 @@ import {
 } from "./operationsReference";
 import type { MindFlowMcpToolHandlers } from "../tools";
 import { MINDFLOW_VERSION } from "../../../shared/version";
-
-const SUPPORTED_PROTOCOL_VERSION = "2024-11-05";
+import { negotiateMindFlowMcpProtocolVersion } from "./protocolVersion";
 
 export interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -86,7 +85,7 @@ export class MindFlowMcpProtocol {
       }
       this.initializeRequested = true;
       return {
-        protocolVersion: SUPPORTED_PROTOCOL_VERSION,
+        protocolVersion: negotiateMindFlowMcpProtocolVersion(request.protocolVersion),
         capabilities: { tools: {}, resources: {} },
         serverInfo: { name: "mindflow-vscode", version: MINDFLOW_VERSION },
         instructions: MINDFLOW_SERVER_INSTRUCTIONS

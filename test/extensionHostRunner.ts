@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { MINDFLOW_MCP_CONTRACT_VERSION } from "../src/platform/mcp/protocol/globalToolSchemas";
+import { MINDFLOW_LATEST_MCP_PROTOCOL_VERSION } from "../src/platform/mcp/protocol/protocolVersion";
 import { parseMindFlowSessionRecord } from "../src/platform/mcp/runtime/sessionRegistry";
 
 export async function run(): Promise<void> {
@@ -24,9 +25,9 @@ export async function run(): Promise<void> {
 
   const initialize = await post(record.endpoint, record.token, {
     jsonrpc: "2.0", id: 1, method: "initialize",
-    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "extension-host-test", version: "1" } }
+    params: { protocolVersion: MINDFLOW_LATEST_MCP_PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "extension-host-test", version: "1" } }
   });
-  assert.equal((initialize.result as Record<string, unknown>).protocolVersion, "2024-11-05");
+  assert.equal((initialize.result as Record<string, unknown>).protocolVersion, MINDFLOW_LATEST_MCP_PROTOCOL_VERSION);
   await post(record.endpoint, record.token, { jsonrpc: "2.0", method: "notifications/initialized" });
   const tools = await post(record.endpoint, record.token, { jsonrpc: "2.0", id: 2, method: "tools/list" });
   assert.ok(Array.isArray((tools.result as Record<string, unknown>).tools));

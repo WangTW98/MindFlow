@@ -1,5 +1,5 @@
-import * as path from "node:path";
 import type * as vscode from "vscode";
+import { canonicalFileKey, canonicalLocalFilePath } from "../../../shared/canonicalFileKey";
 
 const RECENT_FLOWS_KEY = "mindflow.recentFlows";
 const RECENT_FLOW_LIMIT = 20;
@@ -22,18 +22,19 @@ export class RecentFlowStore {
   }
 
   public async add(flowPath: string, openedAt = Date.now()): Promise<void> {
-    const normalizedPath = normalizePath(flowPath);
+    const normalizedPath = canonicalLocalFilePath(flowPath);
+    const key = canonicalFileKey(normalizedPath);
     const records = this.get() ?? [];
     await this.replace([
       { absolutePath: normalizedPath, lastOpenedAt: openedAt },
-      ...records.filter((record) => normalizePath(record.absolutePath) !== normalizedPath)
+      ...records.filter((record) => canonicalFileKey(record.absolutePath) !== key)
     ]);
   }
 
   public async remove(flowPath: string): Promise<void> {
-    const normalizedPath = normalizePath(flowPath);
+    const key = canonicalFileKey(flowPath);
     const records = this.get() ?? [];
-    await this.replace(records.filter((record) => normalizePath(record.absolutePath) !== normalizedPath));
+    await this.replace(records.filter((record) => canonicalFileKey(record.absolutePath) !== key));
   }
 
   public async clear(): Promise<void> {
@@ -45,20 +46,17 @@ function normalizeRecentFlows(records: RecentFlowRecord[]): RecentFlowRecord[] {
   const seen = new Set<string>();
   return records
     .map((record) => ({
-      absolutePath: normalizePath(record.absolutePath),
+      absolutePath: canonicalLocalFilePath(record.absolutePath),
       lastOpenedAt: Number.isFinite(record.lastOpenedAt) ? record.lastOpenedAt : 0
     }))
     .filter((record) => {
-      if (!record.absolutePath || seen.has(record.absolutePath)) {
+      const key = canonicalFileKey(record.absolutePath);
+      if (!record.absolutePath || seen.has(key)) {
         return false;
       }
-      seen.add(record.absolutePath);
+      seen.add(key);
       return true;
     })
     .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
     .slice(0, RECENT_FLOW_LIMIT);
-}
-
-function normalizePath(flowPath: string): string {
-  return path.normalize(flowPath);
 }

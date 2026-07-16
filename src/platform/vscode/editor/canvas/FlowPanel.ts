@@ -66,6 +66,10 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     return FlowPanel.registry.hasSession(flowUri);
   }
 
+  public static getOpenFlowUri(flowUri: vscode.Uri): vscode.Uri | undefined {
+    return FlowPanel.registry.getOpenFlowUri(flowUri);
+  }
+
   private constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly onDidOpenFlow: OpenFlowCallback
@@ -76,6 +80,15 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): void {
+    const existingUri = FlowPanel.registry.getOpenFlowUri(document.uri);
+    if (existingUri && existingUri.toString() !== document.uri.toString()) {
+      FlowPanel.registry.revealSession(existingUri);
+      webviewPanel.dispose();
+      void vscode.window.showWarningMessage(
+        `This physical MindFlow file is already open as ${existingUri.scheme === "file" ? existingUri.fsPath : existingUri.toString()}.`
+      );
+      return;
+    }
     FlowPanel.registry.setActive(document.uri);
     this.onDidOpenFlow(document.uri);
     webviewPanel.webview.options = {

@@ -69,3 +69,22 @@ test("RecentFlowStore clears and removes recent MindFlow records", async () => {
   await store.clear();
   assert.deepEqual(store.get(), []);
 });
+
+test("RecentFlowStore deduplicates symlink aliases by physical file", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-recent-key-"));
+  try {
+    const physicalPath = path.join(directory, "physical.mindflow");
+    const aliasPath = path.join(directory, "alias.mindflow");
+    await fs.writeFile(physicalPath, "{}", "utf8");
+    await fs.symlink(physicalPath, aliasPath);
+    const store = new RecentFlowStore(new FakeMemento() as unknown as vscode.Memento);
+
+    await store.add(physicalPath, 100);
+    await store.add(aliasPath, 200);
+    assert.deepEqual(store.get(), [{ absolutePath: await fs.realpath(physicalPath), lastOpenedAt: 200 }]);
+    await store.remove(aliasPath);
+    assert.deepEqual(store.get(), []);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});

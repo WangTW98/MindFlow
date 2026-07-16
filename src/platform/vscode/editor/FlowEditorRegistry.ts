@@ -1,6 +1,7 @@
 import type * as vscode from "vscode";
 import type { ProductFlow } from "../../../product-flow/domain";
 import type { FlowSelectionState } from "../../../product-flow/domain/selection";
+import { canonicalFileKey } from "../../../shared/canonicalFileKey";
 
 export interface OpenFlowEditorSession {
   uri: vscode.Uri;
@@ -24,11 +25,11 @@ export class FlowEditorRegistry {
   private activeFlowKey: string | undefined;
 
   public setActive(flowUri: vscode.Uri): void {
-    this.activeFlowKey = flowUri.toString();
+    this.activeFlowKey = canonicalFileKey(flowUri);
   }
 
   public register(flowUri: vscode.Uri, document: vscode.TextDocument, session: RenderableFlowEditorSession): void {
-    const key = flowUri.toString();
+    const key = canonicalFileKey(flowUri);
     const entry = this.entries.get(key) ?? { document, sessions: new Set<RenderableFlowEditorSession>() };
     entry.document = document;
     entry.sessions.add(session);
@@ -36,7 +37,7 @@ export class FlowEditorRegistry {
   }
 
   public remove(flowUri: vscode.Uri, session: RenderableFlowEditorSession): boolean {
-    const key = flowUri.toString();
+    const key = canonicalFileKey(flowUri);
     const entry = this.entries.get(key);
     if (!entry || !entry.sessions.delete(session)) {
       return false;
@@ -65,18 +66,29 @@ export class FlowEditorRegistry {
   }
 
   public hasSession(flowUri: vscode.Uri): boolean {
-    return (this.entries.get(flowUri.toString())?.sessions.size ?? 0) > 0;
+    return (this.entries.get(canonicalFileKey(flowUri))?.sessions.size ?? 0) > 0;
+  }
+
+  public getOpenFlowUri(flowUri: vscode.Uri): vscode.Uri | undefined {
+    return this.entries.get(canonicalFileKey(flowUri))?.document.uri;
+  }
+
+  public revealSession(flowUri: vscode.Uri): boolean {
+    const session = this.entries.get(canonicalFileKey(flowUri))?.sessions.values().next().value;
+    if (!session) return false;
+    session.reveal();
+    return true;
   }
 
   public applySelection(flowUri: vscode.Uri | string, selection: FlowSelectionState): void {
-    const key = typeof flowUri === "string" ? flowUri : flowUri.toString();
+    const key = canonicalFileKey(flowUri);
     for (const session of this.entries.get(key)?.sessions ?? []) {
       session.applySelection(selection);
     }
   }
 
   public renderSession(flowUri: vscode.Uri, fallbackFlow: ProductFlow): boolean {
-    const sessions = this.entries.get(flowUri.toString())?.sessions;
+    const sessions = this.entries.get(canonicalFileKey(flowUri))?.sessions;
     if (!sessions || sessions.size === 0) {
       return false;
     }

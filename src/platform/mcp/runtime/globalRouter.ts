@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import * as http from "node:http";
-import * as path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { canonicalFileKey } from "../../../shared/canonicalFileKey";
 import { assertAbsoluteLocalMindFlowPath } from "../../../shared/localMindFlowPath";
 import { MINDFLOW_VERSION } from "../../../shared/version";
 import { mindflowMcpContractHash } from "../protocol/contractHash";
@@ -16,6 +15,7 @@ import {
   MINDFLOW_SERVER_INSTRUCTIONS
 } from "../protocol/operationsReference";
 import { MINDFLOW_MCP_TOOLS } from "../protocol/toolSchemas";
+import { MINDFLOW_LATEST_MCP_PROTOCOL_VERSION, negotiateMindFlowMcpProtocolVersion } from "../protocol/protocolVersion";
 import {
   discoverMindFlowSessions,
   mindflowSessionDirectory,
@@ -24,7 +24,6 @@ import {
   type UnavailableMindFlowSession
 } from "./sessionRegistry";
 
-const MCP_PROTOCOL_VERSION = "2024-11-05";
 export const MAX_MCP_MESSAGE_BYTES = 10 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 30_000;
 const SESSION_CACHE_MS = 1_000;
@@ -94,7 +93,7 @@ export class MindFlowGlobalRouter {
       }
       this.initializeRequested = true;
       return {
-        protocolVersion: MCP_PROTOCOL_VERSION,
+        protocolVersion: negotiateMindFlowMcpProtocolVersion(input.protocolVersion),
         capabilities: { tools: {}, resources: {} },
         serverInfo: { name: "mindflow-global-router", version: MINDFLOW_VERSION },
         instructions: `${MINDFLOW_SERVER_INSTRUCTIONS}\n\nThis global Router discovers local VS Code hosts. Call mindflow_list_hosts and mindflow_get_open_editors first. Prefer flowUri for precise operations. With multiple hosts, every call that can change editor or window state requires an explicit flowUri or hostId; only read-only calls may use recent-focus routing.`
@@ -243,7 +242,11 @@ export class MindFlowGlobalRouter {
     if (existing?.initialized && existing.endpoint === host.endpoint) return;
     const initialize = await postJson(host, {
       jsonrpc: "2.0", id: this.nextInternalId(), method: "initialize",
-      params: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "mindflow-global-router", version: "0.1.0" } }
+      params: {
+        protocolVersion: MINDFLOW_LATEST_MCP_PROTOCOL_VERSION,
+        capabilities: {},
+        clientInfo: { name: "mindflow-global-router", version: MINDFLOW_VERSION }
+      }
     }, this.clientId);
     if (!initialize || isRecord(initialize.error)) {
       throw new Error(isRecord(initialize?.error) ? String(initialize.error.message ?? "Backend initialization failed.") : "Backend initialization returned no response.");
@@ -407,29 +410,9 @@ function compareHostsForDisplay(left: Record<string, unknown>, right: Record<str
 }
 
 function sameFlow(editor: EditorRecord, flowUri: string): boolean {
-  if (normalizeUri(editor.uri) === normalizeUri(flowUri)) return true;
-  if (editor.path && path.isAbsolute(editor.path) && path.isAbsolute(flowUri)) return normalizeFsPath(editor.path) === normalizeFsPath(flowUri);
-  try {
-    if (new URL(flowUri).protocol === "file:" && editor.path) return normalizeFsPath(editor.path) === normalizeFsPath(fileURLToPath(flowUri));
-  } catch {
-    if (path.isAbsolute(flowUri)) return normalizeUri(pathToFileURL(flowUri).toString()) === normalizeUri(editor.uri);
-  }
-  return false;
-}
-
-function normalizeUri(uri: string): string {
-  try {
-    const parsed = new URL(uri);
-    if (parsed.protocol === "file:") return pathToFileURL(normalizeFsPath(fileURLToPath(parsed))).toString();
-    return parsed.toString();
-  } catch {
-    return uri.trim();
-  }
-}
-
-function normalizeFsPath(value: string): string {
-  const resolved = path.resolve(value);
-  return process.platform === "win32" ? resolved.toLocaleLowerCase("en-US") : resolved;
+  const requestedKey = canonicalFileKey(flowUri);
+  return canonicalFileKey(editor.uri) === requestedKey ||
+    (typeof editor.path === "string" && canonicalFileKey(editor.path) === requestedKey);
 }
 
 function postJson(host: MindFlowMcpHostRecord, payload: Record<string, unknown>, clientId: string): Promise<Record<string, unknown> | undefined> {

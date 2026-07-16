@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mindflowGlobalToolDefinitions, MINDFLOW_GLOBAL_CONTRACT_DESCRIPTOR, MINDFLOW_HOST_SESSION_FIELDS, MINDFLOW_MCP_CONTRACT_VERSION } from "./globalToolSchemas";
 import { MINDFLOW_MCP_TOOLS } from "./toolSchemas";
+import { MINDFLOW_SUPPORTED_MCP_PROTOCOL_VERSIONS } from "./protocolVersion";
 
 export function mindflowMcpContractHash(): string {
   return createHash("sha256").update(JSON.stringify(mindflowMcpCompatibilityDescriptor())).digest("hex");
@@ -9,6 +10,7 @@ export function mindflowMcpContractHash(): string {
 export function mindflowMcpCompatibilityDescriptor(): Record<string, unknown> {
   return {
     contractVersion: MINDFLOW_MCP_CONTRACT_VERSION,
+    protocolVersions: MINDFLOW_SUPPORTED_MCP_PROTOCOL_VERSIONS,
     backendTools: MINDFLOW_MCP_TOOLS.map(wireToolDefinition),
     globalTools: mindflowGlobalToolDefinitions().map(wireToolDefinition),
     hostSessionFields: MINDFLOW_HOST_SESSION_FIELDS,

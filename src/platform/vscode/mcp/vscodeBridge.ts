@@ -26,7 +26,8 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
   public async openFlow(flowPath: string): Promise<MindFlowEditorSnapshot> {
     const resolvedPath = resolveInputFlowPath(flowPath);
     const uri = vscode.Uri.file(resolvedPath);
-    if (FlowPanel.hasOpenEditor(uri)) return this.readSnapshot(uri, true);
+    const existingUri = FlowPanel.getOpenFlowUri(uri);
+    if (existingUri) return this.readSnapshot(existingUri, true);
     const mode = vscode.workspace.getConfiguration("mindflow.security").get<MindFlowExternalFileAccessMode>("externalFileAccess", "prompt");
     const authorizedPath = await authorizeMcpFileOpen(
       resolvedPath,
@@ -77,10 +78,11 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
   }
 
   private async readSnapshot(uri: vscode.Uri, active: boolean): Promise<MindFlowEditorSnapshot> {
-    if (!FlowPanel.hasOpenEditor(uri)) {
+    const openUri = FlowPanel.getOpenFlowUri(uri);
+    if (!openUri) {
       throw new Error(`MindFlow MCP can only access an open MindFlow editor: ${uri.toString()}`);
     }
-    const document = await vscode.workspace.openTextDocument(uri);
+    const document = await vscode.workspace.openTextDocument(openUri);
     const { flow } = parseProductFlowText(document.getText(), `ProductFlow document ${flowDisplayName(document.uri)}`);
     return {
       uri: document.uri.toString(),
@@ -96,8 +98,9 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
 
 function requireOpenFlowUri(flowUri: string): vscode.Uri {
   const uri = normalizeFlowUri(flowUri);
-  if (!uri || !FlowPanel.hasOpenEditor(uri)) {
+  const openUri = uri ? FlowPanel.getOpenFlowUri(uri) : undefined;
+  if (!openUri) {
     throw new Error(`MindFlow MCP can only access an open MindFlow editor: ${flowUri}`);
   }
-  return uri;
+  return openUri;
 }

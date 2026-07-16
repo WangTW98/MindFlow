@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
 import {
   emptyFlowSelection,
-  flowSelectionKey,
   normalizeFlowSelection,
   type FlowSelectionPatch,
   type FlowSelectionState
 } from "../../../product-flow/domain/selection";
+import { canonicalFileKey } from "../../../shared/canonicalFileKey";
 
 export class FlowSelectionStore {
   private readonly selections = new Map<string, FlowSelectionState>();
@@ -13,12 +13,12 @@ export class FlowSelectionStore {
   public get(flowUri: vscode.Uri | string): FlowSelectionState {
     return normalizeFlowSelection({
       ...emptyFlowSelection(),
-      ...(this.selections.get(flowSelectionKey(flowUri)) ?? {})
+      ...(this.selections.get(canonicalFileKey(flowUri)) ?? {})
     });
   }
 
   public set(flowUri: vscode.Uri | string, selection: FlowSelectionPatch): void {
-    this.selections.set(flowSelectionKey(flowUri), normalizeFlowSelection({
+    this.selections.set(canonicalFileKey(flowUri), normalizeFlowSelection({
       ...emptyFlowSelection(),
       ...selection
     }));
@@ -32,6 +32,6 @@ export class FlowSelectionStore {
   }
 
   public delete(flowUri: vscode.Uri | string): void {
-    this.selections.delete(flowSelectionKey(flowUri));
+    this.selections.delete(canonicalFileKey(flowUri));
   }
 }
