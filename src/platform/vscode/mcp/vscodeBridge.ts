@@ -25,9 +25,11 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
 
   public async openFlow(flowPath: string): Promise<MindFlowEditorSnapshot> {
     const resolvedPath = resolveInputFlowPath(flowPath);
-    const flow = await loadMindFlowFile(resolvedPath);
+    await loadMindFlowFile(resolvedPath);
     const uri = vscode.Uri.file(resolvedPath);
-    FlowPanel.createOrShow(this.extensionUri, flow, uri);
+    if (!FlowPanel.hasOpenEditor(uri)) {
+      await vscode.commands.executeCommand("vscode.openWith", uri, FlowPanel.viewType);
+    }
     return this.readSnapshot(uri, true);
   }
 

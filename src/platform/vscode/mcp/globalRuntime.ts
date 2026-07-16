@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { mindflowToolsetHash } from "../../mcp/protocol/toolsetHash";
+import { mindflowMcpContractHash } from "../../mcp/protocol/contractHash";
 import { discoverMindFlowSessions, mindflowRuntimeDirectory } from "../../mcp/runtime/sessionRegistry";
 
 const ROUTER_BUNDLE_RELATIVE_PATH = "out/mcp-runtime/mindflow-mcp-router.cjs";
@@ -15,7 +15,7 @@ export interface MindFlowGlobalRuntimeInstallation {
   routerPath: string;
   manifestPath: string;
   bundleHash: string;
-  toolsetHash: string;
+  contractHash: string;
 }
 
 export interface MindFlowRuntimeCommand {
@@ -36,7 +36,7 @@ export class MindFlowGlobalRuntimeManager {
     const routerPath = path.join(directory, ROUTER_FILE_NAME);
     const manifestPath = path.join(directory, RUNTIME_MANIFEST_FILE_NAME);
     const bundleHash = createHash("sha256").update(bundle).digest("hex");
-    const toolsetHash = mindflowToolsetHash();
+    const contractHash = mindflowMcpContractHash();
     const existingHash = await fs.readFile(routerPath).then((value) => createHash("sha256").update(value).digest("hex")).catch(() => undefined);
     await fs.mkdir(directory, { recursive: true, mode: 0o700 });
     if (process.platform !== "win32") await fs.chmod(directory, 0o700);
@@ -46,17 +46,17 @@ export class MindFlowGlobalRuntimeManager {
     if (process.platform !== "win32") await fs.chmod(routerPath, 0o600);
     const manifest = {
       bundleHash,
-      toolsetHash,
+      contractHash,
       extensionVersion: String(this.context.extension.packageJSON?.version ?? "unknown"),
       installedAt: new Date().toISOString()
     };
     await writeAtomic(manifestPath, Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`), 0o600);
-    return { routerPath, manifestPath, bundleHash, toolsetHash };
+    return { routerPath, manifestPath, bundleHash, contractHash };
   }
 
   public async buildGlobalConfig(): Promise<Record<string, unknown>> {
     const installation = await this.ensureInstalled();
-    const runtime = await this.resolveRuntime(installation.routerPath, installation.toolsetHash);
+    const runtime = await this.resolveRuntime(installation.routerPath, installation.contractHash);
     return {
       mcpServers: {
         mindflow: {
@@ -70,36 +70,36 @@ export class MindFlowGlobalRuntimeManager {
 
   public async status(): Promise<Record<string, unknown>> {
     const installation = await this.ensureInstalled();
-    const discovery = await discoverMindFlowSessions(undefined, installation.toolsetHash);
-    const runtime = await this.resolveRuntime(installation.routerPath, installation.toolsetHash).catch((error) => ({ error: errorMessage(error) }));
+    const discovery = await discoverMindFlowSessions(undefined, installation.contractHash);
+    const runtime = await this.resolveRuntime(installation.routerPath, installation.contractHash).catch((error) => ({ error: errorMessage(error) }));
     return {
       routerPath: installation.routerPath,
       bundleHash: installation.bundleHash,
-      toolsetHash: installation.toolsetHash,
+      contractHash: installation.contractHash,
       runtime,
-      workspaces: discovery.sessions.flatMap((session) => session.workspaceFolders.map((folder) => ({
-        workspaceUri: folder.uri,
-        name: folder.name,
+      hosts: discovery.sessions.map((session) => ({
+        hostId: session.hostId,
+        displayName: session.displayName,
         focused: session.windowFocused,
         extensionVersion: session.extensionVersion
-      }))),
+      })),
       unavailable: discovery.unavailable
     };
   }
 
-  private async resolveRuntime(routerPath: string, expectedToolsetHash: string): Promise<MindFlowRuntimeCommand> {
+  private async resolveRuntime(routerPath: string, expectedContractHash: string): Promise<MindFlowRuntimeCommand> {
     const electronRuntime: MindFlowRuntimeCommand = {
       command: process.execPath,
       args: [routerPath],
       env: { ELECTRON_RUN_AS_NODE: "1" }
     };
-    if (await selfTestRuntime(electronRuntime, expectedToolsetHash)) {
+    if (await selfTestRuntime(electronRuntime, expectedContractHash)) {
       return electronRuntime;
     }
     const nodePath = await findExecutableOnPath(process.platform === "win32" ? ["node.exe"] : ["node"]);
     if (nodePath) {
       const nodeRuntime: MindFlowRuntimeCommand = { command: nodePath, args: [routerPath] };
-      if (await selfTestRuntime(nodeRuntime, expectedToolsetHash)) {
+      if (await selfTestRuntime(nodeRuntime, expectedContractHash)) {
         return nodeRuntime;
       }
     }
@@ -107,7 +107,7 @@ export class MindFlowGlobalRuntimeManager {
   }
 }
 
-async function selfTestRuntime(runtime: MindFlowRuntimeCommand, expectedToolsetHash: string): Promise<boolean> {
+async function selfTestRuntime(runtime: MindFlowRuntimeCommand, expectedContractHash: string): Promise<boolean> {
   return new Promise((resolve) => {
     const child = spawn(runtime.command, [...runtime.args, "--self-test"], {
       env: { ...process.env, ...runtime.env },
@@ -127,8 +127,8 @@ async function selfTestRuntime(runtime: MindFlowRuntimeCommand, expectedToolsetH
         return;
       }
       try {
-        const result = JSON.parse(stdout.trim()) as { ok?: unknown; toolsetHash?: unknown };
-        resolve(result.ok === true && result.toolsetHash === expectedToolsetHash);
+        const result = JSON.parse(stdout.trim()) as { ok?: unknown; contractHash?: unknown };
+        resolve(result.ok === true && result.contractHash === expectedContractHash);
       } catch {
         resolve(false);
       }

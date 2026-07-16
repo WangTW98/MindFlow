@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { getWorkspaceRoot, isRealMindFlowUri } from "./documents/flowUri";
+import { getWorkspaceRootIfAvailable, isRealMindFlowUri } from "./documents/flowUri";
 import { rememberCurrentFlowUri } from "./state/activeFlowState";
 import { rememberRecentFlow } from "./state/recentFlowState";
 import { registerMindFlowCommands } from "./commands/registerMindFlowCommands";
@@ -8,7 +8,7 @@ import { FlowPanel } from "./editor/canvas/FlowPanel";
 import { SidebarView } from "./sidebar/SidebarView";
 
 export function activate(context: vscode.ExtensionContext): void {
-  const sidebarView = new SidebarView(context, getWorkspaceRoot);
+  const sidebarView = new SidebarView(context, getWorkspaceRootIfAvailable);
   context.subscriptions.push(
     ...registerMindFlowMcp(context),
     FlowPanel.register(context, (flowUri) => {

@@ -5,12 +5,12 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import type { MindFlowEditorBridge } from "../../mcp/protocol/bridge";
 import { MindFlowMcpProtocol } from "../../mcp/protocol/jsonRpcProtocol";
-import { mindflowToolsetHash } from "../../mcp/protocol/toolsetHash";
+import { mindflowMcpContractHash } from "../../mcp/protocol/contractHash";
 import {
   isProcessAlive,
   mindflowSessionDirectory,
   parseMindFlowSessionRecord,
-  type MindFlowMcpSessionRecord
+  type MindFlowMcpHostRecord
 } from "../../mcp/runtime/sessionRegistry";
 import { MindFlowMcpToolHandlers } from "../../mcp/tools";
 
@@ -18,11 +18,11 @@ const MAX_MCP_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
 
 export class MindFlowMcpServerManager implements vscode.Disposable {
   private server: http.Server | undefined;
-  private session: MindFlowMcpSessionRecord | undefined;
+  private session: MindFlowMcpHostRecord | undefined;
   private startPromise: Promise<void> | undefined;
   private startError: string | undefined;
   private disposed = false;
-  private readonly sessionId = randomUUID();
+  private readonly hostId = randomUUID();
   private sessionFilePath: string | undefined;
   private lastRegistryWrite = 0;
   private readonly protocols = new Map<string, MindFlowMcpProtocol>();
@@ -87,20 +87,17 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
       const sessionPath = this.sessionPath();
       const endpoint = `http://127.0.0.1:${port}/mcp`;
       const now = new Date().toISOString();
-      const session: MindFlowMcpSessionRecord = {
-        sessionId: this.sessionId,
+      const session: MindFlowMcpHostRecord = {
+        hostId: this.hostId,
+        displayName: vscode.workspace.name?.trim() || "VS Code Window",
+        environment: "local",
         endpoint,
         token,
         pid: process.pid,
         createdAt: now,
         lastSeenAt: now,
         extensionVersion: String(this.context.extension.packageJSON?.version ?? "unknown"),
-        toolsetHash: mindflowToolsetHash(),
-        workspaceFolders: (vscode.workspace.workspaceFolders ?? []).filter((folder) => folder.uri.scheme === "file").map((folder) => ({
-          uri: folder.uri.toString(),
-          fsPath: folder.uri.fsPath,
-          name: folder.name
-        })),
+        contractHash: mindflowMcpContractHash(),
         windowFocused: vscode.window.state.focused,
         lastFocusedAt: now
       };
@@ -160,7 +157,7 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
   }
 
   private sessionPath(): string {
-    return path.join(mindflowSessionDirectory(), `${this.sessionId}.json`);
+    return path.join(mindflowSessionDirectory(), `${this.hostId}.json`);
   }
 
   private async touchSessionRegistry(): Promise<void> {
@@ -196,7 +193,7 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
   }
 }
 
-async function writeSessionFile(sessionPath: string, session: MindFlowMcpSessionRecord): Promise<void> {
+async function writeSessionFile(sessionPath: string, session: MindFlowMcpHostRecord): Promise<void> {
   const directory = path.dirname(sessionPath);
   const temporaryPath = `${sessionPath}.${process.pid}.${randomUUID()}.tmp`;
   await fs.mkdir(directory, { recursive: true, mode: 0o700 });

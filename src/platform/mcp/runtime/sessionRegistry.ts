@@ -1,23 +1,19 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { MINDFLOW_HOST_SESSION_FIELDS } from "../protocol/globalToolSchemas";
 
-export interface MindFlowWorkspaceFolderRecord {
-  uri: string;
-  fsPath: string;
-  name: string;
-}
-
-export interface MindFlowMcpSessionRecord {
-  sessionId: string;
+export interface MindFlowMcpHostRecord {
+  hostId: string;
+  displayName: string;
+  environment: "local";
   endpoint: string;
   token: string;
   pid: number;
   createdAt: string;
   lastSeenAt: string;
   extensionVersion: string;
-  toolsetHash: string;
-  workspaceFolders: MindFlowWorkspaceFolderRecord[];
+  contractHash: string;
   windowFocused: boolean;
   lastFocusedAt: string;
 }
@@ -25,11 +21,11 @@ export interface MindFlowMcpSessionRecord {
 export interface UnavailableMindFlowSession {
   fileName: string;
   reason: string;
-  workspaceUris?: string[];
+  hostId?: string;
 }
 
 export interface MindFlowSessionDiscovery {
-  sessions: MindFlowMcpSessionRecord[];
+  sessions: MindFlowMcpHostRecord[];
   unavailable: UnavailableMindFlowSession[];
 }
 
@@ -50,10 +46,10 @@ export function mindflowRuntimeDirectory(): string {
 
 export async function discoverMindFlowSessions(
   directory = mindflowSessionDirectory(),
-  expectedToolsetHash?: string
+  expectedContractHash?: string
 ): Promise<MindFlowSessionDiscovery> {
   const entries = await fs.readdir(directory, { withFileTypes: true }).catch(() => []);
-  const sessions: MindFlowMcpSessionRecord[] = [];
+  const sessions: MindFlowMcpHostRecord[] = [];
   const unavailable: UnavailableMindFlowSession[] = [];
 
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
@@ -73,16 +69,12 @@ export async function discoverMindFlowSessions(
       if (!isProcessAlive(record.pid)) {
         throw new Error("Extension Host process is not running.");
       }
-      if (expectedToolsetHash && record.toolsetHash !== expectedToolsetHash) {
+      if (expectedContractHash && record.contractHash !== expectedContractHash) {
         unavailable.push({
           fileName: entry.name,
-          reason: "MindFlow MCP toolset does not match the installed global Router. Reload VS Code and restart the Agent.",
-          workspaceUris: record.workspaceFolders.map((folder) => folder.uri)
+          reason: "MindFlow MCP contract does not match the installed global Router. Reload VS Code and restart the Agent.",
+          hostId: record.hostId
         });
-        continue;
-      }
-      if (record.workspaceFolders.length === 0) {
-        unavailable.push({ fileName: entry.name, reason: "VS Code window has no local workspace folder." });
         continue;
       }
       sessions.push(record);
@@ -94,40 +86,41 @@ export async function discoverMindFlowSessions(
   return { sessions, unavailable };
 }
 
-export function parseMindFlowSessionRecord(value: unknown, fileName?: string): MindFlowMcpSessionRecord {
+export function parseMindFlowSessionRecord(value: unknown, fileName?: string): MindFlowMcpHostRecord {
   if (!isRecord(value)) {
     throw new Error("Invalid MindFlow MCP session record.");
   }
-  const sessionId = requireString(value.sessionId, "sessionId");
-  if (fileName && fileName !== `${sessionId}.json`) {
-    throw new Error("Session ID does not match its registry filename.");
+  const allowedFields = new Set<string>(MINDFLOW_HOST_SESSION_FIELDS);
+  const unexpectedFields = Object.keys(value).filter((field) => !allowedFields.has(field));
+  if (unexpectedFields.length > 0) {
+    throw new Error(`Invalid legacy or unsupported session field(s): ${unexpectedFields.join(", ")}.`);
+  }
+  const hostId = requireString(value.hostId, "hostId");
+  if (fileName && fileName !== `${hostId}.json`) {
+    throw new Error("Host ID does not match its registry filename.");
   }
   const endpoint = validateEndpoint(requireString(value.endpoint, "endpoint"));
   const pid = value.pid;
   if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) {
     throw new Error("Invalid session pid.");
   }
-  const toolsetHash = requireString(value.toolsetHash, "toolsetHash");
-  if (!/^[a-f0-9]{64}$/i.test(toolsetHash)) {
-    throw new Error("Invalid session toolsetHash.");
-  }
-  if (!Array.isArray(value.workspaceFolders)) {
-    throw new Error("Invalid session workspaceFolders.");
-  }
-  const workspaceFolders = value.workspaceFolders.map((folder, index) => parseWorkspaceFolder(folder, index));
+  const contractHash = requireString(value.contractHash, "contractHash");
+  if (!/^[a-f0-9]{64}$/i.test(contractHash)) throw new Error("Invalid session contractHash.");
+  if (value.environment !== "local") throw new Error("Unsupported non-local MindFlow host environment.");
   if (typeof value.windowFocused !== "boolean") {
     throw new Error("Invalid session windowFocused.");
   }
   return {
-    sessionId,
+    hostId,
+    displayName: requireString(value.displayName, "displayName"),
+    environment: "local",
     endpoint,
     token: requireString(value.token, "token"),
     pid,
     createdAt: requireTimestamp(value.createdAt, "createdAt"),
     lastSeenAt: requireTimestamp(value.lastSeenAt, "lastSeenAt"),
     extensionVersion: requireString(value.extensionVersion, "extensionVersion"),
-    toolsetHash,
-    workspaceFolders,
+    contractHash,
     windowFocused: value.windowFocused,
     lastFocusedAt: requireTimestamp(value.lastFocusedAt, "lastFocusedAt")
   };
@@ -140,27 +133,6 @@ export function isProcessAlive(pid: number): boolean {
   } catch (error) {
     return isRecord(error) && error.code === "EPERM";
   }
-}
-
-function parseWorkspaceFolder(value: unknown, index: number): MindFlowWorkspaceFolderRecord {
-  if (!isRecord(value)) {
-    throw new Error(`Invalid workspaceFolders[${index}].`);
-  }
-  const uri = requireString(value.uri, `workspaceFolders[${index}].uri`);
-  let parsed: URL;
-  try {
-    parsed = new URL(uri);
-  } catch {
-    throw new Error(`Invalid local workspace URI: ${uri}`);
-  }
-  if (parsed.protocol !== "file:") {
-    throw new Error(`Unsupported non-local workspace URI: ${uri}`);
-  }
-  const fsPath = requireString(value.fsPath, `workspaceFolders[${index}].fsPath`);
-  if (!path.isAbsolute(fsPath)) {
-    throw new Error(`Workspace path must be absolute: ${fsPath}`);
-  }
-  return { uri: parsed.toString(), fsPath: path.resolve(fsPath), name: requireString(value.name, `workspaceFolders[${index}].name`) };
 }
 
 function validateEndpoint(raw: string): string {

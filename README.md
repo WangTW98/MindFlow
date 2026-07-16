@@ -29,11 +29,11 @@ Submit, approve, reject, and CRUD meaning belongs in `trigger`, `action`, and `c
 | Command | Purpose |
 | --- | --- |
 | `MindFlow: New Blank Flow` | Open an untitled blank canvas |
-| `MindFlow: Open Product Flow` | Open a workspace `.mindflow` file |
+| `MindFlow: Open Product Flow` | Open any local `.mindflow` file |
 | `MindFlow: Save Flow As...` | Save the active canvas |
 | `MindFlow: Validate Flow JSON` | Validate the active document |
 | `MindFlow: Copy Global MCP Config` | Copy a global stdio MCP configuration to the clipboard |
-| `MindFlow: Show MCP Connection Status` | Show the Router, runtime, workspace, and session diagnostics |
+| `MindFlow: Show MCP Connection Status` | Show the Router, runtime, host, and session diagnostics |
 
 Canvas drag, detail, taxonomy, edge, and delete commands are internal custom-editor commands shared with the application operation layer.
 
@@ -50,7 +50,7 @@ The extension starts an authenticated loopback MCP session. MCP can:
 - dry-run and atomically apply bounded revision-checked changesets using request-local references;
 - return id maps, operation plans, validation issues, entity/type/outlet counts, and the resulting revision.
 
-MCP edits the VS Code document through one workspace edit. It does not save the file; the user reviews and saves a dirty canvas.
+MCP edits the VS Code document through one atomic VS Code edit. It does not save the file; the user reviews and saves a dirty canvas.
 
 ## Global MCP registration
 
@@ -61,15 +61,17 @@ There is no client plugin or universal zero-configuration discovery. The extensi
 
 Register it once:
 
-1. Install the MindFlow VSIX and open at least one local VS Code workspace.
+1. Install the MindFlow VSIX and start a local VS Code window. A workspace folder is optional.
 2. Run `MindFlow: Copy Global MCP Config`.
 3. Add the copied `mcpServers.mindflow` entry to the Agent's user/global MCP configuration.
 4. Restart or refresh the Agent's MCP servers.
-5. Call `mindflow_list_workspaces`, then `mindflow_get_open_editors`.
+5. Call `mindflow_list_hosts`, then `mindflow_get_open_editors`.
 
-The copied JSON contains only a verified runtime command and the stable Router path. It contains no workspace path, session id, port, or token. Codex users can translate the entry to `codex mcp add mindflow [--env KEY=VALUE] -- <command> <router-path>`. Claude Code users can add the inner server object with `claude mcp add-json` at `--scope user`; see the [official Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp).
+The copied JSON contains only a verified runtime command and the stable Router path. It contains no project path, host id, port, or token. Codex users can translate the entry to `codex mcp add mindflow [--env KEY=VALUE] -- <command> <router-path>`. Claude Code users can add the inner server object with `claude mcp add-json` at `--scope user`; see the [official Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp).
 
-The Router discovers live session records from `~/.mindflow/mcp/sessions/` (or `%LOCALAPPDATA%/MindFlow/mcp/sessions/` on Windows), validates them, and routes each call dynamically. With multiple workspaces, use `workspaceUri` for create/open and a precise `flowUri` for all subsequent canvas calls. The Router never selects a write target from window focus alone.
+The Router discovers live VS Code host records from `~/.mindflow/mcp/sessions/` (or `%LOCALAPPDATA%/MindFlow/mcp/sessions/` on Windows), validates them, and routes each call dynamically. It works in empty VS Code windows and is not bound to a project or workspace. Use a precise `flowUri` whenever possible; with multiple windows, optional `hostId` overrides the default most-recently-focused host. `mindflow_open_flow.flowPath` must be an absolute local `.mindflow` path. Remote SSH, WSL, Dev Container, and virtual-file-system paths are not supported.
+
+MindFlow can open, edit, validate, and save local `.mindflow` files outside every open workspace. The configured workspace `flowDirectory` remains only an optional default storage and initial-discovery location.
 
 ## Agent workflow and resumable tasks
 

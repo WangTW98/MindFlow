@@ -9,12 +9,13 @@ import { nowIso } from "../../../product-flow/domain/id";
 import { getRememberedFlowPath, getRememberedFlowUri, rememberCurrentFlowUri } from "../state/activeFlowState";
 import { enqueueFlowDocumentEdit } from "./flowEditQueue";
 import {
-  assertWorkspaceMindFlowUri,
+  assertLocalMindFlowUri,
   createFlowRepository,
   flowDisplayName,
   getWorkspaceMindFlowDirectoryUri,
   isMindFlowDocument,
   normalizeFlowUri,
+  resolveInputFlowPath,
   type FlowUriArgument
 } from "./flowUri";
 
@@ -67,11 +68,11 @@ export async function pickMindFlowFile(): Promise<string | undefined> {
       "All Files": ["*"]
     }
   });
-  return picked?.[0] ? assertWorkspaceMindFlowUri(picked[0]).fsPath : undefined;
+  return picked?.[0] ? assertLocalMindFlowUri(picked[0]).fsPath : undefined;
 }
 
 export async function loadMindFlowFile(flowPath: string): Promise<ProductFlow> {
-  const normalizedPath = assertWorkspaceMindFlowUri(vscode.Uri.file(flowPath)).fsPath;
+  const normalizedPath = resolveInputFlowPath(flowPath);
   return new FlowRepository(path.dirname(normalizedPath)).load(normalizedPath);
 }
 
@@ -108,11 +109,12 @@ async function resolveCurrentFlowUri(sourceUri?: FlowUriArgument): Promise<vscod
   if (!flowUri) {
     throw new Error("No MindFlow file exists. Create or open a MindFlow file first.");
   }
-  return flowUri.scheme === "untitled" ? flowUri : assertWorkspaceMindFlowUri(flowUri);
+  return flowUri.scheme === "untitled" ? flowUri : assertLocalMindFlowUri(flowUri);
 }
 
 async function chooseOrLatestFlowUri(): Promise<vscode.Uri | undefined> {
   const repository = createFlowRepository();
+  if (!repository) return undefined;
   const flowPath = await chooseOrLatestFlow(repository);
   return flowPath ? vscode.Uri.file(flowPath) : undefined;
 }

@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import * as http from "node:http";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { assertAbsoluteLocalMindFlowPath } from "../../../shared/localMindFlowPath";
+import { mindflowMcpContractHash } from "../protocol/contractHash";
+import { mindflowGlobalToolDefinitions } from "../protocol/globalToolSchemas";
 import {
   MINDFLOW_AUTHORING_REFERENCE,
   MINDFLOW_AUTHORING_REFERENCE_URI,
@@ -11,14 +14,12 @@ import {
   MINDFLOW_OPERATIONS_REFERENCE_URI,
   MINDFLOW_SERVER_INSTRUCTIONS
 } from "../protocol/operationsReference";
-import { MINDFLOW_MCP_TOOLS, type McpToolDefinition } from "../protocol/toolSchemas";
-import { mindflowToolsetHash } from "../protocol/toolsetHash";
+import { MINDFLOW_MCP_TOOLS } from "../protocol/toolSchemas";
 import {
   discoverMindFlowSessions,
   mindflowSessionDirectory,
-  type MindFlowMcpSessionRecord,
+  type MindFlowMcpHostRecord,
   type MindFlowSessionDiscovery,
-  type MindFlowWorkspaceFolderRecord,
   type UnavailableMindFlowSession
 } from "./sessionRegistry";
 
@@ -43,8 +44,8 @@ interface EditorRecord extends Record<string, unknown> {
   uri: string;
   path?: string;
   displayName?: string;
-  workspaceUri: string;
-  workspaceName: string;
+  hostId: string;
+  hostName: string;
 }
 
 class RouterError extends Error {
@@ -74,7 +75,6 @@ export class MindFlowGlobalRouter {
     if (request.id === undefined) {
       if (request.method === "notifications/initialized" || request.method === "initialized") {
         if (this.initializeRequested) this.initialized = true;
-        return undefined;
       }
       return undefined;
     }
@@ -96,7 +96,7 @@ export class MindFlowGlobalRouter {
         protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: { tools: {}, resources: {} },
         serverInfo: { name: "mindflow-global-router", version: "0.1.0" },
-        instructions: `${MINDFLOW_SERVER_INSTRUCTIONS}\n\nThis is the global MindFlow Router. Discover workspaces first and use explicit flowUri values whenever multiple workspaces are active.`
+        instructions: `${MINDFLOW_SERVER_INSTRUCTIONS}\n\nThis global Router discovers local VS Code hosts. Call mindflow_list_hosts and mindflow_get_open_editors first. Prefer flowUri for precise operations; use hostId to override recent-focus routing.`
       };
     }
     if (method !== "ping" && !this.initialized) {
@@ -104,7 +104,7 @@ export class MindFlowGlobalRouter {
     }
     switch (method) {
       case "ping": return {};
-      case "tools/list": return { tools: globalToolDefinitions() };
+      case "tools/list": return { tools: mindflowGlobalToolDefinitions() };
       case "tools/call": return this.callTool(params);
       case "resources/list": return { resources: resourceDefinitions() };
       case "resources/read": return readResource(params);
@@ -117,174 +117,141 @@ export class MindFlowGlobalRouter {
     const name = typeof request.name === "string" ? request.name : "";
     if (!name) throw new RouterError(-32602, "tools/call.name must be a non-empty string.");
     const args = request.arguments === undefined ? {} : requireRecord(request.arguments, "tools/call.arguments must be an object.");
-    if (name === "mindflow_list_workspaces") {
+    if (name === "mindflow_list_hosts") {
       rejectUnexpectedKeys(args, []);
-      return toolResult(await this.listWorkspaces());
+      return toolResult(await this.listHosts());
     }
     if (name === "mindflow_get_open_editors") {
-      rejectUnexpectedKeys(args, ["workspaceUri"]);
-      const workspaceUri = optionalString(args.workspaceUri, "workspaceUri");
-      return toolResult(await this.aggregateOpenEditors(workspaceUri));
+      rejectUnexpectedKeys(args, ["hostId"]);
+      return toolResult(await this.aggregateOpenEditors(optionalString(args.hostId, "hostId")));
     }
-    const session = await this.selectSession(name, args);
+    const host = await this.selectHost(name, args);
     const forwardedArguments = { ...args };
-    delete forwardedArguments.workspaceUri;
-    const backendResult = await this.callBackendTool(session, name, forwardedArguments);
-    return annotateBackendToolResult(backendResult, session, name);
+    delete forwardedArguments.hostId;
+    const backendResult = await this.callBackendTool(host, name, forwardedArguments);
+    return annotateBackendToolResult(backendResult, host, name);
   }
 
-  private async listWorkspaces(): Promise<Record<string, unknown>> {
+  private async listHosts(): Promise<Record<string, unknown>> {
     const discovery = await this.discover(true);
-    const editorCounts = new Map<string, number>();
     const aggregate = await this.aggregateOpenEditors(undefined, discovery);
+    const editorCounts = new Map<string, number>();
     for (const editor of aggregate.editors as EditorRecord[]) {
-      editorCounts.set(editor.workspaceUri, (editorCounts.get(editor.workspaceUri) ?? 0) + 1);
+      editorCounts.set(editor.hostId, (editorCounts.get(editor.hostId) ?? 0) + 1);
     }
     return {
-      workspaces: discovery.sessions.flatMap((session) => session.workspaceFolders.map((folder) => ({
-        workspaceUri: folder.uri,
-        name: folder.name,
-        focused: session.windowFocused,
-        editorCount: editorCounts.get(folder.uri) ?? 0,
-        extensionVersion: session.extensionVersion
-      }))).sort((left, right) => left.name.localeCompare(right.name) || left.workspaceUri.localeCompare(right.workspaceUri)),
+      hosts: discovery.sessions.map((host) => ({
+        hostId: host.hostId,
+        displayName: host.displayName,
+        focused: host.windowFocused,
+        lastFocusedAt: host.lastFocusedAt,
+        openEditorCount: editorCounts.get(host.hostId) ?? 0,
+        extensionVersion: host.extensionVersion
+      })).sort(compareHostsForDisplay),
       unavailable: mergeUnavailable(discovery.unavailable, aggregate.unavailable as UnavailableMindFlowSession[])
     };
   }
 
-  private async aggregateOpenEditors(workspaceUri?: string, knownDiscovery?: MindFlowSessionDiscovery): Promise<Record<string, unknown>> {
+  private async aggregateOpenEditors(hostId?: string, knownDiscovery?: MindFlowSessionDiscovery): Promise<Record<string, unknown>> {
     const discovery = knownDiscovery ?? await this.discover(true);
-    const candidates = workspaceUri ? sessionsForWorkspace(discovery.sessions, workspaceUri) : discovery.sessions;
-    if (workspaceUri && candidates.length === 0) {
-      throw new RouterError(-32602, workspaceNotFoundMessage(workspaceUri, discovery.sessions));
-    }
+    const candidates = hostId ? [requireHost(discovery.sessions, hostId)] : discovery.sessions;
     const editors: EditorRecord[] = [];
     const unavailable = [...discovery.unavailable];
-    await Promise.all(candidates.map(async (session) => {
+    await Promise.all(candidates.map(async (host) => {
       try {
-        const result = await this.callBackendTool(session, "mindflow_get_open_editors", {});
+        const result = await this.callBackendTool(host, "mindflow_get_open_editors", {});
         const structured = readStructuredContent(result);
         const values = Array.isArray(structured.editors) ? structured.editors : [];
         for (const value of values) {
           if (!isRecord(value) || typeof value.uri !== "string") continue;
-          const workspace = workspaceForEditor(session, value);
-          if (!workspace || (workspaceUri && normalizeUri(workspace.uri) !== normalizeUri(workspaceUri))) continue;
-          editors.push({ ...value, uri: value.uri, workspaceUri: workspace.uri, workspaceName: workspace.name });
+          editors.push({ ...value, uri: value.uri, hostId: host.hostId, hostName: host.displayName });
         }
       } catch (error) {
-        unavailable.push({
-          fileName: `${session.sessionId}.json`,
-          reason: errorMessage(error),
-          workspaceUris: session.workspaceFolders.map((folder) => folder.uri)
-        });
+        unavailable.push({ fileName: `${host.hostId}.json`, reason: errorMessage(error), hostId: host.hostId });
       }
     }));
-    editors.sort((left, right) => left.workspaceName.localeCompare(right.workspaceName) ||
+    editors.sort((left, right) => left.hostName.localeCompare(right.hostName) ||
       String(left.displayName ?? "").localeCompare(String(right.displayName ?? "")) || left.uri.localeCompare(right.uri));
     return { editors, unavailable: mergeUnavailable(unavailable) };
   }
 
-  private async selectSession(toolName: string, args: Record<string, unknown>): Promise<MindFlowMcpSessionRecord> {
+  private async selectHost(toolName: string, args: Record<string, unknown>): Promise<MindFlowMcpHostRecord> {
     const discovery = await this.discover(true);
-    if (discovery.sessions.length === 0) {
-      throw new RouterError(-32602, noWorkspaceMessage(discovery.unavailable));
-    }
-    if (toolName === "mindflow_create_flow") {
-      return selectWorkspaceSession(discovery.sessions, optionalString(args.workspaceUri, "workspaceUri"));
-    }
-    if (toolName === "mindflow_open_flow") {
-      return this.selectOpenFlowSession(discovery.sessions, args);
-    }
+    if (discovery.sessions.length === 0) throw new RouterError(-32602, noHostMessage(discovery.unavailable));
+    const hostId = optionalString(args.hostId, "hostId");
+    if (toolName === "mindflow_open_flow") return this.selectOpenFlowHost(discovery, args, hostId);
+
     const flowUri = optionalString(args.flowUri, "flowUri");
-    if (flowUri) {
-      const aggregate = await this.aggregateOpenEditors(undefined, discovery);
-      const matches = (aggregate.editors as EditorRecord[]).filter((editor) => sameFlow(editor, flowUri));
-      if (matches.length !== 1) {
-        const candidates = matches.map((editor) => editor.workspaceUri);
-        throw new RouterError(-32602, matches.length === 0
-          ? `No open MindFlow editor owns flowUri ${flowUri}. Call mindflow_get_open_editors first.`
-          : `flowUri ${flowUri} is open in multiple workspaces: ${candidates.join(", ")}. Close the duplicate editor before modifying it.`);
-      }
-      return selectWorkspaceSession(discovery.sessions, matches[0]?.workspaceUri);
-    }
-    if (workspaceCount(discovery.sessions) !== 1 || discovery.sessions.length !== 1) {
-      throw new RouterError(-32602, `Multiple MindFlow sessions or workspaces are active. Call mindflow_get_open_editors and repeat ${toolName} with an explicit flowUri.`);
-    }
-    return discovery.sessions[0] as MindFlowMcpSessionRecord;
+    if (flowUri) return this.selectHostForOpenFlow(discovery, flowUri, hostId, "flowUri", toolIsReadOnly(toolName));
+    if (hostId) return requireHost(discovery.sessions, hostId);
+    return preferredHost(discovery.sessions);
   }
 
-  private async selectOpenFlowSession(sessions: MindFlowMcpSessionRecord[], args: Record<string, unknown>): Promise<MindFlowMcpSessionRecord> {
-    const requestedWorkspace = optionalString(args.workspaceUri, "workspaceUri");
-    if (requestedWorkspace) {
-      const session = selectWorkspaceSession(sessions, requestedWorkspace);
-      const flowPath = requiredString(args.flowPath, "flowPath");
-      const folder = workspaceFolderForUri(session, requestedWorkspace);
-      if (!path.isAbsolute(flowPath)) {
-        args.flowPath = path.resolve(folder.fsPath, flowPath);
-      } else if (!pathContains(folder.fsPath, flowPath)) {
-        throw new RouterError(-32602, `flowPath ${flowPath} is outside workspace ${requestedWorkspace}.`);
-      }
-      return session;
-    }
+  private async selectOpenFlowHost(
+    discovery: MindFlowSessionDiscovery,
+    args: Record<string, unknown>,
+    hostId?: string
+  ): Promise<MindFlowMcpHostRecord> {
     const flowPath = requiredString(args.flowPath, "flowPath");
-    const openEditors = await this.aggregateOpenEditors(undefined, { sessions, unavailable: [] });
-    const openMatches = (openEditors.editors as EditorRecord[]).filter((editor) => sameFlow(editor, flowPath));
-    if (openMatches.length === 1) {
-      return selectWorkspaceSession(sessions, openMatches[0]?.workspaceUri);
+    try {
+      args.flowPath = assertAbsoluteLocalMindFlowPath(flowPath);
+    } catch (error) {
+      throw new RouterError(-32602, errorMessage(error));
     }
-    if (openMatches.length > 1) {
-      throw new RouterError(-32602, `flowPath ${flowPath} is open in multiple workspaces. Close the duplicate editor or provide workspaceUri.`);
-    }
-    if (!path.isAbsolute(flowPath)) {
-      throw new RouterError(-32602, "mindflow_open_flow requires workspaceUri when flowPath is relative.");
-    }
-    const normalizedPath = normalizeFsPath(flowPath);
-    const matches = sessions.flatMap((session) => session.workspaceFolders
-      .filter((folder) => pathContains(folder.fsPath, normalizedPath))
-      .map((folder) => ({ session, length: normalizeFsPath(folder.fsPath).length })));
-    if (matches.length === 0) {
-      throw new RouterError(-32602, `No active workspace contains ${flowPath}. Provide workspaceUri explicitly.`);
-    }
-    const longest = Math.max(...matches.map((match) => match.length));
-    const finalists = uniqueSessions(matches.filter((match) => match.length === longest).map((match) => match.session));
-    if (finalists.length !== 1) {
-      throw new RouterError(-32602, `Multiple workspaces contain ${flowPath}. Provide workspaceUri explicitly.`);
-    }
-    return finalists[0] as MindFlowMcpSessionRecord;
+    const aggregate = await this.aggregateOpenEditors(undefined, discovery);
+    const matches = (aggregate.editors as EditorRecord[]).filter((editor) => sameFlow(editor, flowPath));
+    if (matches.length > 0) return resolveEditorHost(discovery.sessions, matches, hostId, flowPath, false);
+    if (hostId) return requireHost(discovery.sessions, hostId);
+    return preferredHost(discovery.sessions);
   }
 
-  private async callBackendTool(session: MindFlowMcpSessionRecord, name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-    await this.ensureBackendInitialized(session);
-    const response = await postJson(session, {
+  private async selectHostForOpenFlow(
+    discovery: MindFlowSessionDiscovery,
+    flowUri: string,
+    hostId: string | undefined,
+    label: string,
+    readOnly: boolean
+  ): Promise<MindFlowMcpHostRecord> {
+    const aggregate = await this.aggregateOpenEditors(undefined, discovery);
+    const matches = (aggregate.editors as EditorRecord[]).filter((editor) => sameFlow(editor, flowUri));
+    if (matches.length === 0) {
+      throw new RouterError(-32602, `No open MindFlow editor owns ${label} ${flowUri}. Call mindflow_get_open_editors first.`);
+    }
+    return resolveEditorHost(discovery.sessions, matches, hostId, flowUri, readOnly);
+  }
+
+  private async callBackendTool(host: MindFlowMcpHostRecord, name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+    await this.ensureBackendInitialized(host);
+    const response = await postJson(host, {
       jsonrpc: "2.0", id: this.nextInternalId(), method: "tools/call", params: { name, arguments: args }
     }, this.clientId);
-    if (!response) throw new Error(`MindFlow workspace ${workspaceNames(session)} returned no response.`);
+    if (!response) throw new Error(`MindFlow host ${host.displayName} returned no response.`);
     if (isRecord(response.error)) throw new Error(String(response.error.message ?? "MindFlow backend tool call failed."));
     if (!isRecord(response.result)) throw new Error("MindFlow backend returned an invalid tool result.");
     return response.result;
   }
 
-  private async ensureBackendInitialized(session: MindFlowMcpSessionRecord): Promise<void> {
-    const existing = this.backendStates.get(session.sessionId);
-    if (existing?.initialized && existing.endpoint === session.endpoint) return;
-    const initialize = await postJson(session, {
+  private async ensureBackendInitialized(host: MindFlowMcpHostRecord): Promise<void> {
+    const existing = this.backendStates.get(host.hostId);
+    if (existing?.initialized && existing.endpoint === host.endpoint) return;
+    const initialize = await postJson(host, {
       jsonrpc: "2.0", id: this.nextInternalId(), method: "initialize",
       params: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "mindflow-global-router", version: "0.1.0" } }
     }, this.clientId);
     if (!initialize || isRecord(initialize.error)) {
       throw new Error(isRecord(initialize?.error) ? String(initialize.error.message ?? "Backend initialization failed.") : "Backend initialization returned no response.");
     }
-    await postJson(session, { jsonrpc: "2.0", method: "notifications/initialized" }, this.clientId);
-    this.backendStates.set(session.sessionId, { endpoint: session.endpoint, initialized: true });
+    await postJson(host, { jsonrpc: "2.0", method: "notifications/initialized" }, this.clientId);
+    this.backendStates.set(host.hostId, { endpoint: host.endpoint, initialized: true });
   }
 
   private async discover(force = false): Promise<MindFlowSessionDiscovery> {
     if (!force && this.cachedDiscovery && Date.now() - this.cachedDiscovery.at < SESSION_CACHE_MS) return this.cachedDiscovery.result;
-    const result = await discoverMindFlowSessions(this.sessionDirectory, mindflowToolsetHash());
+    const result = await discoverMindFlowSessions(this.sessionDirectory, mindflowMcpContractHash());
     this.cachedDiscovery = { at: Date.now(), result };
-    const activeIds = new Set(result.sessions.map((session) => session.sessionId));
-    for (const sessionId of this.backendStates.keys()) {
-      if (!activeIds.has(sessionId)) this.backendStates.delete(sessionId);
+    const activeIds = new Set(result.sessions.map((host) => host.hostId));
+    for (const hostId of this.backendStates.keys()) {
+      if (!activeIds.has(hostId)) this.backendStates.delete(hostId);
     }
     return result;
   }
@@ -297,7 +264,7 @@ export class MindFlowGlobalRouter {
 
 export function runMindFlowGlobalRouter(): void {
   if (process.argv.includes("--self-test")) {
-    process.stdout.write(`${JSON.stringify({ ok: true, toolsetHash: mindflowToolsetHash() })}\n`);
+    process.stdout.write(`${JSON.stringify({ ok: true, contractHash: mindflowMcpContractHash() })}\n`);
     return;
   }
   const router = new MindFlowGlobalRouter();
@@ -348,25 +315,6 @@ export function runMindFlowGlobalRouter(): void {
   }
 }
 
-function globalToolDefinitions(): McpToolDefinition[] {
-  const workspaceProperty = { workspaceUri: { type: "string", description: "Optional local VS Code workspace URI used by the global MindFlow Router." } };
-  const routed = new Set(["mindflow_create_flow", "mindflow_open_flow", "mindflow_get_open_editors"]);
-  return [
-    {
-      name: "mindflow_list_workspaces",
-      description: "List local VS Code workspaces currently exposing MindFlow MCP sessions.",
-      inputSchema: { type: "object", additionalProperties: false, properties: {} },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true }
-    },
-    ...MINDFLOW_MCP_TOOLS.map((definition) => {
-      if (!routed.has(definition.name)) return definition;
-      const schema = definition.inputSchema;
-      const properties = isRecord(schema.properties) ? schema.properties : {};
-      return { ...definition, inputSchema: { ...schema, properties: { ...properties, ...workspaceProperty } } };
-    })
-  ];
-}
-
 function resourceDefinitions(): Array<Record<string, string>> {
   return [
     resource(MINDFLOW_OPERATIONS_REFERENCE_URI, "MindFlow operations reference", "Operation-level workflow for reading and editing MindFlow."),
@@ -388,14 +336,11 @@ function toolResult(value: Record<string, unknown>): Record<string, unknown> {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }], structuredContent: value };
 }
 
-function annotateBackendToolResult(result: Record<string, unknown>, session: MindFlowMcpSessionRecord, toolName: string): Record<string, unknown> {
+function annotateBackendToolResult(result: Record<string, unknown>, host: MindFlowMcpHostRecord, toolName: string): Record<string, unknown> {
   if (toolName !== "mindflow_create_flow" && toolName !== "mindflow_open_flow") return result;
   const structured = readStructuredContent(result);
   if (!isRecord(structured.editor)) return result;
-  const workspace = workspaceForEditor(session, structured.editor) ?? session.workspaceFolders[0];
-  if (!workspace) return result;
-  const next = { ...structured, editor: { ...structured.editor, workspaceUri: workspace.uri, workspaceName: workspace.name } };
-  return toolResult(next);
+  return toolResult({ ...structured, editor: { ...structured.editor, hostId: host.hostId, hostName: host.displayName } });
 }
 
 function readStructuredContent(result: Record<string, unknown>): Record<string, unknown> {
@@ -403,39 +348,51 @@ function readStructuredContent(result: Record<string, unknown>): Record<string, 
   return result.structuredContent;
 }
 
-function selectWorkspaceSession(sessions: MindFlowMcpSessionRecord[], workspaceUri?: string): MindFlowMcpSessionRecord {
-  if (!workspaceUri) {
-    if (workspaceCount(sessions) === 1 && sessions.length === 1) return sessions[0] as MindFlowMcpSessionRecord;
-    throw new RouterError(-32602, `Multiple MindFlow sessions or workspaces are active. Specify workspaceUri. Candidates: ${workspaceCandidates(sessions)}`);
+function resolveEditorHost(
+  hosts: MindFlowMcpHostRecord[],
+  matches: EditorRecord[],
+  requestedHostId: string | undefined,
+  flowReference: string,
+  allowExplicitDuplicate: boolean
+): MindFlowMcpHostRecord {
+  const uniqueHostIds = [...new Set(matches.map((editor) => editor.hostId))];
+  if (uniqueHostIds.length > 1 && (!requestedHostId || !allowExplicitDuplicate)) {
+    throw new RouterError(-32602, `${flowReference} is open in multiple MindFlow hosts: ${uniqueHostIds.join(", ")}. Close the duplicate editor before modifying it.`);
   }
-  const matches = sessionsForWorkspace(sessions, workspaceUri);
-  if (matches.length !== 1) throw new RouterError(-32602, workspaceNotFoundMessage(workspaceUri, sessions));
-  return matches[0] as MindFlowMcpSessionRecord;
-}
-
-function workspaceCount(sessions: MindFlowMcpSessionRecord[]): number {
-  return new Set(sessions.flatMap((session) => session.workspaceFolders.map((folder) => normalizeUri(folder.uri)))).size;
-}
-
-function sessionsForWorkspace(sessions: MindFlowMcpSessionRecord[], workspaceUri: string): MindFlowMcpSessionRecord[] {
-  const normalized = normalizeUri(workspaceUri);
-  return uniqueSessions(sessions.filter((session) => session.workspaceFolders.some((folder) => normalizeUri(folder.uri) === normalized)));
-}
-
-function workspaceFolderForUri(session: MindFlowMcpSessionRecord, workspaceUri: string): MindFlowWorkspaceFolderRecord {
-  const folder = session.workspaceFolders.find((candidate) => normalizeUri(candidate.uri) === normalizeUri(workspaceUri));
-  if (!folder) throw new RouterError(-32602, `Workspace ${workspaceUri} is not owned by the selected MindFlow session.`);
-  return folder;
-}
-
-function workspaceForEditor(session: MindFlowMcpSessionRecord, editor: Record<string, unknown>): MindFlowWorkspaceFolderRecord | undefined {
-  const editorPath = typeof editor.path === "string" && path.isAbsolute(editor.path) ? normalizeFsPath(editor.path) : undefined;
-  if (editorPath) {
-    const matches = session.workspaceFolders.filter((folder) => pathContains(folder.fsPath, editorPath))
-      .sort((left, right) => normalizeFsPath(right.fsPath).length - normalizeFsPath(left.fsPath).length);
-    if (matches[0]) return matches[0];
+  if (requestedHostId) {
+    requireHost(hosts, requestedHostId);
+    if (!uniqueHostIds.includes(requestedHostId)) {
+      throw new RouterError(-32602, `hostId ${requestedHostId} does not own ${flowReference}. Candidate hosts: ${uniqueHostIds.join(", ")}.`);
+    }
+    return requireHost(hosts, requestedHostId);
   }
-  return session.workspaceFolders[0];
+  return requireHost(hosts, uniqueHostIds[0] as string);
+}
+
+function toolIsReadOnly(toolName: string): boolean {
+  return MINDFLOW_MCP_TOOLS.find((tool) => tool.name === toolName)?.annotations?.readOnlyHint === true;
+}
+
+function requireHost(hosts: MindFlowMcpHostRecord[], hostId: string): MindFlowMcpHostRecord {
+  const match = hosts.find((host) => host.hostId === hostId);
+  if (!match) throw new RouterError(-32602, `No active MindFlow host matches hostId ${hostId}. Candidates: ${hostCandidates(hosts) || "none"}.`);
+  return match;
+}
+
+function preferredHost(hosts: MindFlowMcpHostRecord[]): MindFlowMcpHostRecord {
+  const sorted = [...hosts].sort((left, right) => {
+    if (left.windowFocused !== right.windowFocused) return left.windowFocused ? -1 : 1;
+    const focused = Date.parse(right.lastFocusedAt) - Date.parse(left.lastFocusedAt);
+    if (focused !== 0) return focused;
+    const created = Date.parse(right.createdAt) - Date.parse(left.createdAt);
+    if (created !== 0) return created;
+    return left.hostId.localeCompare(right.hostId);
+  });
+  return sorted[0] as MindFlowMcpHostRecord;
+}
+
+function compareHostsForDisplay(left: Record<string, unknown>, right: Record<string, unknown>): number {
+  return String(left.displayName).localeCompare(String(right.displayName)) || String(left.hostId).localeCompare(String(right.hostId));
 }
 
 function sameFlow(editor: EditorRecord, flowUri: string): boolean {
@@ -464,20 +421,13 @@ function normalizeFsPath(value: string): string {
   return process.platform === "win32" ? resolved.toLocaleLowerCase("en-US") : resolved;
 }
 
-function pathContains(root: string, candidate: string): boolean {
-  const normalizedRoot = normalizeFsPath(root);
-  const normalizedCandidate = normalizeFsPath(candidate);
-  const relative = path.relative(normalizedRoot, normalizedCandidate);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
-}
-
-function postJson(session: MindFlowMcpSessionRecord, payload: Record<string, unknown>, clientId: string): Promise<Record<string, unknown> | undefined> {
+function postJson(host: MindFlowMcpHostRecord, payload: Record<string, unknown>, clientId: string): Promise<Record<string, unknown> | undefined> {
   const body = JSON.stringify(payload);
   return new Promise((resolve, reject) => {
-    const request = http.request(new URL(session.endpoint), {
+    const request = http.request(new URL(host.endpoint), {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${session.token}`,
+        "Authorization": `Bearer ${host.token}`,
         "Content-Type": "application/json",
         "Content-Length": String(Buffer.byteLength(body)),
         "X-MindFlow-Mcp-Client": clientId
@@ -520,25 +470,13 @@ function mergeUnavailable(...lists: UnavailableMindFlowSession[][]): Unavailable
     .sort((left, right) => left.fileName.localeCompare(right.fileName) || left.reason.localeCompare(right.reason));
 }
 
-function noWorkspaceMessage(unavailable: UnavailableMindFlowSession[]): string {
-  const detail = unavailable.length ? ` Unavailable sessions: ${unavailable.map((item) => item.reason).join("; ")}` : "";
-  return `No active local MindFlow workspace. Open a local folder in VS Code and ensure the MindFlow extension is active.${detail}`;
+function noHostMessage(unavailable: UnavailableMindFlowSession[]): string {
+  const detail = unavailable.length ? ` Unavailable hosts: ${unavailable.map((item) => item.reason).join("; ")}` : "";
+  return `No active local MindFlow VS Code host. Start VS Code and ensure the MindFlow extension is active.${detail}`;
 }
 
-function workspaceNotFoundMessage(workspaceUri: string, sessions: MindFlowMcpSessionRecord[]): string {
-  return `No unique active MindFlow workspace matches ${workspaceUri}. Candidates: ${workspaceCandidates(sessions) || "none"}`;
-}
-
-function workspaceCandidates(sessions: MindFlowMcpSessionRecord[]): string {
-  return sessions.flatMap((session) => session.workspaceFolders.map((folder) => folder.uri)).sort().join(", ");
-}
-
-function workspaceNames(session: MindFlowMcpSessionRecord): string {
-  return session.workspaceFolders.map((folder) => folder.name).join(", ");
-}
-
-function uniqueSessions(sessions: MindFlowMcpSessionRecord[]): MindFlowMcpSessionRecord[] {
-  return [...new Map(sessions.map((session) => [session.sessionId, session])).values()];
+function hostCandidates(hosts: MindFlowMcpHostRecord[]): string {
+  return hosts.map((host) => `${host.hostId} (${host.displayName})`).sort().join(", ");
 }
 
 function requiredString(value: unknown, field: string): string {

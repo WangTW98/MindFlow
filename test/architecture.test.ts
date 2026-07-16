@@ -70,6 +70,21 @@ test("platform adapters use application operations instead of direct domain edit
   assert.ok(mcpSource.includes("product-flow/application/operations"));
 });
 
+test("MCP source uses host routing without workspace contract fields", async () => {
+  const root = process.cwd();
+  const mcpSource = [
+    await readSources(path.join(root, "src", "platform", "mcp")),
+    await readSources(path.join(root, "src", "platform", "vscode", "mcp"))
+  ].join("\n");
+
+  for (const removedContractName of ["mindflow_list_workspaces", "workspaceUri", "workspaceName", "workspaceFolders", "toolsetHash"]) {
+    assert.equal(mcpSource.includes(removedContractName), false, `${removedContractName} must not remain in the MCP implementation`);
+  }
+  assert.ok(mcpSource.includes("mindflow_list_hosts"));
+  assert.ok(mcpSource.includes("hostId"));
+  assert.ok(mcpSource.includes("contractHash"));
+});
+
 test("webview client source is TypeScript and bundle output is outside src", async () => {
   const root = process.cwd();
   const clientRoot = path.join(root, "src", "platform", "webview", "canvas", "client");

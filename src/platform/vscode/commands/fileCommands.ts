@@ -7,7 +7,7 @@ import { FlowRepository } from "../../../product-flow/infrastructure/persistence
 import { FlowPanel } from "../editor/canvas/FlowPanel";
 import type { SidebarView } from "../sidebar/SidebarView";
 import { loadCurrentFlow, loadMindFlowFile, pickMindFlowFile, showError } from "../documents/flowDocumentService";
-import { ensureMindFlowExtension, flowDisplayName, getDefaultSaveUri, resolveInputFlowPath, type FlowUriArgument } from "../documents/flowUri";
+import { assertLocalMindFlowUri, ensureMindFlowExtension, flowDisplayName, getDefaultSaveUri, resolveInputFlowPath, type FlowUriArgument } from "../documents/flowUri";
 import { rememberUntitledFlow } from "../state/activeFlowState";
 import { rememberRecentFlow } from "../state/recentFlowState";
 
@@ -46,7 +46,7 @@ export async function saveFlowAs(
     if (!targetUri) {
       return;
     }
-    const targetPath = ensureMindFlowExtension(targetUri.fsPath);
+    const targetPath = assertLocalMindFlowUri(vscode.Uri.file(ensureMindFlowExtension(targetUri.fsPath))).fsPath;
     await new FlowRepository(path.dirname(targetPath)).saveToPath(targetPath, flow);
     await rememberRecentFlow(context, sidebarView, targetPath);
     FlowPanel.createOrShow(context.extensionUri, flow, vscode.Uri.file(targetPath));

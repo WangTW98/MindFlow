@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { createMindFlowFileName } from "../../../product-flow/domain/model/fileNaming";
 import type { ProductFlow } from "../../../product-flow/domain";
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../../../product-flow/infrastructure/persistence/flowRepository";
+import { assertAbsoluteLocalMindFlowPath } from "../../../shared/localMindFlowPath";
 import { isPathInsideWorkspace, normalizeWorkspaceRelativeDirectory } from "./workspacePathPolicy";
 
 export type FlowUriArgument = vscode.Uri | string | undefined;
@@ -23,19 +24,15 @@ export function normalizeFlowUri(flowUri: FlowUriArgument): vscode.Uri | undefin
   if (uri.scheme === "untitled") {
     return uri;
   }
-  return assertWorkspaceMindFlowUri(uri);
+  return assertLocalMindFlowUri(uri);
 }
 
-export function assertWorkspaceMindFlowUri(uri: vscode.Uri): vscode.Uri {
+export function assertLocalMindFlowUri(uri: vscode.Uri): vscode.Uri {
   if (!isRealMindFlowUri(uri)) {
-    throw new Error("MindFlow only supports local file URIs inside an open workspace folder.");
+    throw new Error("MindFlow only supports local absolute file URIs.");
   }
   if (path.extname(uri.fsPath).toLowerCase() !== FLOW_FILE_EXTENSION) {
     throw new Error(`MindFlow file must use the ${FLOW_FILE_EXTENSION} extension.`);
-  }
-  const folder = workspaceFolderForUri(uri);
-  if (!folder || !isPathInsideWorkspace(folder.uri.fsPath, uri.fsPath)) {
-    throw new Error(`MindFlow file is outside the open workspace: ${uri.fsPath}`);
   }
   return uri;
 }
@@ -49,15 +46,12 @@ export function ensureMindFlowExtension(filePath: string): string {
 }
 
 export function resolveInputFlowPath(flowPath: string): string {
-  const uri = path.isAbsolute(flowPath)
-    ? vscode.Uri.file(flowPath)
-    : vscode.Uri.file(path.join(getWorkspaceRoot(), flowPath));
-  return assertWorkspaceMindFlowUri(uri).fsPath;
+  return assertLocalMindFlowUri(vscode.Uri.file(assertAbsoluteLocalMindFlowPath(flowPath))).fsPath;
 }
 
 export function getDefaultSaveUri(flow: ProductFlow, flowUri: vscode.Uri): vscode.Uri | undefined {
   if (isRealMindFlowUri(flowUri)) {
-    return assertWorkspaceMindFlowUri(vscode.Uri.file(ensureMindFlowExtension(flowUri.fsPath)));
+    return assertLocalMindFlowUri(vscode.Uri.file(ensureMindFlowExtension(flowUri.fsPath)));
   }
   const folder = preferredWorkspaceFolder();
   if (!folder) {
@@ -67,24 +61,16 @@ export function getDefaultSaveUri(flow: ProductFlow, flowUri: vscode.Uri): vscod
   return vscode.Uri.file(path.join(folder.uri.fsPath, flowDirectory, createMindFlowFileName(flow)));
 }
 
-export function createFlowRepository(resource?: vscode.Uri): FlowRepository {
+export function createFlowRepository(resource?: vscode.Uri): FlowRepository | undefined {
   const folder = resource ? workspaceFolderForUri(resource) : preferredWorkspaceFolder();
   if (!folder) {
-    throw new Error("MindFlow requires an open workspace folder.");
+    return undefined;
   }
   return new FlowRepository(folder.uri.fsPath, getConfiguredFlowDirectory(folder.uri));
 }
 
 export function getWorkspaceRootIfAvailable(resource?: vscode.Uri): string | undefined {
   return (resource ? workspaceFolderForUri(resource) : preferredWorkspaceFolder())?.uri.fsPath;
-}
-
-export function getWorkspaceRoot(resource?: vscode.Uri): string {
-  const workspaceRoot = getWorkspaceRootIfAvailable(resource);
-  if (!workspaceRoot) {
-    throw new Error("MindFlow requires an open workspace folder.");
-  }
-  return workspaceRoot;
 }
 
 export function getWorkspaceMindFlowDirectoryUri(resource?: vscode.Uri): vscode.Uri | undefined {
@@ -102,8 +88,7 @@ function uriFromString(value: string): vscode.Uri {
   if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
     return vscode.Uri.parse(value);
   }
-  const root = getWorkspaceRoot();
-  return vscode.Uri.file(path.join(root, value));
+  throw new Error("MindFlow file path must be an absolute local path.");
 }
 
 function preferredWorkspaceFolder(): vscode.WorkspaceFolder | undefined {

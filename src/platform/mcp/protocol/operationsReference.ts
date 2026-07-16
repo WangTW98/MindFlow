@@ -17,7 +17,7 @@ MindFlow MCP is an operation layer for an open VS Code MindFlow editor.
 
 Recommended workflow:
 
-1. Create a new canvas or open an explicit workspace .mindflow file.
+1. Create a new canvas or open an explicit absolute local .mindflow file. A VS Code workspace is not required.
 2. Query only the entity pages required for the current task partition.
 3. Dry-run mindflow_apply_canvas_changes with the current revision.
 4. Apply the same bounded changeset.

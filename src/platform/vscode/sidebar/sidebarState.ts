@@ -3,6 +3,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { FlowRepository } from "../../../product-flow/infrastructure/persistence/flowRepository";
 import { RecentFlowStore, type RecentFlowRecord } from "../state/recentFlows";
+import { isPathInsideWorkspace } from "../documents/workspacePathPolicy";
 
 export interface SidebarState {
   flows: FlowItem[];
@@ -17,21 +18,15 @@ export interface FlowItem {
 }
 
 export interface SidebarStateOptions {
-  getWorkspaceRoot(): string;
+  getWorkspaceRoot(): string | undefined;
   recentFlows: RecentFlowStore;
-  workspaceRecentFlows: RecentFlowStore;
 }
 
 export async function createSidebarState(options: SidebarStateOptions): Promise<SidebarState> {
-  let workspaceRoot = "";
-  try {
-    workspaceRoot = options.getWorkspaceRoot();
-  } catch {
-    workspaceRoot = "";
-  }
+  const workspaceRoot = options.getWorkspaceRoot() ?? "";
   const flowDirectory = vscode.workspace.getConfiguration("mindflow.storage").get<string>("flowDirectory", ".mindflow/flows");
   const repository = workspaceRoot ? new FlowRepository(workspaceRoot, flowDirectory) : undefined;
-  let recentRecords = await getGlobalRecentRecords(options.recentFlows, options.workspaceRecentFlows);
+  let recentRecords = options.recentFlows.get();
   if (!recentRecords && repository) {
     const seededRecords = await seedRecentFlowRecords(await repository.list().catch(() => []));
     await options.recentFlows.replace(seededRecords);
@@ -56,19 +51,6 @@ async function filterExistingFlowRecords(records: RecentFlowRecord[]): Promise<R
   return checks.filter((record): record is RecentFlowRecord => Boolean(record));
 }
 
-async function getGlobalRecentRecords(
-  recentFlows: RecentFlowStore,
-  workspaceRecentFlows: RecentFlowStore
-): Promise<RecentFlowRecord[] | undefined> {
-  const globalRecords = recentFlows.get();
-  const workspaceRecords = workspaceRecentFlows.get();
-  if (workspaceRecords?.length) {
-    await recentFlows.replace([...(globalRecords ?? []), ...workspaceRecords]);
-    return recentFlows.get();
-  }
-  return globalRecords;
-}
-
 async function seedRecentFlowRecords(files: string[]): Promise<RecentFlowRecord[]> {
   const records = await Promise.all(
     files.map(async (file) => ({
@@ -84,7 +66,9 @@ async function toFlowItem(workspaceRoot: string, record: RecentFlowRecord): Prom
   const lastOpenedAt = record.lastOpenedAt || stats?.mtimeMs || 0;
   return {
     absolutePath: record.absolutePath,
-    relativePath: workspaceRoot ? path.relative(workspaceRoot, record.absolutePath) : record.absolutePath,
+    relativePath: workspaceRoot && isPathInsideWorkspace(workspaceRoot, record.absolutePath)
+      ? path.relative(workspaceRoot, record.absolutePath)
+      : record.absolutePath,
     name: path.basename(record.absolutePath),
     lastOpenedAt,
     usedLabel: lastOpenedAt ? `最近打开 ${formatDateTime(lastOpenedAt)}` : "最近打开时间未知"

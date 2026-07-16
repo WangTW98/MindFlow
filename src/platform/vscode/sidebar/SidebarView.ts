@@ -8,12 +8,10 @@ export class SidebarView implements vscode.WebviewViewProvider {
   public static readonly viewId = "mindflow.sidebar";
 
   private readonly recentFlows: RecentFlowStore;
-  private readonly workspaceRecentFlows: RecentFlowStore;
   private webviewView: vscode.WebviewView | undefined;
 
-  public constructor(private readonly context: vscode.ExtensionContext, private readonly getWorkspaceRoot: () => string) {
+  public constructor(private readonly context: vscode.ExtensionContext, private readonly getWorkspaceRoot: () => string | undefined) {
     this.recentFlows = new RecentFlowStore(context.globalState);
-    this.workspaceRecentFlows = new RecentFlowStore(context.workspaceState);
   }
 
   public async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
@@ -41,12 +39,10 @@ export class SidebarView implements vscode.WebviewViewProvider {
           break;
         case "clearRecent":
           await this.recentFlows.clear();
-          await this.workspaceRecentFlows.clear();
           await this.refresh();
           break;
         case "removeRecent":
           await this.recentFlows.remove(message.flowPath);
-          await this.workspaceRecentFlows.remove(message.flowPath);
           await this.refresh();
           break;
         default:
@@ -65,8 +61,7 @@ export class SidebarView implements vscode.WebviewViewProvider {
   private async render(webview: vscode.Webview): Promise<string> {
     const state = await createSidebarState({
       getWorkspaceRoot: this.getWorkspaceRoot,
-      recentFlows: this.recentFlows,
-      workspaceRecentFlows: this.workspaceRecentFlows
+      recentFlows: this.recentFlows
     });
     return renderSidebarHtml({
       extensionUri: this.context.extensionUri,

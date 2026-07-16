@@ -126,8 +126,8 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
   tool("mindflow_create_flow", "Create and open a new unsaved MindFlow canvas. The user must save it in VS Code.", objectSchema({
     title: { type: "string" }
   })),
-  tool("mindflow_open_flow", "Open a current-format .mindflow file inside the active VS Code workspace.", objectSchema({
-    flowPath: { type: "string" }
+  tool("mindflow_open_flow", "Open a current-format .mindflow file at any absolute local filesystem path.", objectSchema({
+    flowPath: { type: "string", description: "Absolute local path to a .mindflow file. Relative paths and virtual/remote URIs are not supported." }
   }, ["flowPath"])),
   tool("mindflow_validate_flow", "Validate an open MindFlow canvas and return structural errors, warnings, and entity counts.", objectSchema({
     ...flowUriProperty
