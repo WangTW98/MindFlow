@@ -69,9 +69,9 @@ Register it once:
 
 The copied JSON contains only a verified runtime command and the stable Router path. It contains no project path, host id, port, or token. Codex users can translate the entry to `codex mcp add mindflow [--env KEY=VALUE] -- <command> <router-path>`. Claude Code users can add the inner server object with `claude mcp add-json` at `--scope user`; see the [official Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp).
 
-The Router discovers live VS Code host records from `~/.mindflow/mcp/sessions/` (or `%LOCALAPPDATA%/MindFlow/mcp/sessions/` on Windows), validates them, and routes each call dynamically. It works in empty VS Code windows and is not bound to a project or workspace. Use a precise `flowUri` whenever possible; with multiple windows, optional `hostId` overrides the default most-recently-focused host. `mindflow_open_flow.flowPath` must be an absolute local `.mindflow` path. Remote SSH, WSL, Dev Container, and virtual-file-system paths are not supported.
+The Router discovers live VS Code host records from `~/.mindflow/mcp/sessions/` (or `%LOCALAPPDATA%/MindFlow/mcp/sessions/` on Windows), validates heartbeat freshness, and routes each call dynamically. It works in empty VS Code windows and is not bound to a project or workspace. Use a precise `flowUri` whenever possible. With multiple hosts, read-only calls may use the most recently focused host, but every call that can change editor or window state requires an explicit `flowUri` or `hostId`. `mindflow_open_flow.flowPath` must be an absolute local `.mindflow` path. Remote SSH, WSL, Dev Container, and virtual-file-system paths are not supported.
 
-MindFlow can open, edit, validate, and save local `.mindflow` files outside every open workspace. The configured workspace `flowDirectory` remains only an optional default storage and initial-discovery location.
+MindFlow can open, edit, validate, and save local `.mindflow` files outside every open workspace. MCP access to an external file prompts for confirmation by default; `mindflow.security.externalFileAccess` can be set to `workspaceOnly` or `allow`. Real paths are checked so a workspace symlink cannot bypass the policy. The configured workspace `flowDirectory` remains only an optional default storage and initial-discovery location.
 
 ## Agent workflow and resumable tasks
 

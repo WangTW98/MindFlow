@@ -1,5 +1,4 @@
-import { APP_SURFACE_TYPES, EDGE_TYPES, ENTITY_STATUSES, FLOW_ENDPOINT_KINDS } from "./constants";
-import type { AppSurfaceType, EdgeType, EntityStatus, FlowEndpointKind } from "./constants";
+import { APP_SURFACE_TYPES, EDGE_TYPES, ENTITY_STATUSES, FLOW_ENDPOINT_KINDS, type AppSurfaceType, type EdgeType, type EntityStatus, type FlowEndpointKind } from "./constants";
 
 const ENTITY_STATUS_VALUES = new Set<string>(ENTITY_STATUSES);
 const EDGE_TYPE_VALUES = new Set<string>(EDGE_TYPES);

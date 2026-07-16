@@ -7,8 +7,9 @@ import test from "node:test";
 import { createEmptyProductFlow } from "../src/product-flow/domain/model/factory";
 import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../src/platform/mcp/protocol/bridge";
 import { mindflowMcpContractHash } from "../src/platform/mcp/protocol/contractHash";
+import { MINDFLOW_MCP_CONTRACT_VERSION } from "../src/platform/mcp/protocol/globalToolSchemas";
 import { MindFlowMcpProtocol } from "../src/platform/mcp/protocol/jsonRpcProtocol";
-import { MindFlowGlobalRouter } from "../src/platform/mcp/runtime/globalRouter";
+import { isMcpStdioMessageWithinLimit, MAX_MCP_MESSAGE_BYTES, MindFlowGlobalRouter } from "../src/platform/mcp/runtime/globalRouter";
 import { MindFlowMcpToolHandlers } from "../src/platform/mcp/tools";
 import { emptyFlowSelection, type FlowSelectionPatch } from "../src/product-flow/domain/selection";
 
@@ -36,6 +37,12 @@ test("MCP protocol validates JSON-RPC and initialization lifecycle", async () =>
 
   const missing = await protocol.handle({ jsonrpc: "2.0", id: 5, method: "missing/method" });
   assert.equal(readErrorCode(missing), -32601);
+});
+
+test("global MCP Router enforces its stdio limit on each complete message", () => {
+  assert.equal(isMcpStdioMessageWithinLimit("x".repeat(MAX_MCP_MESSAGE_BYTES)), true);
+  assert.equal(isMcpStdioMessageWithinLimit("x".repeat(MAX_MCP_MESSAGE_BYTES + 1)), false);
+  assert.equal(isMcpStdioMessageWithinLimit("你".repeat(Math.floor(MAX_MCP_MESSAGE_BYTES / 3) + 1)), false);
 });
 
 test("global MCP Router discovers a live host and aggregates its editors", async () => {
@@ -68,7 +75,7 @@ test("global MCP Router discovers a live host and aggregates its editors", async
   await fs.writeFile(path.join(directory, "host-a.json"), JSON.stringify({
     hostId: "host-a", displayName: "VS Code Window", environment: "local",
     endpoint: `http://127.0.0.1:${port}/mcp`, token, pid: process.pid,
-    createdAt: now, lastSeenAt: now, extensionVersion: "0.1.0", contractHash: mindflowMcpContractHash(),
+    createdAt: now, lastSeenAt: now, extensionVersion: "0.1.0", contractVersion: MINDFLOW_MCP_CONTRACT_VERSION, contractHash: mindflowMcpContractHash(),
     windowFocused: true, lastFocusedAt: now
   }), { encoding: "utf8", mode: 0o600 });
 
@@ -179,7 +186,7 @@ test("global MCP Router uses recent focus, accepts hostId override, and routes b
       await fs.writeFile(path.join(directory, `${hostId}.json`), JSON.stringify({
         hostId, displayName: `host-window-${index}`, environment: "local",
         endpoint: `http://127.0.0.1:${port}/mcp`, token, pid: process.pid,
-        createdAt: now, lastSeenAt: now, extensionVersion: "0.1.0", contractHash: mindflowMcpContractHash(),
+        createdAt: now, lastSeenAt: now, extensionVersion: "0.1.0", contractVersion: MINDFLOW_MCP_CONTRACT_VERSION, contractHash: mindflowMcpContractHash(),
         windowFocused: index === 0, lastFocusedAt: now
       }), { mode: 0o600 });
     }
@@ -190,6 +197,18 @@ test("global MCP Router uses recent focus, accepts hostId override, and routes b
       jsonrpc: "2.0", id: 10, method: "tools/call", params: { name: "mindflow_get_editor_state", arguments: {} }
     });
     assert.equal(((readStructuredToolResult(automatic).editor as Record<string, unknown>).title), "Flow 0");
+
+    const ambiguousWrite = await router.handle({
+      jsonrpc: "2.0", id: 15, method: "tools/call",
+      params: { name: "mindflow_update_root", arguments: { title: "Unsafe implicit write" } }
+    });
+    assert.match(readErrorMessage(ambiguousWrite), /explicit hostId or flowUri/);
+
+    const ambiguousOpen = await router.handle({
+      jsonrpc: "2.0", id: 16, method: "tools/call",
+      params: { name: "mindflow_open_flow", arguments: { flowPath: path.join(os.tmpdir(), "ambiguous.mindflow") } }
+    });
+    assert.match(readErrorMessage(ambiguousOpen), /explicit hostId or flowUri/);
 
     const explicit = await router.handle({
       jsonrpc: "2.0", id: 14, method: "tools/call",
@@ -251,7 +270,7 @@ test("global MCP Router rejects modifying a flow opened by multiple hosts", asyn
       await fs.writeFile(path.join(directory, `duplicate-${index}.json`), JSON.stringify({
         hostId: `duplicate-${index}`, displayName: `duplicate-${index}`, environment: "local",
         endpoint: `http://127.0.0.1:${port}/mcp`, token, pid: process.pid,
-        createdAt: now, lastSeenAt: now, extensionVersion: "0.1.0", contractHash: mindflowMcpContractHash(),
+        createdAt: now, lastSeenAt: now, extensionVersion: "0.1.0", contractVersion: MINDFLOW_MCP_CONTRACT_VERSION, contractHash: mindflowMcpContractHash(),
         windowFocused: index === 0, lastFocusedAt: now
       }), { mode: 0o600 });
     }

@@ -1,6 +1,5 @@
 import { normalizeFlowSelection, type FlowSelectionPatch } from "../../../product-flow/domain/selection";
-import type { FlowOperationResult } from "../../../product-flow/application/operations";
-import { PROJECT_OVERVIEW_NODE_ID } from "../../../product-flow/application/operations";
+import { PROJECT_OVERVIEW_NODE_ID, type FlowOperationResult } from "../../../product-flow/application/operations";
 import type { PageNode, ProductFlow } from "../../../product-flow/domain";
 import type { MindFlowEditorSnapshot } from "../protocol/bridge";
 

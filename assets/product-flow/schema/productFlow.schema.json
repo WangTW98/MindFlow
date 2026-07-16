@@ -19,11 +19,11 @@
     "edges"
   ],
   "properties": {
-    "flowId": { "type": "string" },
+    "flowId": { "type": "string", "minLength": 1 },
     "revision": { "type": "integer", "minimum": 1 },
-    "title": { "type": "string" },
-    "createdAt": { "type": "string" },
-    "updatedAt": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "createdAt": { "$ref": "#/$defs/isoDate" },
+    "updatedAt": { "$ref": "#/$defs/isoDate" },
     "projectOverview": { "$ref": "#/$defs/projectOverview" },
     "domains": {
       "type": "array",
@@ -67,7 +67,12 @@
     },
     "stringArray": {
       "type": "array",
-      "items": { "type": "string" }
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "isoDate": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
     },
     "position": {
       "type": "object",
@@ -90,7 +95,7 @@
       "additionalProperties": false,
       "required": ["summary", "goal"],
       "properties": {
-        "summary": { "type": "string" },
+        "summary": { "type": "string", "minLength": 1 },
         "goal": { "type": "string" },
         "view": { "$ref": "#/$defs/view" }
       }
@@ -100,8 +105,8 @@
       "additionalProperties": false,
       "required": ["domainId", "name", "description"],
       "properties": {
-        "domainId": { "type": "string" },
-        "name": { "type": "string" },
+        "domainId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
         "description": { "type": "string" }
       }
     },
@@ -110,8 +115,8 @@
       "additionalProperties": false,
       "required": ["roleId", "name", "description", "domainIds"],
       "properties": {
-        "roleId": { "type": "string" },
-        "name": { "type": "string" },
+        "roleId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
         "domainIds": { "$ref": "#/$defs/stringArray" }
       }
@@ -121,8 +126,8 @@
       "additionalProperties": false,
       "required": ["appId", "name", "type", "description", "domainIds", "roleIds"],
       "properties": {
-        "appId": { "type": "string" },
-        "name": { "type": "string" },
+        "appId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
         "type": {
           "type": "string",
           "enum": ["admin", "web", "app", "miniapp", "desktop", "other"]
@@ -138,8 +143,8 @@
       "additionalProperties": false,
       "required": ["statusGroupId", "title", "color"],
       "properties": {
-        "statusGroupId": { "type": "string" },
-        "title": { "type": "string" },
+        "statusGroupId": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
         "color": {
           "type": "string",
@@ -152,9 +157,9 @@
       "additionalProperties": false,
       "required": ["itemId", "name", "type", "description"],
       "properties": {
-        "itemId": { "type": "string" },
-        "name": { "type": "string" },
-        "type": { "type": "string" },
+        "itemId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
         "dataBinding": { "type": "string" },
         "required": { "type": "boolean" }
@@ -165,9 +170,9 @@
       "additionalProperties": false,
       "required": ["actionId", "label", "type"],
       "properties": {
-        "actionId": { "type": "string" },
-        "label": { "type": "string" },
-        "type": { "type": "string" },
+        "actionId": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
         "targetNodeId": { "type": "string" },
         "preconditions": { "$ref": "#/$defs/stringArray" },
         "result": { "type": "string" }
@@ -178,9 +183,9 @@
       "additionalProperties": false,
       "required": ["groupId", "name", "type", "description", "items"],
       "properties": {
-        "groupId": { "type": "string" },
-        "name": { "type": "string" },
-        "type": { "type": "string" },
+        "groupId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
         "items": {
           "type": "array",
@@ -210,18 +215,18 @@
         "permissions"
       ],
       "properties": {
-        "nodeId": { "type": "string" },
+        "nodeId": { "type": "string", "minLength": 1 },
         "status": { "$ref": "#/$defs/entityStatus" },
-        "title": { "type": "string" },
+        "title": { "type": "string", "minLength": 1 },
         "pageType": {
           "type": "string",
           "enum": ["skeleton", "navigation", "page", "popup", "component"]
         },
         "appSurfaceIds": { "$ref": "#/$defs/stringArray" },
-        "statusGroupId": { "type": "string" },
+        "statusGroupId": { "type": "string", "minLength": 1 },
         "domainIds": { "$ref": "#/$defs/stringArray" },
         "roleIds": { "$ref": "#/$defs/stringArray" },
-        "purpose": { "type": "string" },
+        "purpose": { "type": "string", "minLength": 1 },
         "featureGroups": {
           "type": "array",
           "items": { "$ref": "#/$defs/featureGroup" }
@@ -229,7 +234,7 @@
         "inputs": { "$ref": "#/$defs/stringArray" },
         "outputs": { "$ref": "#/$defs/stringArray" },
         "permissions": { "$ref": "#/$defs/stringArray" },
-        "removedAt": { "type": "string" },
+        "removedAt": { "$ref": "#/$defs/isoDate" },
         "view": { "$ref": "#/$defs/view" }
       }
     },
@@ -291,20 +296,20 @@
       "additionalProperties": false,
       "required": ["edgeId", "status", "fromNodeId", "toNodeId", "from", "to", "action", "type", "appSurfaceIds", "domainIds", "roleIds"],
       "properties": {
-        "edgeId": { "type": "string" },
+        "edgeId": { "type": "string", "minLength": 1 },
         "status": { "$ref": "#/$defs/entityStatus" },
-        "fromNodeId": { "type": "string" },
-        "toNodeId": { "type": "string" },
+        "fromNodeId": { "type": "string", "minLength": 1 },
+        "toNodeId": { "type": "string", "minLength": 1 },
         "from": { "$ref": "#/$defs/endpoint" },
         "to": { "$ref": "#/$defs/endpoint" },
-        "action": { "type": "string" },
+        "action": { "type": "string", "minLength": 1 },
         "trigger": { "type": "string" },
         "type": { "$ref": "#/$defs/edgeType" },
         "condition": { "type": "string" },
         "appSurfaceIds": { "$ref": "#/$defs/stringArray" },
         "domainIds": { "$ref": "#/$defs/stringArray" },
         "roleIds": { "$ref": "#/$defs/stringArray" },
-        "removedAt": { "type": "string" }
+        "removedAt": { "$ref": "#/$defs/isoDate" }
       }
     }
   }

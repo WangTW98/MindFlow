@@ -149,7 +149,7 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
     ...flowUriProperty,
     expectedRevision: { type: "integer", minimum: 1 },
     dryRun: { type: "boolean" },
-    operations: { type: "array", minItems: 1, items: changesetOperationSchema },
+    operations: { type: "array", minItems: 1, maxItems: 200, items: changesetOperationSchema },
     selection: { type: "object" }
   }, ["expectedRevision", "dryRun", "operations"])),
   tool("mindflow_get_editor_state", "Read compact editor metadata, counts, complete selection, schema enums, and capabilities. Set includeFlow=true for the complete flow.", objectSchema({
@@ -273,7 +273,7 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
 
 function tool(name: string, description: string, inputSchema: Record<string, unknown>): McpToolDefinition {
   const readOnly = name.startsWith("mindflow_get_") || name === "mindflow_query_entities" || name === "mindflow_validate_flow";
-  const destructive = name.includes("remove");
+  const destructive = name.includes("remove") || name === "mindflow_apply_canvas_changes";
   const idempotent = readOnly || name.includes("move") || name.includes("update") || name.includes("validate") || name.includes("query");
   return {
     name,
@@ -294,7 +294,7 @@ function objectSchema(properties: Record<string, unknown>, required: string[] = 
 }
 
 function stringArray(): Record<string, unknown> {
-  return { type: "array", items: { type: "string" } };
+  return { type: "array", maxItems: 200, items: { type: "string" } };
 }
 
 function changesetEndpointSchema(): Record<string, unknown> {
@@ -371,8 +371,8 @@ function batchNodesSchema(itemProperties: Record<string, unknown>, itemRequired:
   return objectSchema({
     ...flowUriProperty,
     dryRun: { type: "boolean" },
-    nodes: { type: "array", minItems: 1, items: objectSchema(itemProperties, itemRequired) },
-    items: { type: "array", minItems: 1, items: objectSchema(itemProperties, itemRequired) }
+    nodes: { type: "array", minItems: 1, maxItems: 100, items: objectSchema(itemProperties, itemRequired) },
+    items: { type: "array", minItems: 1, maxItems: 100, items: objectSchema(itemProperties, itemRequired) }
   }, [], [{ required: ["nodes"] }, { required: ["items"] }]);
 }
 

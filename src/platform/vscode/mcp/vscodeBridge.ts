@@ -5,12 +5,12 @@ import type { ProductFlow } from "../../../product-flow/domain";
 import { createEmptyProductFlow } from "../../../product-flow/domain/model/factory";
 import { parseProductFlowText } from "../../../product-flow/domain/serialization/codec";
 import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../../mcp/protocol/bridge";
-import { applyFlowDocumentEdit } from "../documents/flowDocumentService";
+import { applyFlowDocumentEdit, loadMindFlowFile } from "../documents/flowDocumentService";
 import { flowDisplayName, normalizeFlowUri, resolveInputFlowPath } from "../documents/flowUri";
 import { createUntitledMindFlowDocumentOptions } from "../documents/untitledMindFlowDocument";
-import { loadMindFlowFile } from "../documents/flowDocumentService";
 import { rememberUntitledFlow } from "../state/activeFlowState";
 import { FlowPanel } from "../editor/canvas/FlowPanel";
+import { authorizeMcpFileOpen, type MindFlowExternalFileAccessMode } from "../documents/externalFileAccess";
 
 export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
   public constructor(private readonly extensionUri: vscode.Uri) {}
@@ -25,12 +25,23 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
 
   public async openFlow(flowPath: string): Promise<MindFlowEditorSnapshot> {
     const resolvedPath = resolveInputFlowPath(flowPath);
-    await loadMindFlowFile(resolvedPath);
     const uri = vscode.Uri.file(resolvedPath);
-    if (!FlowPanel.hasOpenEditor(uri)) {
-      await vscode.commands.executeCommand("vscode.openWith", uri, FlowPanel.viewType);
-    }
-    return this.readSnapshot(uri, true);
+    if (FlowPanel.hasOpenEditor(uri)) return this.readSnapshot(uri, true);
+    const mode = vscode.workspace.getConfiguration("mindflow.security").get<MindFlowExternalFileAccessMode>("externalFileAccess", "prompt");
+    const authorizedPath = await authorizeMcpFileOpen(
+      resolvedPath,
+      vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [],
+      mode,
+      async (realPath) => await vscode.window.showWarningMessage(
+        `MindFlow MCP wants to open a file outside the current workspace:\n${realPath}`,
+        { modal: true },
+        "Open External MindFlow"
+      ) === "Open External MindFlow"
+    );
+    await loadMindFlowFile(authorizedPath);
+    const authorizedUri = vscode.Uri.file(authorizedPath);
+    await vscode.commands.executeCommand("vscode.openWith", authorizedUri, FlowPanel.viewType);
+    return this.readSnapshot(authorizedUri, true);
   }
 
   public async getOpenEditors(): Promise<MindFlowEditorSnapshot[]> {

@@ -1,13 +1,17 @@
 import { randomUUID } from "node:crypto";
+import * as fsSync from "node:fs";
 import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { MindFlowEditorBridge } from "../../mcp/protocol/bridge";
 import { MindFlowMcpProtocol } from "../../mcp/protocol/jsonRpcProtocol";
+import { MindFlowMcpProtocolCache } from "../../mcp/protocol/protocolCache";
 import { mindflowMcpContractHash } from "../../mcp/protocol/contractHash";
+import { MINDFLOW_MCP_CONTRACT_VERSION } from "../../mcp/protocol/globalToolSchemas";
 import {
   isProcessAlive,
+  MINDFLOW_SESSION_HEARTBEAT_INTERVAL_MS,
   mindflowSessionDirectory,
   parseMindFlowSessionRecord,
   type MindFlowMcpHostRecord
@@ -25,12 +29,15 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
   private readonly hostId = randomUUID();
   private sessionFilePath: string | undefined;
   private lastRegistryWrite = 0;
-  private readonly protocols = new Map<string, MindFlowMcpProtocol>();
+  private readonly protocols = new MindFlowMcpProtocolCache<MindFlowMcpProtocol>();
   private readonly windowStateDisposable: vscode.Disposable;
+  private heartbeatTimer: NodeJS.Timeout | undefined;
+  private registryWriteQueue: Promise<void> = Promise.resolve();
 
   public constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly bridge: MindFlowEditorBridge
+    private readonly bridge: MindFlowEditorBridge,
+    private readonly log: (level: "info" | "warn" | "error", message: string) => void = (level, message) => console[level](message)
   ) {
     this.windowStateDisposable = vscode.window.onDidChangeWindowState((state) => {
       void this.updateWindowState(state.focused);
@@ -56,9 +63,20 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
     this.server = undefined;
     this.session = undefined;
     this.protocols.clear();
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = undefined;
     server?.close();
+    this.log("info", "Local MCP bridge stopped.");
     if (this.sessionFilePath) {
-      void fs.rm(this.sessionFilePath, { force: true });
+      const sessionFilePath = this.sessionFilePath;
+      try {
+        fsSync.rmSync(sessionFilePath, { force: true });
+      } catch (error) {
+        this.log("warn", `Unable to remove MCP session record during shutdown: ${errorMessage(error)}`);
+      }
+      void this.registryWriteQueue
+        .finally(() => fs.rm(sessionFilePath, { force: true }))
+        .catch((error) => this.log("warn", `Unable to confirm MCP session cleanup: ${errorMessage(error)}`));
     }
   }
 
@@ -97,6 +115,7 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
         createdAt: now,
         lastSeenAt: now,
         extensionVersion: String(this.context.extension.packageJSON?.version ?? "unknown"),
+        contractVersion: MINDFLOW_MCP_CONTRACT_VERSION,
         contractHash: mindflowMcpContractHash(),
         windowFocused: vscode.window.state.focused,
         lastFocusedAt: now
@@ -111,11 +130,13 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
       this.server = server;
       this.session = session;
       this.sessionFilePath = sessionPath;
+      this.startHeartbeat();
       this.startError = undefined;
+      this.log("info", `Local MCP bridge started at ${endpoint}.`);
     } catch (error) {
       server?.close();
       this.startError = error instanceof Error ? error.message : String(error);
-      console.warn(`MindFlow MCP server failed to start: ${this.startError}`);
+      this.log("error", `Local MCP bridge failed to start: ${this.startError}`);
     }
   }
 
@@ -166,9 +187,7 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
     }
     this.lastRegistryWrite = Date.now();
     this.session.lastSeenAt = new Date().toISOString();
-    if (this.sessionFilePath) {
-      await writeSessionFile(this.sessionFilePath, this.session).catch(() => undefined);
-    }
+    await this.queueSessionWrite();
   }
 
   private async updateWindowState(focused: boolean): Promise<void> {
@@ -176,20 +195,37 @@ export class MindFlowMcpServerManager implements vscode.Disposable {
     this.session.windowFocused = focused;
     if (focused) this.session.lastFocusedAt = new Date().toISOString();
     this.session.lastSeenAt = new Date().toISOString();
-    await writeSessionFile(this.sessionFilePath, this.session).catch(() => undefined);
+    await this.queueSessionWrite();
+  }
+
+  private startHeartbeat(): void {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = setInterval(() => {
+      if (!this.session || this.disposed) return;
+      this.session.lastSeenAt = new Date().toISOString();
+      void this.queueSessionWrite();
+    }, MINDFLOW_SESSION_HEARTBEAT_INTERVAL_MS);
+    this.heartbeatTimer.unref?.();
+  }
+
+  private queueSessionWrite(): Promise<void> {
+    if (!this.session || !this.sessionFilePath || this.disposed) return Promise.resolve();
+    const snapshot = { ...this.session };
+    const sessionFilePath = this.sessionFilePath;
+    this.registryWriteQueue = this.registryWriteQueue
+      .catch(() => undefined)
+      .then(() => this.disposed ? undefined : writeSessionFile(sessionFilePath, snapshot))
+      .catch((error) => {
+        this.log("warn", `MCP heartbeat write failed: ${errorMessage(error)}`);
+      });
+    return this.registryWriteQueue;
   }
 
   private protocolForRequest(request: http.IncomingMessage): MindFlowMcpProtocol {
     const header = request.headers?.["x-mindflow-mcp-client"];
     const rawClientId = Array.isArray(header) ? header[0] : header;
     const clientId = typeof rawClientId === "string" && rawClientId.trim() ? rawClientId.trim().slice(0, 128) : "direct";
-    const existing = this.protocols.get(clientId);
-    if (existing) {
-      return existing;
-    }
-    const protocol = new MindFlowMcpProtocol(new MindFlowMcpToolHandlers(this.bridge));
-    this.protocols.set(clientId, protocol);
-    return protocol;
+    return this.protocols.get(clientId, () => new MindFlowMcpProtocol(new MindFlowMcpToolHandlers(this.bridge)));
   }
 }
 
@@ -275,6 +311,10 @@ class RequestBodyTooLargeError extends Error {
   public constructor(limitBytes: number) {
     super(`MindFlow MCP request body exceeds ${limitBytes} bytes.`);
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function writeJson(response: http.ServerResponse, statusCode: number, value: unknown): void {

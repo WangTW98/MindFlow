@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import Ajv2020 from "ajv/dist/2020.js";
 
 await import("./build-webview.mjs");
 
@@ -9,6 +10,7 @@ const outputDir = path.join(root, "out", "webview-smoke");
 const outputFile = path.join(outputDir, "index.html");
 
 const flow = createSmokeFlow();
+await assertCurrentProductFlow(flow);
 const initialState = {
   flow,
   flowPath: "smoke.mindflow",
@@ -66,6 +68,15 @@ function renderHtml(state, styleFiles, cacheToken) {
 </html>`;
 }
 
+async function assertCurrentProductFlow(flow) {
+  const schemaPath = path.join(root, "assets", "product-flow", "schema", "productFlow.schema.json");
+  const schema = JSON.parse(await fs.readFile(schemaPath, "utf8"));
+  const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+  if (!validate(flow)) {
+    throw new Error(`Webview smoke fixture is not a current ProductFlow: ${JSON.stringify(validate.errors)}`);
+  }
+}
+
 function createSmokeFlow() {
   const now = "2026-07-05T00:00:00.000Z";
   return {
@@ -121,13 +132,6 @@ function createSmokeFlow() {
             ]
           }
         ],
-        elements: [
-          { elementId: "el_list", name: "任务列表", type: "table", description: "展示待处理任务。" },
-          { elementId: "el_create", name: "新建按钮", type: "button", description: "进入新建页面。" }
-        ],
-        actions: [
-          { actionId: "act_create", label: "新建按钮", type: "user", result: "进入新建页面。" }
-        ],
         inputs: [],
         outputs: [],
         permissions: ["role_operator"],
@@ -153,13 +157,6 @@ function createSmokeFlow() {
               { itemId: "item_submit", name: "提交按钮", type: "button", description: "提交配置。" }
             ]
           }
-        ],
-        elements: [
-          { elementId: "el_name", name: "配置名称", type: "input", description: "录入配置名称。" },
-          { elementId: "el_submit", name: "提交按钮", type: "button", description: "提交配置。" }
-        ],
-        actions: [
-          { actionId: "act_submit", label: "提交按钮", type: "user", result: "提交配置。" }
         ],
         inputs: [],
         outputs: [],

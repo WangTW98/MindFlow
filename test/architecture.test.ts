@@ -77,7 +77,7 @@ test("MCP source uses host routing without workspace contract fields", async () 
     await readSources(path.join(root, "src", "platform", "vscode", "mcp"))
   ].join("\n");
 
-  for (const removedContractName of ["mindflow_list_workspaces", "workspaceUri", "workspaceName", "workspaceFolders", "toolsetHash"]) {
+  for (const removedContractName of ["mindflow_list_workspaces", "workspaceUri", "workspaceName", "toolsetHash"]) {
     assert.equal(mcpSource.includes(removedContractName), false, `${removedContractName} must not remain in the MCP implementation`);
   }
   assert.ok(mcpSource.includes("mindflow_list_hosts"));

@@ -1,22 +1,26 @@
 import { MINDFLOW_MCP_TOOLS, type McpToolDefinition } from "./toolSchemas";
 
+export const MINDFLOW_MCP_CONTRACT_VERSION = 2;
+
 export const MINDFLOW_HOST_SESSION_FIELDS = [
   "hostId", "displayName", "environment", "endpoint", "token", "pid", "createdAt", "lastSeenAt",
-  "windowFocused", "lastFocusedAt", "extensionVersion", "contractHash"
+  "windowFocused", "lastFocusedAt", "extensionVersion", "contractVersion", "contractHash"
 ] as const;
 
 export const MINDFLOW_GLOBAL_CONTRACT_DESCRIPTOR = {
+  contractVersion: MINDFLOW_MCP_CONTRACT_VERSION,
   listHostsResult: ["hosts", "unavailable"],
   hostSummaryFields: ["hostId", "displayName", "focused", "lastFocusedAt", "openEditorCount", "extensionVersion"],
   editorHostFields: ["hostId", "hostName"],
-  routingPriority: ["flowUri", "hostId", "recentFocus"],
+  routingPriority: ["flowUri", "hostId", "recentFocusForReadOnly"],
+  multiHostMutationTarget: "explicit",
   openFlowPath: "absolute-local-mindflow"
 } as const;
 
 const hostIdProperty = {
   hostId: {
     type: "string",
-    description: "Optional active MindFlow VS Code host id. Defaults to the most recently focused host when flowUri is absent."
+    description: "Active MindFlow VS Code host id. Optional for reads; mutating calls require hostId or flowUri when multiple hosts are active."
   }
 };
 

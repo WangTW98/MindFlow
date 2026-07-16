@@ -1,8 +1,6 @@
 import * as vscode from "vscode";
 import type { EdgeType, FlowEndpoint } from "../../../product-flow/domain";
-import type { UpdateEdgeDetailsInput, UpdateNodeDetailsInput } from "../../../product-flow/application/operations";
-import type { UpdateProjectOverviewInput } from "../../../product-flow/application/operations";
-import type { TaxonomyRequest } from "../../../product-flow/application/operations";
+import type { TaxonomyRequest, UpdateEdgeDetailsInput, UpdateNodeDetailsInput, UpdateProjectOverviewInput } from "../../../product-flow/application/operations";
 import type { SidebarView } from "../sidebar/SidebarView";
 import { isMindFlowDocument, type FlowUriArgument } from "../documents/flowUri";
 import { rememberRecentFlow } from "../state/recentFlowState";

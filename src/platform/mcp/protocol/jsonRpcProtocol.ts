@@ -8,6 +8,7 @@ import {
   MINDFLOW_SERVER_INSTRUCTIONS
 } from "./operationsReference";
 import type { MindFlowMcpToolHandlers } from "../tools";
+import { MINDFLOW_VERSION } from "../../../shared/version";
 
 const SUPPORTED_PROTOCOL_VERSION = "2024-11-05";
 
@@ -87,7 +88,7 @@ export class MindFlowMcpProtocol {
       return {
         protocolVersion: SUPPORTED_PROTOCOL_VERSION,
         capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: "mindflow-vscode", version: "0.1.0" },
+        serverInfo: { name: "mindflow-vscode", version: MINDFLOW_VERSION },
         instructions: MINDFLOW_SERVER_INSTRUCTIONS
       };
     }

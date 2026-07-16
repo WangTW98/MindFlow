@@ -58,6 +58,25 @@ test("MindFlow MCP rejects arguments that do not match the advertised schema", a
     () => handlers.callTool("mindflow_batch_move_nodes", { nodes: [] }),
     /at least 1/
   );
+  await assert.rejects(
+    () => handlers.callTool("mindflow_apply_canvas_changes", { expectedRevision: 1.5, dryRun: true, operations: [{ op: "root.update" }] }),
+    /must be an integer/
+  );
+  await assert.rejects(
+    () => handlers.callTool("mindflow_apply_canvas_changes", { expectedRevision: 0, dryRun: true, operations: [{ op: "root.update" }] }),
+    /must be at least 1/
+  );
+  await assert.rejects(
+    () => handlers.callTool("mindflow_apply_canvas_changes", {
+      expectedRevision: 1,
+      dryRun: true,
+      operations: Array.from({ length: 201 }, () => ({ op: "root.update" }))
+    }),
+    /at most 200/
+  );
+
+  const changeset = MINDFLOW_MCP_TOOLS.find((tool) => tool.name === "mindflow_apply_canvas_changes");
+  assert.equal(changeset?.annotations?.destructiveHint, true);
 });
 
 test("MindFlow MCP editor state is compact and returns complete selection", async () => {

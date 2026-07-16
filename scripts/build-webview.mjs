@@ -19,16 +19,17 @@ for (const sourcePath of sourceFiles) {
 
 await build({
   stdin: {
-    contents: `(() => {${chunks.join("\n")}\n})();\n`,
+    contents: `${chunks.join("\n")}\nexport {};\n`,
     loader: "ts",
     sourcefile: "flowEditor.entry.ts"
   },
   outfile: outputFile,
-  bundle: false,
+  bundle: true,
   format: "iife",
   platform: "browser",
   target: "es2020",
-  sourcemap: false,
+  sourcemap: true,
+  sourcesContent: false,
   legalComments: "none",
   logLevel: "silent"
 });

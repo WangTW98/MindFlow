@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
-import type { TaxonomyRequest } from "../../../product-flow/application/operations";
-import { applyFlowOperation, type FlowOperation, type FlowOperationResult } from "../../../product-flow/application/operations";
+import { applyFlowOperation, type FlowOperation, type FlowOperationResult, type TaxonomyRequest } from "../../../product-flow/application/operations";
 import { editCurrentFlowDocument, showError } from "../documents/flowDocumentService";
 import type { FlowUriArgument } from "../documents/flowUri";
 import { FlowPanel } from "../editor/canvas/FlowPanel";

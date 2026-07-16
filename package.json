@@ -116,18 +116,31 @@
           "type": "string",
           "default": ".mindflow/flows",
           "description": "Workspace-relative directory where MindFlow ProductFlow files are stored."
+        },
+        "mindflow.security.externalFileAccess": {
+          "type": "string",
+          "enum": ["prompt", "allow", "workspaceOnly"],
+          "default": "prompt",
+          "description": "Controls whether MCP may open .mindflow files outside the current VS Code workspace."
         }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run compile && npm run check:package",
     "clean": "node -e \"require('node:fs').rmSync('out',{recursive:true,force:true})\"",
     "build:webview": "node scripts/build-webview.mjs",
     "smoke:webview": "node scripts/render-webview-smoke.mjs",
     "build:mcp-router": "node scripts/build-mcp-router.mjs",
-    "compile": "npm run clean && npm run build:webview && npm run build:mcp-router && tsc -p ./",
+    "build:extension": "node scripts/build-extension.mjs",
+    "check:build": "node scripts/check-build-budgets.mjs",
+    "check:package": "node scripts/check-package-contents.mjs",
+    "compile": "npm run clean && npm run build:webview && npm run build:mcp-router && tsc -p ./ --noEmit && npm run build:extension && npm run check:build",
     "typecheck": "npm run build:webview && npm run build:mcp-router && tsc -p ./ --noEmit && tsc -p ./tsconfig.webview.json && tsc -p ./tsconfig.test.json --noEmit",
+    "lint": "eslint src test scripts",
+    "coverage": "c8 --all --check-coverage --include='out-test/src/**/*.js' --exclude='out-test/src/platform/vscode/**' --exclude='out-test/src/platform/webview/canvas/client/**' --lines=70 --functions=70 --branches=60 node scripts/run-tests.mjs",
+    "test:extension": "npm run compile && tsc -p ./tsconfig.test.json && node scripts/run-extension-e2e.mjs",
+    "check": "npm run lint && npm test && npm run typecheck && npm run smoke:webview && npm run compile && npm run check:package && npm run coverage",
     "watch": "npm run build:webview && tsc -watch -p ./",
     "package": "vsce package --no-dependencies",
     "test": "node scripts/run-tests.mjs"
@@ -135,8 +148,13 @@
   "devDependencies": {
     "@types/node": "20.16.1",
     "@types/vscode": "1.92.0",
+    "@vscode/test-electron": "^3.0.0",
     "@vscode/vsce": "^3.9.2",
+    "ajv": "^8.18.0",
+    "c8": "^11.0.0",
     "esbuild": "^0.28.1",
-    "typescript": "5.5.4"
+    "eslint": "^10.7.0",
+    "typescript": "5.5.4",
+    "typescript-eslint": "^8.64.0"
   }
 }

@@ -1,8 +1,10 @@
 .git/**
+.github/**
 .gitignore
 .codegraph/**
 .vscode/**
 .npm-cache/**
+coverage/**
 node_modules/**
 out-test/**
 test/**
@@ -24,7 +26,7 @@ assets/**
 !assets/webview/canvas/media/**
 !assets/webview/sidebar/
 !assets/webview/sidebar/media/**
-out/**/*.map
+eslint.config.mjs
 plan.md
 todo.md
 tsconfig*.json

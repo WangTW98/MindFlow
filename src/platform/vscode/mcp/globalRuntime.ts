@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { mindflowMcpContractHash } from "../../mcp/protocol/contractHash";
+import { MINDFLOW_MCP_CONTRACT_VERSION } from "../../mcp/protocol/globalToolSchemas";
 import { discoverMindFlowSessions, mindflowRuntimeDirectory } from "../../mcp/runtime/sessionRegistry";
 
 const ROUTER_BUNDLE_RELATIVE_PATH = "out/mcp-runtime/mindflow-mcp-router.cjs";
@@ -37,6 +38,7 @@ export class MindFlowGlobalRuntimeManager {
     const manifestPath = path.join(directory, RUNTIME_MANIFEST_FILE_NAME);
     const bundleHash = createHash("sha256").update(bundle).digest("hex");
     const contractHash = mindflowMcpContractHash();
+    const extensionVersion = String(this.context.extension.packageJSON?.version ?? "unknown");
     const existingHash = await fs.readFile(routerPath).then((value) => createHash("sha256").update(value).digest("hex")).catch(() => undefined);
     await fs.mkdir(directory, { recursive: true, mode: 0o700 });
     if (process.platform !== "win32") await fs.chmod(directory, 0o700);
@@ -44,13 +46,17 @@ export class MindFlowGlobalRuntimeManager {
       await writeAtomic(routerPath, bundle, 0o600);
     }
     if (process.platform !== "win32") await fs.chmod(routerPath, 0o600);
-    const manifest = {
+    const desiredManifest = {
       bundleHash,
       contractHash,
-      extensionVersion: String(this.context.extension.packageJSON?.version ?? "unknown"),
-      installedAt: new Date().toISOString()
+      contractVersion: MINDFLOW_MCP_CONTRACT_VERSION,
+      extensionVersion
     };
-    await writeAtomic(manifestPath, Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`), 0o600);
+    const currentManifest = await readRuntimeManifest(manifestPath);
+    if (!currentManifest || !sameRuntimeManifest(currentManifest, desiredManifest)) {
+      await writeAtomic(manifestPath, Buffer.from(`${JSON.stringify({ ...desiredManifest, installedAt: new Date().toISOString() }, null, 2)}\n`), 0o600);
+    }
+    if (process.platform !== "win32") await fs.chmod(manifestPath, 0o600);
     return { routerPath, manifestPath, bundleHash, contractHash };
   }
 
@@ -76,6 +82,7 @@ export class MindFlowGlobalRuntimeManager {
       routerPath: installation.routerPath,
       bundleHash: installation.bundleHash,
       contractHash: installation.contractHash,
+      contractVersion: MINDFLOW_MCP_CONTRACT_VERSION,
       runtime,
       hosts: discovery.sessions.map((session) => ({
         hostId: session.hostId,
@@ -127,8 +134,8 @@ async function selfTestRuntime(runtime: MindFlowRuntimeCommand, expectedContract
         return;
       }
       try {
-        const result = JSON.parse(stdout.trim()) as { ok?: unknown; contractHash?: unknown };
-        resolve(result.ok === true && result.contractHash === expectedContractHash);
+        const result = JSON.parse(stdout.trim()) as { ok?: unknown; contractVersion?: unknown; contractHash?: unknown };
+        resolve(result.ok === true && result.contractVersion === MINDFLOW_MCP_CONTRACT_VERSION && result.contractHash === expectedContractHash);
       } catch {
         resolve(false);
       }
@@ -161,6 +168,27 @@ async function writeAtomic(targetPath: string, contents: Buffer, mode: number): 
     await fs.rm(temporaryPath, { force: true });
     throw error;
   }
+}
+
+interface RuntimeManifestIdentity {
+  bundleHash: string;
+  contractHash: string;
+  contractVersion: number;
+  extensionVersion: string;
+}
+
+async function readRuntimeManifest(manifestPath: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    const value = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function sameRuntimeManifest(current: Record<string, unknown>, desired: RuntimeManifestIdentity): boolean {
+  return current.bundleHash === desired.bundleHash && current.contractHash === desired.contractHash &&
+    current.contractVersion === desired.contractVersion && current.extensionVersion === desired.extensionVersion;
 }
 
 function errorMessage(error: unknown): string {

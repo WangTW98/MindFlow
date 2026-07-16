@@ -344,6 +344,7 @@ function summarize(flow: ProductFlow): Record<string, unknown> {
 }
 
 function enforceBatchBounds(operations: Record<string, unknown>[]): void {
+  if (operations.length > 200) throw new Error("A canvas changeset may contain at most 200 operations.");
   const nodeCount = operations.filter((operation) => operation.op === "node.upsert").length;
   const edgeCount = operations.filter((operation) => operation.op === "edge.upsert").length;
   if (nodeCount > 40) throw new Error("A canvas changeset may upsert at most 40 nodes.");

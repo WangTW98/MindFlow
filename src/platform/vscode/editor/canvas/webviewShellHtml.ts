@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 export const FLOW_WEBVIEW_STYLE_FILES = [
   "styles.css",
   "styles-layout.css",
@@ -76,12 +78,7 @@ export function createFlowRestorePendingHtml(nonce: string): string {
 }
 
 export function getNonce(): string {
-  let text = "";
-  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i += 1) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
+  return randomBytes(24).toString("base64url");
 }
 
 export function escapeScriptJson(value: unknown): string {

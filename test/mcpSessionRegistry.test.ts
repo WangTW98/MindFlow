@@ -3,8 +3,9 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
-import { mindflowMcpContractHash } from "../src/platform/mcp/protocol/contractHash";
-import { discoverMindFlowSessions } from "../src/platform/mcp/runtime/sessionRegistry";
+import { mindflowMcpCompatibilityDescriptor, mindflowMcpContractHash } from "../src/platform/mcp/protocol/contractHash";
+import { MINDFLOW_MCP_CONTRACT_VERSION } from "../src/platform/mcp/protocol/globalToolSchemas";
+import { discoverMindFlowSessions, MINDFLOW_SESSION_STALE_AFTER_MS } from "../src/platform/mcp/runtime/sessionRegistry";
 
 test("host discovery accepts empty-window hosts and rejects legacy workspace records", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-session-registry-"));
@@ -37,6 +38,36 @@ test("host discovery accepts empty-window hosts and rejects legacy workspace rec
   }
 });
 
+test("MCP compatibility descriptor contains only versioned wire fields", () => {
+  const descriptor = mindflowMcpCompatibilityDescriptor();
+  const text = JSON.stringify(descriptor);
+  assert.equal(text.includes("description"), false);
+  assert.equal(text.includes("annotations"), false);
+  assert.equal(descriptor.contractVersion, MINDFLOW_MCP_CONTRACT_VERSION);
+});
+
+test("host discovery rejects stale and implausibly future heartbeats even when the pid is alive", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-session-heartbeat-"));
+  const nowMs = Date.now();
+  try {
+    await fs.writeFile(path.join(directory, "stale.json"), JSON.stringify(hostRecord(
+      "stale",
+      new Date(nowMs - MINDFLOW_SESSION_STALE_AFTER_MS - 1).toISOString()
+    )), { mode: 0o600 });
+    await fs.writeFile(path.join(directory, "future.json"), JSON.stringify(hostRecord(
+      "future",
+      new Date(nowMs + 10 * 60_000).toISOString()
+    )), { mode: 0o600 });
+
+    const discovery = await discoverMindFlowSessions(directory, mindflowMcpContractHash(), nowMs);
+    assert.deepEqual(discovery.sessions, []);
+    assert.ok(discovery.unavailable.some((item) => item.reason.includes("stale")));
+    assert.ok(discovery.unavailable.some((item) => item.reason.includes("future")));
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
 function hostRecord(hostId: string, now: string): Record<string, unknown> {
   return {
     hostId,
@@ -48,6 +79,7 @@ function hostRecord(hostId: string, now: string): Record<string, unknown> {
     createdAt: now,
     lastSeenAt: now,
     extensionVersion: "0.1.0",
+    contractVersion: MINDFLOW_MCP_CONTRACT_VERSION,
     contractHash: mindflowMcpContractHash(),
     windowFocused: false,
     lastFocusedAt: now

@@ -3,8 +3,9 @@ import * as http from "node:http";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertAbsoluteLocalMindFlowPath } from "../../../shared/localMindFlowPath";
+import { MINDFLOW_VERSION } from "../../../shared/version";
 import { mindflowMcpContractHash } from "../protocol/contractHash";
-import { mindflowGlobalToolDefinitions } from "../protocol/globalToolSchemas";
+import { mindflowGlobalToolDefinitions, MINDFLOW_MCP_CONTRACT_VERSION } from "../protocol/globalToolSchemas";
 import {
   MINDFLOW_AUTHORING_REFERENCE,
   MINDFLOW_AUTHORING_REFERENCE_URI,
@@ -24,7 +25,7 @@ import {
 } from "./sessionRegistry";
 
 const MCP_PROTOCOL_VERSION = "2024-11-05";
-const MAX_MESSAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_MCP_MESSAGE_BYTES = 10 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 30_000;
 const SESSION_CACHE_MS = 1_000;
 
@@ -95,8 +96,8 @@ export class MindFlowGlobalRouter {
       return {
         protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: "mindflow-global-router", version: "0.1.0" },
-        instructions: `${MINDFLOW_SERVER_INSTRUCTIONS}\n\nThis global Router discovers local VS Code hosts. Call mindflow_list_hosts and mindflow_get_open_editors first. Prefer flowUri for precise operations; use hostId to override recent-focus routing.`
+        serverInfo: { name: "mindflow-global-router", version: MINDFLOW_VERSION },
+        instructions: `${MINDFLOW_SERVER_INSTRUCTIONS}\n\nThis global Router discovers local VS Code hosts. Call mindflow_list_hosts and mindflow_get_open_editors first. Prefer flowUri for precise operations. With multiple hosts, every call that can change editor or window state requires an explicit flowUri or hostId; only read-only calls may use recent-focus routing.`
       };
     }
     if (method !== "ping" && !this.initialized) {
@@ -184,6 +185,9 @@ export class MindFlowGlobalRouter {
     const flowUri = optionalString(args.flowUri, "flowUri");
     if (flowUri) return this.selectHostForOpenFlow(discovery, flowUri, hostId, "flowUri", toolIsReadOnly(toolName));
     if (hostId) return requireHost(discovery.sessions, hostId);
+    if (discovery.sessions.length > 1 && !toolIsReadOnly(toolName)) {
+      throw new RouterError(-32602, explicitHostRequiredMessage(toolName, discovery.sessions));
+    }
     return preferredHost(discovery.sessions);
   }
 
@@ -202,6 +206,9 @@ export class MindFlowGlobalRouter {
     const matches = (aggregate.editors as EditorRecord[]).filter((editor) => sameFlow(editor, flowPath));
     if (matches.length > 0) return resolveEditorHost(discovery.sessions, matches, hostId, flowPath, false);
     if (hostId) return requireHost(discovery.sessions, hostId);
+    if (discovery.sessions.length > 1) {
+      throw new RouterError(-32602, explicitHostRequiredMessage("mindflow_open_flow", discovery.sessions));
+    }
     return preferredHost(discovery.sessions);
   }
 
@@ -264,7 +271,7 @@ export class MindFlowGlobalRouter {
 
 export function runMindFlowGlobalRouter(): void {
   if (process.argv.includes("--self-test")) {
-    process.stdout.write(`${JSON.stringify({ ok: true, contractHash: mindflowMcpContractHash() })}\n`);
+    process.stdout.write(`${JSON.stringify({ ok: true, version: MINDFLOW_VERSION, contractVersion: MINDFLOW_MCP_CONTRACT_VERSION, contractHash: mindflowMcpContractHash() })}\n`);
     return;
   }
   const router = new MindFlowGlobalRouter();
@@ -291,9 +298,9 @@ export function runMindFlowGlobalRouter(): void {
       buffer = buffer.slice(newline + 1);
       if (line.trim()) await handleLine(line);
     }
-    if (Buffer.byteLength(buffer) > MAX_MESSAGE_BYTES) {
+    if (Buffer.byteLength(buffer) > MAX_MCP_MESSAGE_BYTES) {
       buffer = "";
-      throw new Error(`MCP stdio message exceeds ${MAX_MESSAGE_BYTES} bytes.`);
+      throw new Error(`MCP stdio message exceeds ${MAX_MCP_MESSAGE_BYTES} bytes.`);
     }
     if (flush && buffer.trim()) {
       const line = buffer.replace(/\r$/, "");
@@ -303,6 +310,10 @@ export function runMindFlowGlobalRouter(): void {
   }
 
   async function handleLine(line: string): Promise<void> {
+    if (!isMcpStdioMessageWithinLimit(line)) {
+      process.stdout.write(`${JSON.stringify(jsonRpcError(null, -32600, `MCP stdio message exceeds ${MAX_MCP_MESSAGE_BYTES} bytes.`))}\n`);
+      return;
+    }
     let payload: unknown;
     try {
       payload = JSON.parse(line);
@@ -437,7 +448,7 @@ function postJson(host: MindFlowMcpHostRecord, payload: Record<string, unknown>,
       let total = 0;
       response.on("data", (chunk) => {
         total += chunk.length;
-        if (total > MAX_MESSAGE_BYTES) request.destroy(new Error(`MindFlow MCP response exceeds ${MAX_MESSAGE_BYTES} bytes.`));
+        if (total > MAX_MCP_MESSAGE_BYTES) request.destroy(new Error(`MindFlow MCP response exceeds ${MAX_MCP_MESSAGE_BYTES} bytes.`));
         else chunks.push(Buffer.from(chunk));
       });
       response.on("end", () => {
@@ -477,6 +488,14 @@ function noHostMessage(unavailable: UnavailableMindFlowSession[]): string {
 
 function hostCandidates(hosts: MindFlowMcpHostRecord[]): string {
   return hosts.map((host) => `${host.hostId} (${host.displayName})`).sort().join(", ");
+}
+
+function explicitHostRequiredMessage(toolName: string, hosts: MindFlowMcpHostRecord[]): string {
+  return `Multiple MindFlow hosts are active. ${toolName} can change editor or window state, so repeat it with an explicit hostId or flowUri. Candidates: ${hostCandidates(hosts)}.`;
+}
+
+export function isMcpStdioMessageWithinLimit(line: string): boolean {
+  return Buffer.byteLength(line) <= MAX_MCP_MESSAGE_BYTES;
 }
 
 function requiredString(value: unknown, field: string): string {

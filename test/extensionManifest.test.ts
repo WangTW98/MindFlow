@@ -17,7 +17,7 @@ import { parseProductFlowText, serializeProductFlow } from "../src/product-flow/
 import { FLOW_FILE_EXTENSION, FlowRepository } from "../src/product-flow/infrastructure/persistence/flowRepository";
 import { RecentFlowStore } from "../src/platform/vscode/state/recentFlows";
 import { recordEdgeDetailsRevision } from "../src/platform/vscode/editor/canvas/flowMessageOrdering";
-import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/platform/vscode/editor/canvas/webviewShellHtml";
+import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml, getNonce } from "../src/platform/vscode/editor/canvas/webviewShellHtml";
 import { parseWebviewMessage } from "../src/platform/webview/protocol/flowWebviewMessages";
 import { assertAppSurfaceEntryEdge, assertNoLegacyFields, assertNoLegacyKeysInJson, assertThrows, createProcurementFlow, FakeMemento, requireNodeByTitle } from "./helpers";
 
@@ -63,7 +63,10 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and a
     manifest.contributes?.keybindings?.some((item) => item.command === "mindflow.saveFlowAs" && item.mac === "cmd+s") ?? false,
     false
   );
-  assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), ["mindflow.storage.flowDirectory"]);
+  assert.deepEqual(Object.keys(manifest.contributes?.configuration?.properties ?? {}), [
+    "mindflow.storage.flowDirectory",
+    "mindflow.security.externalFileAccess"
+  ]);
   assert.equal(manifest.contributes?.jsonValidation?.[0]?.url, "./assets/product-flow/schema/productFlow.schema.json");
   assert.equal(manifest.bin, undefined);
   const removedScriptPrefix = ["m", "c", "p"].join("") + ":";
@@ -72,4 +75,11 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and a
   assert.equal(manifest.activationEvents?.includes("onCommand:mindflow.copyMcpConfig"), false);
   assert.equal(manifest.activationEvents?.includes("onCommand:mindflow.copyGlobalMcpConfig"), true);
   assert.equal(manifest.activationEvents?.includes("onCommand:mindflow.showMcpConnectionStatus"), true);
+});
+
+test("webview CSP nonces are cryptographically-sized and unique", () => {
+  const first = getNonce();
+  const second = getNonce();
+  assert.match(first, /^[A-Za-z0-9_-]{32}$/);
+  assert.notEqual(first, second);
 });

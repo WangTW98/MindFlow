@@ -7,13 +7,26 @@ interface JsonSchema {
   additionalProperties?: boolean;
   items?: JsonSchema;
   enum?: unknown[];
+  const?: unknown;
   pattern?: string;
+  minLength?: number;
+  maxLength?: number;
   minItems?: number;
+  maxItems?: number;
+  minimum?: number;
+  maximum?: number;
   anyOf?: JsonSchema[];
   oneOf?: JsonSchema[];
+  description?: string;
 }
 
+const SUPPORTED_SCHEMA_KEYS = new Set([
+  "type", "properties", "required", "additionalProperties", "items", "enum", "const", "pattern",
+  "minLength", "maxLength", "minItems", "maxItems", "minimum", "maximum", "anyOf", "oneOf", "description"
+]);
+
 export function validateMcpToolInput(tool: McpToolDefinition, value: unknown): Record<string, unknown> {
+  assertSupportedSchema(tool.inputSchema as JsonSchema, `${tool.name}.inputSchema`);
   const input = value === undefined ? {} : value;
   const errors: string[] = [];
   validateValue(input, tool.inputSchema as JsonSchema, "$", errors);
@@ -81,6 +94,9 @@ function validateValue(value: unknown, schema: JsonSchema, path: string, errors:
     if (schema.minItems !== undefined && value.length < schema.minItems) {
       errors.push(`${path} must contain at least ${schema.minItems} item(s)`);
     }
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+      errors.push(`${path} must contain at most ${schema.maxItems} item(s)`);
+    }
     if (schema.items) {
       value.forEach((item, index) => validateValue(item, schema.items as JsonSchema, `${path}[${index}]`, errors));
     }
@@ -95,10 +111,25 @@ function validateValue(value: unknown, schema: JsonSchema, path: string, errors:
     if (schema.pattern && !new RegExp(schema.pattern).test(value)) {
       errors.push(`${path} has an invalid format`);
     }
-  } else if (schema.type === "number") {
+    if (schema.minLength !== undefined && value.length < schema.minLength) {
+      errors.push(`${path} must contain at least ${schema.minLength} character(s)`);
+    }
+    if (schema.maxLength !== undefined && value.length > schema.maxLength) {
+      errors.push(`${path} must contain at most ${schema.maxLength} character(s)`);
+    }
+  } else if (schema.type === "number" || schema.type === "integer") {
     if (typeof value !== "number" || !Number.isFinite(value)) {
       errors.push(`${path} must be a finite number`);
       return;
+    }
+    if (schema.type === "integer" && !Number.isInteger(value)) {
+      errors.push(`${path} must be an integer`);
+    }
+    if (schema.minimum !== undefined && value < schema.minimum) {
+      errors.push(`${path} must be at least ${schema.minimum}`);
+    }
+    if (schema.maximum !== undefined && value > schema.maximum) {
+      errors.push(`${path} must be at most ${schema.maximum}`);
     }
   } else if (schema.type === "boolean" && typeof value !== "boolean") {
     errors.push(`${path} must be a boolean`);
@@ -108,6 +139,22 @@ function validateValue(value: unknown, schema: JsonSchema, path: string, errors:
   if (schema.enum && !schema.enum.includes(value)) {
     errors.push(`${path} must be one of ${schema.enum.map(String).join(", ")}`);
   }
+  if ("const" in schema && value !== schema.const) {
+    errors.push(`${path} must equal ${String(schema.const)}`);
+  }
+}
+
+function assertSupportedSchema(schema: JsonSchema, path: string): void {
+  const unsupported = Object.keys(schema).filter((key) => !SUPPORTED_SCHEMA_KEYS.has(key));
+  if (unsupported.length > 0) {
+    throw new Error(`Unsupported MCP JSON Schema keyword(s) at ${path}: ${unsupported.join(", ")}`);
+  }
+  for (const [key, property] of Object.entries(schema.properties ?? {})) {
+    assertSupportedSchema(property, `${path}.properties.${key}`);
+  }
+  if (schema.items) assertSupportedSchema(schema.items, `${path}.items`);
+  schema.anyOf?.forEach((item, index) => assertSupportedSchema(item, `${path}.anyOf[${index}]`));
+  schema.oneOf?.forEach((item, index) => assertSupportedSchema(item, `${path}.oneOf[${index}]`));
 }
 
 function validateAlternatives(

@@ -1,5 +1,4 @@
-import type { AppSurface, EdgeType, FlowEdge, PageNode, ProductFlow } from "../..";
-import { isEdgeType } from "../..";
+import { isEdgeType, type AppSurface, type EdgeType, type FlowEdge, type PageNode, type ProductFlow } from "../..";
 import { makeEdgeId, nowIso, shortHash } from "../../id";
 
 export function requireNode(flow: ProductFlow, nodeId: string | undefined): PageNode {

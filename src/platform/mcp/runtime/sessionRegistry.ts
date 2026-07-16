@@ -3,6 +3,10 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { MINDFLOW_HOST_SESSION_FIELDS } from "../protocol/globalToolSchemas";
 
+export const MINDFLOW_SESSION_HEARTBEAT_INTERVAL_MS = 15_000;
+export const MINDFLOW_SESSION_STALE_AFTER_MS = 60_000;
+const MINDFLOW_SESSION_MAX_FUTURE_SKEW_MS = 5 * 60_000;
+
 export interface MindFlowMcpHostRecord {
   hostId: string;
   displayName: string;
@@ -13,6 +17,7 @@ export interface MindFlowMcpHostRecord {
   createdAt: string;
   lastSeenAt: string;
   extensionVersion: string;
+  contractVersion: number;
   contractHash: string;
   windowFocused: boolean;
   lastFocusedAt: string;
@@ -30,6 +35,9 @@ export interface MindFlowSessionDiscovery {
 }
 
 export function mindflowMcpDirectory(): string {
+  if (process.env.MINDFLOW_MCP_HOME) {
+    return path.resolve(process.env.MINDFLOW_MCP_HOME);
+  }
   if (process.platform === "win32" && process.env.LOCALAPPDATA) {
     return path.join(process.env.LOCALAPPDATA, "MindFlow", "mcp");
   }
@@ -46,7 +54,8 @@ export function mindflowRuntimeDirectory(): string {
 
 export async function discoverMindFlowSessions(
   directory = mindflowSessionDirectory(),
-  expectedContractHash?: string
+  expectedContractHash?: string,
+  nowMs = Date.now()
 ): Promise<MindFlowSessionDiscovery> {
   const entries = await fs.readdir(directory, { withFileTypes: true }).catch(() => []);
   const sessions: MindFlowMcpHostRecord[] = [];
@@ -68,6 +77,13 @@ export async function discoverMindFlowSessions(
       const record = parseMindFlowSessionRecord(JSON.parse(await fs.readFile(filePath, "utf8")), entry.name);
       if (!isProcessAlive(record.pid)) {
         throw new Error("Extension Host process is not running.");
+      }
+      const lastSeenMs = Date.parse(record.lastSeenAt);
+      if (lastSeenMs > nowMs + MINDFLOW_SESSION_MAX_FUTURE_SKEW_MS) {
+        throw new Error("Extension Host heartbeat is implausibly far in the future.");
+      }
+      if (nowMs - lastSeenMs > MINDFLOW_SESSION_STALE_AFTER_MS) {
+        throw new Error("Extension Host heartbeat is stale.");
       }
       if (expectedContractHash && record.contractHash !== expectedContractHash) {
         unavailable.push({
@@ -107,6 +123,9 @@ export function parseMindFlowSessionRecord(value: unknown, fileName?: string): M
   const contractHash = requireString(value.contractHash, "contractHash");
   if (!/^[a-f0-9]{64}$/i.test(contractHash)) throw new Error("Invalid session contractHash.");
   if (value.environment !== "local") throw new Error("Unsupported non-local MindFlow host environment.");
+  if (typeof value.contractVersion !== "number" || !Number.isInteger(value.contractVersion) || value.contractVersion < 1) {
+    throw new Error("Invalid session contractVersion.");
+  }
   if (typeof value.windowFocused !== "boolean") {
     throw new Error("Invalid session windowFocused.");
   }
@@ -120,6 +139,7 @@ export function parseMindFlowSessionRecord(value: unknown, fileName?: string): M
     createdAt: requireTimestamp(value.createdAt, "createdAt"),
     lastSeenAt: requireTimestamp(value.lastSeenAt, "lastSeenAt"),
     extensionVersion: requireString(value.extensionVersion, "extensionVersion"),
+    contractVersion: value.contractVersion,
     contractHash,
     windowFocused: value.windowFocused,
     lastFocusedAt: requireTimestamp(value.lastFocusedAt, "lastFocusedAt")

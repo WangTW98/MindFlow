@@ -1,5 +1,4 @@
-import type { EdgeType, FlowEndpoint } from "../../../../product-flow/domain";
-import { isEdgeType, isFlowEndpointKind } from "../../../../product-flow/domain";
+import { isEdgeType, isFlowEndpointKind, type EdgeType, type FlowEndpoint } from "../../../../product-flow/domain";
 import { isRecord, readOptionalString, readString } from "./readers";
 
 export function readEndpoint(value: unknown): FlowEndpoint | undefined {
