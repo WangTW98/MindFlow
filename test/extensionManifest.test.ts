@@ -90,7 +90,8 @@ test("AGPL license and public source notice replace proprietary distribution ter
     fs.readFile(path.join(process.cwd(), "LICENSE.txt"), "utf8"),
     fs.readFile(path.join(process.cwd(), "README.md"), "utf8")
   ]);
-  for (const candidate of [licenseText, licenseText.replace(/\n/gu, "\r\n")]) {
+  const canonicalLicenseText = licenseText.replace(/\r\n?/gu, "\n");
+  for (const candidate of [canonicalLicenseText, canonicalLicenseText.replace(/\n/gu, "\r\n")]) {
     const normalizedLicenseText = candidate.replace(/\r\n?/gu, "\n");
     assert.ok(normalizedLicenseText.includes("GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3, 19 November 2007"));
     assert.ok(normalizedLicenseText.includes("13. Remote Network Interaction; Use with the GNU General Public License."));
