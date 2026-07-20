@@ -397,6 +397,43 @@ export interface CanvasViewportHelpers {
   canvasViewportAnimationIsSettled(from: CanvasViewportFit, to: CanvasViewportFit): boolean;
 }
 
+export interface CanvasNodeClipboardHelpers {
+  createSelectedNodeClipboardPayload(): Record<string, unknown> | null;
+  isCanvasCommandModifier(event: Record<string, unknown>): boolean;
+  handleNodeClipboardShortcut(event: Record<string, unknown>): boolean;
+}
+
+export interface CanvasSelectAllShortcutHelpers {
+  handleSelectAllNodesShortcut(event: Record<string, unknown>): boolean;
+}
+
+export interface CanvasViewSelectionHelpers {
+  allNodeSelectionForFlow(flow: unknown, currentPrimaryNodeId: string): {
+    nodeIds: string[];
+    primaryNodeId: string;
+  } | null;
+  activeSelectedNodeIds(flow: unknown, nodeIds: string[]): string[];
+}
+
+export interface CanvasCardDragHelpers {
+  selectedNodeDragMembers(draggedNodeId: string): Array<{
+    id: string;
+    card: unknown;
+    originX: number;
+    originY: number;
+  }>;
+  nodeGroupDragPositions(
+    members: Array<{ id: string; originX: number; originY: number }>,
+    screenDx: number,
+    screenDy: number,
+    currentZoom: number
+  ): Array<{ id: string; x: number; y: number }>;
+}
+
+export interface CanvasDeleteSelectionHelpers {
+  deleteSelectedNodes(): boolean;
+}
+
 export interface AutoLayoutPosition {
   x: number;
   y: number;
@@ -479,6 +516,172 @@ export async function loadCanvasViewportHelpers(): Promise<CanvasViewportHelpers
     `${source}\nreturn { canvasViewportFitForBounds, canvasViewportFocusForCard, canvasViewportAnimationDuration, canvasViewportAnimationState, canvasViewportAnimationIsSettled };`
   ) as (minZoom: number, maxZoom: number, clamp: (value: number, min: number, max: number) => number) => CanvasViewportHelpers;
   return factory(0.05, 2.6, (value, min, max) => Math.min(max, Math.max(min, value)));
+}
+
+export async function loadCanvasNodeClipboardHelpers(options: {
+  state: unknown;
+  selectedNodeIds: string[];
+  selectedNodeId: string;
+  nodePositions: Map<string, { x: number; y: number }>;
+  isEditingTarget?: (target: unknown) => boolean;
+  postWebviewMessage?: (message: unknown) => void;
+  setCommandStatus?: (ok: boolean, message: string) => void;
+  updateCommandStatusElement?: () => void;
+}): Promise<CanvasNodeClipboardHelpers> {
+  const source = await readWebviewRuntimeFile("interactions", "canvas-node-clipboard.js");
+  const factory = new Function(
+    "state",
+    "selectedNodeIds",
+    "selectedNodeId",
+    "nodePositions",
+    "isEditingTarget",
+    "postWebviewMessage",
+    "setCommandStatus",
+    "updateCommandStatusElement",
+    "document",
+    "screenToWorld",
+    `${source}\nreturn { createSelectedNodeClipboardPayload, isCanvasCommandModifier, handleNodeClipboardShortcut };`
+  ) as (
+    state: unknown,
+    selectedNodeIds: string[],
+    selectedNodeId: string,
+    nodePositions: Map<string, { x: number; y: number }>,
+    isEditingTarget: (target: unknown) => boolean,
+    postWebviewMessage: (message: unknown) => void,
+    setCommandStatus: (ok: boolean, message: string) => void,
+    updateCommandStatusElement: () => void,
+    document: unknown,
+    screenToWorld: () => { x: number; y: number }
+  ) => CanvasNodeClipboardHelpers;
+  return factory(
+    options.state,
+    options.selectedNodeIds,
+    options.selectedNodeId,
+    options.nodePositions,
+    options.isEditingTarget || (() => false),
+    options.postWebviewMessage || (() => undefined),
+    options.setCommandStatus || (() => undefined),
+    options.updateCommandStatusElement || (() => undefined),
+    { getElementById: () => null },
+    () => ({ x: 0, y: 0 })
+  );
+}
+
+export async function loadCanvasSelectAllShortcutHelpers(options: {
+  isEditingTarget?: (target: unknown) => boolean;
+  selectAllNodes?: () => boolean;
+  getSelection?: () => { rangeCount: number; removeAllRanges(): void } | null;
+} = {}): Promise<CanvasSelectAllShortcutHelpers> {
+  const source = await readWebviewRuntimeFile("interactions", "canvas-interactions.js");
+  const factory = new Function(
+    "isEditingTarget",
+    "isCanvasCommandModifier",
+    "selectAllNodes",
+    "window",
+    `${source}\nreturn { handleSelectAllNodesShortcut };`
+  ) as (
+    isEditingTarget: (target: unknown) => boolean,
+    isCanvasCommandModifier: (event: Record<string, unknown>) => boolean,
+    selectAllNodes: () => boolean,
+    window: { getSelection(): { rangeCount: number; removeAllRanges(): void } | null }
+  ) => CanvasSelectAllShortcutHelpers;
+  return factory(
+    options.isEditingTarget || (() => false),
+    (event) => Boolean((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey),
+    options.selectAllNodes || (() => false),
+    { getSelection: options.getSelection || (() => null) }
+  );
+}
+
+export async function loadCanvasViewSelectionHelpers(): Promise<CanvasViewSelectionHelpers> {
+  const source = await readWebviewRuntimeFile("data", "canvas-view.js");
+  const factory = new Function(
+    "uniqueStringIds",
+    `${source}\nreturn { allNodeSelectionForFlow, activeSelectedNodeIds };`
+  ) as (uniqueStringIds: (values: unknown) => string[]) => CanvasViewSelectionHelpers;
+  return factory((values) => Array.from(new Set(
+    Array.isArray(values) ? values.filter((value): value is string => typeof value === "string" && Boolean(value)) : []
+  )));
+}
+
+export async function loadCanvasCardDragHelpers(options: {
+  state: unknown;
+  selectedNodeIds: string[];
+  nodePositions: Map<string, { x: number; y: number }>;
+  isNodeSelected: (nodeId: string) => boolean;
+  getCardElement: (kind: string, nodeId: string) => unknown;
+}): Promise<CanvasCardDragHelpers> {
+  const source = await readWebviewRuntimeFile("interactions", "canvas-card-drag.js");
+  const factory = new Function(
+    "state",
+    "selectedNodeIds",
+    "nodePositions",
+    "isNodeSelected",
+    "activeSelectedNodeIds",
+    "getCardElement",
+    `${source}\nreturn { selectedNodeDragMembers, nodeGroupDragPositions };`
+  ) as (
+    state: unknown,
+    selectedNodeIds: string[],
+    nodePositions: Map<string, { x: number; y: number }>,
+    isNodeSelected: (nodeId: string) => boolean,
+    activeSelectedNodeIds: (flow: { nodes: Array<{ nodeId: string; status: string }> }, nodeIds: string[]) => string[],
+    getCardElement: (kind: string, nodeId: string) => unknown
+  ) => CanvasCardDragHelpers;
+  return factory(
+    options.state,
+    options.selectedNodeIds,
+    options.nodePositions,
+    options.isNodeSelected,
+    (flow, nodeIds) => {
+      const activeIds = new Set(flow.nodes.filter((node) => node.status !== "removed").map((node) => node.nodeId));
+      return Array.from(new Set(nodeIds)).filter((nodeId) => activeIds.has(nodeId));
+    },
+    options.getCardElement
+  );
+}
+
+export async function loadCanvasDeleteSelectionHelpers(options: {
+  state: unknown;
+  selectedNodeIds: string[];
+  postWebviewMessage: (message: unknown) => void;
+  clearNodeSelectionState?: () => void;
+  clearTimeout?: (timer: unknown) => void;
+}): Promise<CanvasDeleteSelectionHelpers> {
+  const source = await readWebviewRuntimeFile("interactions", "canvas-interactions.js");
+  const factory = new Function(
+    "state",
+    "selectedNodeIds",
+    "activeSelectedNodeIds",
+    "clearTimeout",
+    "nodeDetailsSaveTimer",
+    "clearNodeSelectionState",
+    "selectedEdgeId",
+    "postWebviewMessage",
+    `${source}\nreturn { deleteSelectedNodes };`
+  ) as (
+    state: unknown,
+    selectedNodeIds: string[],
+    activeSelectedNodeIds: (flow: { nodes: Array<{ nodeId: string; status: string }> }, nodeIds: string[]) => string[],
+    clearTimeout: (timer: unknown) => void,
+    nodeDetailsSaveTimer: unknown,
+    clearNodeSelectionState: () => void,
+    selectedEdgeId: string,
+    postWebviewMessage: (message: unknown) => void
+  ) => CanvasDeleteSelectionHelpers;
+  return factory(
+    options.state,
+    options.selectedNodeIds,
+    (flow, nodeIds) => {
+      const activeIds = new Set(flow.nodes.filter((node) => node.status !== "removed").map((node) => node.nodeId));
+      return Array.from(new Set(nodeIds)).filter((nodeId) => activeIds.has(nodeId));
+    },
+    options.clearTimeout || (() => undefined),
+    null,
+    options.clearNodeSelectionState || (() => undefined),
+    "",
+    options.postWebviewMessage
+  );
 }
 
 export async function loadAutoLayoutHelpers(): Promise<AutoLayoutHelpers> {

@@ -54,6 +54,48 @@ function selectNode(nodeId, center, options = {}) {
   });
 }
 
+function allNodeSelectionForFlow(flow, currentPrimaryNodeId) {
+  const nodeIds = flow.nodes
+    .filter((node) => node.status !== "removed")
+    .map((node) => node.nodeId);
+  if (nodeIds.length === 0) {
+    return null;
+  }
+  return {
+    nodeIds,
+    primaryNodeId: nodeIds.includes(currentPrimaryNodeId) ? currentPrimaryNodeId : nodeIds[0]
+  };
+}
+
+function activeSelectedNodeIds(flow, nodeIds) {
+  const activeNodeIds = new Set(
+    flow.nodes
+      .filter((node) => node.status !== "removed")
+      .map((node) => node.nodeId)
+  );
+  return uniqueStringIds(nodeIds).filter((nodeId) => activeNodeIds.has(nodeId));
+}
+
+function selectAllNodes() {
+  const selection = allNodeSelectionForFlow(state.flow, selectedNodeId);
+  if (!selection) {
+    return false;
+  }
+  selectedProjectOverview = false;
+  setSelectedNodes(selection.nodeIds, selection.primaryNodeId);
+  selectedEdgeId = "";
+  selectedAppSurfaceId = "";
+  selectedDomainId = "";
+  selectedRoleId = "";
+  selectedStatusGroupId = "";
+  taxonomySelection = clearAllTaxonomySelections();
+  connectingFrom = null;
+  postWebviewMessage({ type: "selectNode", nodeId: selectedNodeId, selectedNodeIds });
+  render();
+  focusCanvas();
+  return true;
+}
+
 function setSelectedNodes(nodeIds, primaryNodeId) {
   selectedNodeIds = uniqueStringIds(nodeIds);
   selectedNodeId = selectedNodeIds.includes(primaryNodeId)

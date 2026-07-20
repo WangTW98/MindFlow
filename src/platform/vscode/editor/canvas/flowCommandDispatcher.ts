@@ -3,6 +3,7 @@ import type { FlowOperation, TaxonomyRequest } from "../../../../product-flow/ap
 import { recordEdgeDetailsRevision } from "./flowMessageOrdering";
 import type { FlowEditorSelectionController } from "./flowSelectionController";
 import type { WebviewMessage } from "../../../webview/protocol/flowWebviewMessages";
+import { parseMindFlowNodeClipboard, serializeMindFlowNodeClipboard } from "../../../webview/protocol/nodeClipboard";
 
 export interface FlowWebviewApplyOptions {
   atomic?: boolean;
@@ -12,6 +13,11 @@ export interface FlowWebviewCommandDispatcher {
   documentUri: vscode.Uri;
   latestEdgeDetailsRevisions: Map<string, number>;
   selectionController: FlowEditorSelectionController;
+  clipboard: {
+    readText(): Thenable<string>;
+    writeText(value: string): Thenable<void>;
+  };
+  postCommandResult(ok: boolean, message: string): void;
   applyOperations(label: string, operations: readonly FlowOperation[], options?: FlowWebviewApplyOptions): Promise<void>;
 }
 
@@ -23,6 +29,37 @@ export async function dispatchFlowWebviewMessage(message: WebviewMessage, dispat
     case "flow.operations":
       await dispatcher.applyOperations("更新画布", message.operations, { atomic: true });
       break;
+    case "copyNodes":
+      try {
+        await dispatcher.clipboard.writeText(serializeMindFlowNodeClipboard(message.payload));
+        dispatcher.postCommandResult(true, `已复制 ${message.payload.nodes.length} 个节点。`);
+      } catch (error) {
+        dispatcher.postCommandResult(false, `复制节点失败：${errorMessage(error)}`);
+      }
+      break;
+    case "pasteNodesAt": {
+      let payload;
+      try {
+        payload = parseMindFlowNodeClipboard(await dispatcher.clipboard.readText());
+      } catch (error) {
+        dispatcher.postCommandResult(false, `读取系统剪贴板失败：${errorMessage(error)}`);
+        break;
+      }
+      if (!payload) {
+        dispatcher.postCommandResult(false, "系统剪贴板中没有可粘贴的 MindFlow 节点，请先使用 Cmd/Ctrl+C 复制已选节点。");
+        break;
+      }
+      await dispatcher.applyOperations("粘贴节点", [{
+        type: "node.paste",
+        request: {
+          nodes: payload.nodes,
+          primaryIndex: payload.primaryIndex,
+          x: message.x,
+          y: message.y
+        }
+      }], { atomic: true });
+      break;
+    }
     case "selectNode":
       setSelection(dispatcher, { selectedProjectOverview: false, selectedNodeId: message.nodeId, selectedNodeIds: message.selectedNodeIds });
       break;
@@ -115,6 +152,10 @@ export async function dispatchFlowWebviewMessage(message: WebviewMessage, dispat
     default:
       break;
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function setSelection(dispatcher: FlowWebviewCommandDispatcher, selection: Parameters<FlowEditorSelectionController["setSelection"]>[1]): void {

@@ -21,6 +21,13 @@ import { emptyFlowSelection, type FlowSelectionPatch, type FlowSelectionState } 
 import { recordEdgeDetailsRevision } from "../src/platform/vscode/editor/canvas/flowMessageOrdering";
 import { FLOW_WEBVIEW_SCRIPT_FILES, FLOW_WEBVIEW_STYLE_FILES, createFlowWebviewHtml } from "../src/platform/vscode/editor/canvas/webviewShellHtml";
 import { parseWebviewMessage } from "../src/platform/webview/protocol/flowWebviewMessages";
+import {
+  MINDFLOW_NODE_CLIPBOARD_KIND,
+  MINDFLOW_NODE_CLIPBOARD_VERSION,
+  parseMindFlowNodeClipboard,
+  serializeMindFlowNodeClipboard,
+  type MindFlowNodeClipboardPayload
+} from "../src/platform/webview/protocol/nodeClipboard";
 import { parseSidebarMessage } from "../src/platform/webview/protocol/sidebarMessages";
 import {
   assertAppSurfaceEntryEdge,
@@ -31,6 +38,11 @@ import {
   createProcurementFlow,
   FakeMemento,
   loadAutoLayoutHelpers,
+  loadCanvasCardDragHelpers,
+  loadCanvasDeleteSelectionHelpers,
+  loadCanvasNodeClipboardHelpers,
+  loadCanvasSelectAllShortcutHelpers,
+  loadCanvasViewSelectionHelpers,
   loadCanvasViewportHelpers,
   loadEndpointCodecHelpers,
   loadSelectionRelationHighlightHelpers,
@@ -833,6 +845,340 @@ test("Webview message parser rejects malformed messages before command dispatch"
   });
 });
 
+test("Node clipboard payload is versioned, strict, and accepted by webview messages", () => {
+  const payload = sampleNodeClipboardPayload();
+  const text = serializeMindFlowNodeClipboard(payload);
+  assert.deepEqual(parseMindFlowNodeClipboard(text), payload);
+  assert.deepEqual(parseWebviewMessage({ type: "copyNodes", payload }), { type: "copyNodes", payload });
+  assert.deepEqual(parseWebviewMessage({ type: "pasteNodesAt", x: 120.4, y: -80.2 }), {
+    type: "pasteNodesAt",
+    x: 120.4,
+    y: -80.2
+  });
+
+  assert.equal(parseMindFlowNodeClipboard("ordinary clipboard text"), undefined);
+  assert.equal(parseMindFlowNodeClipboard(JSON.stringify({ ...payload, version: 2 })), undefined);
+  assert.equal(parseWebviewMessage({ type: "pasteNodesAt", x: Number.NaN, y: 20 }), undefined);
+  assert.equal(parseWebviewMessage({
+    type: "copyNodes",
+    payload: {
+      ...payload,
+      nodes: [{
+        ...payload.nodes[0],
+        featureGroups: [{
+          ...payload.nodes[0]!.featureGroups[0],
+          actions: [{ actionId: "action_open", label: "打开", type: "user", targetNodeId: "node_external" }]
+        }]
+      }]
+    }
+  }), undefined);
+});
+
+test("Canvas node clipboard and select-all shortcuts support Meta and Control without hijacking text editing", async () => {
+  const [clipboardSource, bindingSource, interactionSource, viewSource] = await Promise.all([
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/interactions/canvas-node-clipboard.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/interactions/canvas-bindings.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/interactions/canvas-interactions.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/data/canvas-view.ts"), "utf8")
+  ]);
+
+  assert.ok(clipboardSource.includes("event.metaKey || event.ctrlKey"));
+  assert.ok(clipboardSource.includes("!event.altKey && !event.shiftKey"));
+  assert.ok(clipboardSource.includes("isEditingTarget(event.target)"));
+  assert.ok(clipboardSource.includes("state.flow.nodes"));
+  assert.ok(clipboardSource.includes('node.status !== "removed"'));
+  assert.ok(clipboardSource.includes("targetNodeId: _targetNodeId"));
+  assert.ok(bindingSource.includes('canvas.addEventListener("pointerenter", trackCanvasClipboardPointer)'));
+  assert.ok(bindingSource.includes('canvas.addEventListener("pointerleave", clearCanvasClipboardPointer)'));
+  assert.ok(interactionSource.includes("handleNodeClipboardShortcut(event)"));
+  assert.ok(interactionSource.includes("handleSelectAllNodesShortcut(event)"));
+  assert.ok(interactionSource.includes("isEditingTarget(event.target)"));
+  assert.ok(interactionSource.includes('String(event.key || "").toLowerCase() !== "a"'));
+  assert.ok(interactionSource.includes("event.preventDefault()"));
+  assert.ok(interactionSource.includes("event.stopPropagation()"));
+  assert.ok(interactionSource.includes("clearNativeDocumentSelection()"));
+  assert.ok(interactionSource.includes("selectAllNodes()"));
+  const selectAllSource = viewSource.match(/function selectAllNodes\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.ok(selectAllSource.includes('selectedEdgeId = ""'));
+  assert.ok(selectAllSource.includes("selectedProjectOverview = false"));
+  assert.ok(selectAllSource.includes('postWebviewMessage({ type: "selectNode", nodeId: selectedNodeId, selectedNodeIds })'));
+  assert.ok(selectAllSource.includes("focusCanvas()"));
+  assert.equal(selectAllSource.includes("centerCard"), false);
+});
+
+test("Canvas select-all owns Meta and Control shortcuts while preserving native editing", async () => {
+  const editingTarget = {};
+  let selectedCount = 0;
+  let nativeSelectionClearCount = 0;
+  const helpers = await loadCanvasSelectAllShortcutHelpers({
+    isEditingTarget: (target) => target === editingTarget,
+    selectAllNodes: () => {
+      selectedCount += 1;
+      return false;
+    },
+    getSelection: () => ({
+      rangeCount: 1,
+      removeAllRanges: () => {
+        nativeSelectionClearCount += 1;
+      }
+    })
+  });
+  let preventedCount = 0;
+  let stoppedCount = 0;
+  const createEvent = (overrides: Record<string, unknown> = {}) => ({
+    key: "a",
+    metaKey: false,
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    target: {},
+    preventDefault: () => {
+      preventedCount += 1;
+    },
+    stopPropagation: () => {
+      stoppedCount += 1;
+    },
+    ...overrides
+  });
+
+  assert.equal(helpers.handleSelectAllNodesShortcut(createEvent({ metaKey: true })), true);
+  assert.equal(helpers.handleSelectAllNodesShortcut(createEvent({ ctrlKey: true })), true);
+  assert.equal(selectedCount, 2);
+  assert.equal(nativeSelectionClearCount, 2);
+  assert.equal(preventedCount, 2);
+  assert.equal(stoppedCount, 2);
+
+  assert.equal(helpers.handleSelectAllNodesShortcut(createEvent({ metaKey: true, target: editingTarget })), false);
+  assert.equal(helpers.handleSelectAllNodesShortcut(createEvent({ ctrlKey: true, shiftKey: true })), false);
+  assert.equal(selectedCount, 2);
+  assert.equal(preventedCount, 2);
+});
+
+test("Canvas select-all includes every active generic node and preserves a valid primary node", async () => {
+  const flow = createEmptyProductFlow();
+  const first = createFlowNode(flow, { title: "列表页" });
+  const second = createFlowNode(flow, { title: "详情页" });
+  const removed = createFlowNode(flow, { title: "已删除页" });
+  removed.status = "removed";
+  const helpers = await loadCanvasViewSelectionHelpers();
+
+  assert.deepEqual(helpers.allNodeSelectionForFlow(flow, second.nodeId), {
+    nodeIds: [first.nodeId, second.nodeId],
+    primaryNodeId: second.nodeId
+  });
+  assert.deepEqual(helpers.allNodeSelectionForFlow(flow, removed.nodeId), {
+    nodeIds: [first.nodeId, second.nodeId],
+    primaryNodeId: first.nodeId
+  });
+  assert.equal(helpers.allNodeSelectionForFlow(createEmptyProductFlow(), ""), null);
+});
+
+test("Canvas multi-selection drag moves every selected active node by one shared world delta", async () => {
+  const flow = createEmptyProductFlow();
+  const first = createFlowNode(flow, { title: "列表页" });
+  const second = createFlowNode(flow, { title: "详情页" });
+  const unselected = createFlowNode(flow, { title: "弹窗" });
+  const removed = createFlowNode(flow, { title: "已删除页" });
+  removed.status = "removed";
+  const selectedNodeIds = [first.nodeId, second.nodeId, removed.nodeId];
+  const cards = new Map([
+    [first.nodeId, { id: first.nodeId }],
+    [second.nodeId, { id: second.nodeId }],
+    [unselected.nodeId, { id: unselected.nodeId }]
+  ]);
+  const helpers = await loadCanvasCardDragHelpers({
+    state: { flow },
+    selectedNodeIds,
+    nodePositions: new Map([
+      [first.nodeId, { x: 100, y: 220 }],
+      [second.nodeId, { x: 430, y: 510 }],
+      [unselected.nodeId, { x: 760, y: 260 }]
+    ]),
+    isNodeSelected: (nodeId) => selectedNodeIds.includes(nodeId),
+    getCardElement: (_kind, nodeId) => cards.get(nodeId) || null
+  });
+
+  const members = helpers.selectedNodeDragMembers(second.nodeId);
+  assert.deepEqual(members.map((member) => member.id), [first.nodeId, second.nodeId]);
+  assert.deepEqual(helpers.nodeGroupDragPositions(members, 75, -35, 0.5), [
+    { id: first.nodeId, x: 250, y: 150 },
+    { id: second.nodeId, x: 580, y: 440 }
+  ]);
+  assert.deepEqual(helpers.selectedNodeDragMembers(unselected.nodeId), []);
+});
+
+test("Canvas multi-selection drag submits atomic moves and moved unselected cards become single selection", async () => {
+  const dragSource = await fs.readFile(
+    path.join(process.cwd(), "src/platform/webview/canvas/client/interactions/canvas-card-drag.ts"),
+    "utf8"
+  );
+  const groupEndSource = dragSource.match(/if \(moved && kind === "node" && groupMembers\.length > 1\) \{[\s\S]*?\n  \}/)?.[0] || "";
+
+  assert.ok(dragSource.includes('draggingCards.forEach((draggingCard) => draggingCard.classList.add("dragging"))'));
+  assert.ok(dragSource.includes("nodeGroupDragPositions(dragState.groupMembers, screenDx, screenDy, zoom)"));
+  assert.ok(groupEndSource.includes('autoLayoutUpdatePreviewPosition("node"'));
+  assert.ok(groupEndSource.includes('postWebviewMessage({ type: "flow.operations", operations })'));
+  assert.equal(groupEndSource.includes("selectNode("), false);
+  assert.ok(dragSource.includes("selectNode(id, false);"));
+});
+
+test("Canvas multi-selection Delete and Backspace emit one active-node removal batch", async () => {
+  const flow = createEmptyProductFlow();
+  const first = createFlowNode(flow, { title: "列表页" });
+  const second = createFlowNode(flow, { title: "详情页" });
+  const removed = createFlowNode(flow, { title: "已删除页" });
+  removed.status = "removed";
+  const messages: unknown[] = [];
+  let clearedSelectionCount = 0;
+  let clearedTimerCount = 0;
+  const helpers = await loadCanvasDeleteSelectionHelpers({
+    state: { flow },
+    selectedNodeIds: [first.nodeId, removed.nodeId, second.nodeId],
+    postWebviewMessage: (message) => messages.push(message),
+    clearNodeSelectionState: () => {
+      clearedSelectionCount += 1;
+    },
+    clearTimeout: () => {
+      clearedTimerCount += 1;
+    }
+  });
+
+  assert.equal(helpers.deleteSelectedNodes(), true);
+  assert.deepEqual(messages, [{
+    type: "flow.operations",
+    operations: [
+      { type: "node.remove", nodeId: first.nodeId },
+      { type: "node.remove", nodeId: second.nodeId }
+    ]
+  }]);
+  assert.equal(clearedSelectionCount, 1);
+  assert.equal(clearedTimerCount, 1);
+
+  const interactionSource = await fs.readFile(
+    path.join(process.cwd(), "src/platform/webview/canvas/client/interactions/canvas-interactions.ts"),
+    "utf8"
+  );
+  assert.ok(interactionSource.includes('event.key !== "Delete" && event.key !== "Backspace"'));
+  assert.equal(interactionSource.includes('event.key === "Arrow'), false);
+  assert.ok(interactionSource.indexOf("isEditingTarget(event.target)") < interactionSource.indexOf("deleteSelectedNodes()"));
+});
+
+test("Canvas node clipboard copies every active selected node with left-top relative offsets", async () => {
+  const flow = createEmptyProductFlow();
+  const first = createFlowNode(flow, {
+    title: "列表页",
+    featureGroups: [{
+      groupId: "group_main",
+      name: "主操作",
+      type: "section",
+      description: "操作区。",
+      items: [],
+      actions: [{ actionId: "action_open", label: "打开", type: "user", targetNodeId: "node_external" }]
+    }]
+  });
+  const second = createFlowNode(flow, { title: "详情页" });
+  const removed = createFlowNode(flow, { title: "已删除页" });
+  removed.status = "removed";
+  const copyMessages: unknown[] = [];
+  const helpers = await loadCanvasNodeClipboardHelpers({
+    state: { flow },
+    selectedNodeIds: [first.nodeId, second.nodeId, removed.nodeId],
+    selectedNodeId: second.nodeId,
+    nodePositions: new Map([
+      [first.nodeId, { x: 500, y: 320 }],
+      [second.nodeId, { x: 860, y: 180 }],
+      [removed.nodeId, { x: 1200, y: 600 }]
+    ]),
+    postWebviewMessage: (message) => copyMessages.push(message)
+  });
+  const payload = helpers.createSelectedNodeClipboardPayload() as {
+    primaryIndex: number;
+    nodes: Array<Record<string, unknown> & { featureGroups: Array<{ actions?: Array<Record<string, unknown>> }> }>;
+  };
+
+  assert.equal(payload.nodes.length, 2);
+  assert.equal(payload.primaryIndex, 1);
+  assert.deepEqual(payload.nodes.map((node) => [node.offsetX, node.offsetY]), [[0, 140], [360, 0]]);
+  assert.equal("inputs" in payload.nodes[0]!, false);
+  assert.equal("outputs" in payload.nodes[0]!, false);
+  assert.equal("targetNodeId" in payload.nodes[0]!.featureGroups[0]!.actions![0]!, false);
+  assert.equal(helpers.isCanvasCommandModifier({ metaKey: true, ctrlKey: false, altKey: false, shiftKey: false }), true);
+  assert.equal(helpers.isCanvasCommandModifier({ metaKey: false, ctrlKey: true, altKey: false, shiftKey: false }), true);
+  assert.equal(helpers.isCanvasCommandModifier({ metaKey: true, ctrlKey: false, altKey: false, shiftKey: true }), false);
+  let successfulCopyPrevented = 0;
+  let successfulCopyStopped = 0;
+  assert.equal(helpers.handleNodeClipboardShortcut({
+    key: "c",
+    metaKey: false,
+    ctrlKey: true,
+    altKey: false,
+    shiftKey: false,
+    target: {},
+    preventDefault: () => {
+      successfulCopyPrevented += 1;
+    },
+    stopPropagation: () => {
+      successfulCopyStopped += 1;
+    }
+  }), true);
+  assert.equal(successfulCopyPrevented, 1);
+  assert.equal(successfulCopyStopped, 1);
+  assert.deepEqual(copyMessages, [{ type: "copyNodes", payload }]);
+
+  const clipboardMessages: unknown[] = [];
+  const commandStatuses: Array<{ ok: boolean; message: string }> = [];
+  let preventedCount = 0;
+  let stoppedCount = 0;
+  let statusUpdateCount = 0;
+  const nonNodeSelection = await loadCanvasNodeClipboardHelpers({
+    state: { flow },
+    selectedNodeIds: [],
+    selectedNodeId: "",
+    nodePositions: new Map(),
+    postWebviewMessage: (message) => clipboardMessages.push(message),
+    setCommandStatus: (ok, message) => commandStatuses.push({ ok, message }),
+    updateCommandStatusElement: () => {
+      statusUpdateCount += 1;
+    }
+  });
+  assert.equal(nonNodeSelection.createSelectedNodeClipboardPayload(), null);
+  assert.equal(nonNodeSelection.handleNodeClipboardShortcut({
+    key: "c",
+    metaKey: true,
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    target: {},
+    preventDefault: () => {
+      preventedCount += 1;
+    },
+    stopPropagation: () => {
+      stoppedCount += 1;
+    }
+  }), true);
+  assert.equal(preventedCount, 1);
+  assert.equal(stoppedCount, 1);
+  assert.deepEqual(clipboardMessages, []);
+  assert.deepEqual(commandStatuses, [{ ok: false, message: "当前没有可复制的普通节点。" }]);
+  assert.equal(statusUpdateCount, 1);
+
+  const editingClipboard = await loadCanvasNodeClipboardHelpers({
+    state: { flow },
+    selectedNodeIds: [first.nodeId],
+    selectedNodeId: first.nodeId,
+    nodePositions: new Map([[first.nodeId, { x: 500, y: 320 }]]),
+    isEditingTarget: () => true
+  });
+  assert.equal(editingClipboard.handleNodeClipboardShortcut({
+    key: "c",
+    metaKey: true,
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    target: {}
+  }), false);
+});
+
 test("Sidebar message parser rejects malformed messages before command dispatch", () => {
   assert.equal(parseSidebarMessage(null), undefined);
   assert.equal(parseSidebarMessage({ type: "openFlow" }), undefined);
@@ -918,6 +1264,38 @@ test("Flow webview command dispatcher maps selection and edit messages", async (
   ]);
 });
 
+test("Flow webview dispatcher uses the system clipboard and pastes nodes atomically", async () => {
+  const dispatcher = createDispatcherHarness();
+  const payload = sampleNodeClipboardPayload();
+
+  await dispatchFlowWebviewMessage({ type: "copyNodes", payload }, dispatcher.dispatcher);
+  assert.deepEqual(parseMindFlowNodeClipboard(dispatcher.clipboardText), payload);
+  assert.deepEqual(dispatcher.commandResults, [{ ok: true, message: "已复制 1 个节点。" }]);
+
+  await dispatchFlowWebviewMessage({ type: "pasteNodesAt", x: 800, y: 520 }, dispatcher.dispatcher);
+  assert.deepEqual(dispatcher.operations, [{
+    label: "粘贴节点",
+    operations: [{
+      type: "node.paste",
+      request: {
+        nodes: payload.nodes,
+        primaryIndex: 0,
+        x: 800,
+        y: 520
+      }
+    }],
+    options: { atomic: true }
+  }]);
+
+  dispatcher.setClipboardText("not a MindFlow clipboard");
+  await dispatchFlowWebviewMessage({ type: "pasteNodesAt", x: 10, y: 20 }, dispatcher.dispatcher);
+  assert.equal(dispatcher.operations.length, 1);
+  assert.deepEqual(dispatcher.commandResults.at(-1), {
+    ok: false,
+    message: "系统剪贴板中没有可粘贴的 MindFlow 节点，请先使用 Cmd/Ctrl+C 复制已选节点。"
+  });
+});
+
 test("Flow webview command dispatcher clears taxonomy selection before delete", async () => {
   const dispatcher = createDispatcherHarness({
     selectedAppSurfaceId: "app_admin",
@@ -983,17 +1361,35 @@ test("Flow webview command dispatcher ignores stale edge detail updates", async 
 function createDispatcherHarness(initialSelection: FlowSelectionPatch = emptyFlowSelection()) {
   const documentUri = "file:///workspace/sample.mindflow" as unknown as vscode.Uri;
   const operations: Array<{ label: string; operations: readonly unknown[]; options?: unknown }> = [];
+  const commandResults: Array<{ ok: boolean; message: string }> = [];
   let selection: FlowSelectionState = { ...emptyFlowSelection(), ...initialSelection };
+  let clipboardText = "";
 
   return {
     documentUri,
     operations,
+    commandResults,
+    setClipboardText(value: string) {
+      clipboardText = value;
+    },
+    get clipboardText() {
+      return clipboardText;
+    },
     get selection() {
       return selection;
     },
     dispatcher: {
       documentUri,
       latestEdgeDetailsRevisions: new Map<string, number>(),
+      clipboard: {
+        readText: async () => clipboardText,
+        writeText: async (value: string) => {
+          clipboardText = value;
+        }
+      },
+      postCommandResult: (ok: boolean, message: string) => {
+        commandResults.push({ ok, message });
+      },
       selectionController: {
         getSelection: () => ({ ...selection }),
         setSelection: (_flowUri: vscode.Uri | string, patch: FlowSelectionPatch) => {
@@ -1008,5 +1404,33 @@ function createDispatcherHarness(initialSelection: FlowSelectionPatch = emptyFlo
         });
       }
     }
+  };
+}
+
+function sampleNodeClipboardPayload(): MindFlowNodeClipboardPayload {
+  return {
+    kind: MINDFLOW_NODE_CLIPBOARD_KIND,
+    version: MINDFLOW_NODE_CLIPBOARD_VERSION,
+    primaryIndex: 0,
+    nodes: [{
+      title: "工作台",
+      pageType: "page",
+      purpose: "处理运营任务。",
+      appSurfaceIds: ["app_admin"],
+      statusGroupId: "status_review",
+      domainIds: ["domain_ops"],
+      roleIds: ["role_ops"],
+      permissions: ["role_ops"],
+      featureGroups: [{
+        groupId: "group_actions",
+        name: "操作区",
+        type: "section",
+        description: "页面操作。",
+        items: [{ itemId: "item_open", name: "打开", type: "button", description: "打开详情。" }],
+        actions: [{ actionId: "action_open", label: "打开", type: "user" }]
+      }],
+      offsetX: 0,
+      offsetY: 0
+    }]
   };
 }

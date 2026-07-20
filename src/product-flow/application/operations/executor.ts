@@ -16,6 +16,7 @@ export function applyFlowOperation(flow: ProductFlow, operation: FlowOperation):
       return applyTaxonomyOperation(flow, operation);
     case "appSurface.move":
     case "node.create":
+    case "node.paste":
     case "node.update":
     case "node.move":
     case "node.remove":

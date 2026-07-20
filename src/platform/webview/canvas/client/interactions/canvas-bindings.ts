@@ -52,10 +52,15 @@ function bindEvents() {
   bindSelectionRelations();
 
   canvas.addEventListener("wheel", handleWheel, { passive: false });
+  canvas.addEventListener("pointerenter", trackCanvasClipboardPointer);
   canvas.addEventListener("pointerdown", startPan);
-  canvas.addEventListener("pointermove", movePan);
+  canvas.addEventListener("pointermove", (event) => {
+    trackCanvasClipboardPointer(event);
+    movePan(event);
+  });
   canvas.addEventListener("pointerup", endPan);
   canvas.addEventListener("pointercancel", endPan);
+  canvas.addEventListener("pointerleave", clearCanvasClipboardPointer);
   canvas.addEventListener("click", handleCanvasClick);
   document.oncontextmenu = handleContextMenu;
   document.onkeydown = handleKeyDown;

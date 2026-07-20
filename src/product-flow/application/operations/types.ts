@@ -10,6 +10,27 @@ import type { TaxonomyKind } from "../../domain/editing/taxonomy";
 import type { FlowSelectionPatch } from "../../domain/selection";
 import type { AppSurface, FlowEdge, FlowEndpoint, PageNode, ProductFlow } from "../../domain";
 
+export interface PasteNodeSnapshot {
+  title: string;
+  pageType: PageNode["pageType"];
+  purpose: string;
+  appSurfaceIds: string[];
+  statusGroupId?: string;
+  domainIds: string[];
+  roleIds: string[];
+  permissions: string[];
+  featureGroups: PageNode["featureGroups"];
+  offsetX: number;
+  offsetY: number;
+}
+
+export interface PasteNodesOperationInput {
+  nodes: PasteNodeSnapshot[];
+  primaryIndex: number;
+  x: number;
+  y: number;
+}
+
 export type FlowOperation =
   | { type: "project.update"; patch: UpdateProjectOverviewInput }
   | { type: "project.move"; x: number; y: number }
@@ -17,6 +38,7 @@ export type FlowOperation =
   | { type: "taxonomy.remove"; kind: TaxonomyKind; id: string }
   | { type: "appSurface.move"; appId: string; x: number; y: number }
   | { type: "node.create"; input?: CreateNodeInput; detailPatch?: UpdateNodeDetailsInput }
+  | { type: "node.paste"; request: PasteNodesOperationInput }
   | { type: "node.update"; nodeId: string; patch: UpdateNodeDetailsInput }
   | { type: "node.move"; nodeId: string; x: number; y: number }
   | { type: "node.remove"; nodeId: string }
@@ -55,6 +77,7 @@ export type FlowOperationResult =
   | { type: "taxonomy.remove"; taxonomy: { kind: TaxonomyKind; id: string; item: null }; removedId: string; selection: FlowSelectionPatch }
   | { type: "appSurface.move"; appSurface: AppSurface }
   | { type: "node.create"; node: PageNode; selection: FlowSelectionPatch }
+  | { type: "node.paste"; nodes: PageNode[]; selection: FlowSelectionPatch }
   | { type: "node.update"; node: PageNode; selection: FlowSelectionPatch }
   | { type: "node.move"; node: PageNode }
   | { type: "node.remove"; removedNodeId: string; removedEdgeIds: string[]; result: RemoveNodeResult; selection: FlowSelectionPatch }

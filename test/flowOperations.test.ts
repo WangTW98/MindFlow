@@ -172,6 +172,105 @@ test("Flow operation batches support atomic rollback and dry-run", () => {
   assert.equal(dryRun.flow.nodes.length, 2);
 });
 
+test("Node paste clones selected cards, filters foreign references, and selects every copy", () => {
+  const flow = createEmptyProductFlow();
+  flow.appSurfaces = [{ appId: "app_admin", name: "管理后台", type: "admin", description: "后台", domainIds: [], roleIds: [] }];
+  flow.domains = [{ domainId: "domain_ops", name: "运营", description: "运营域" }];
+  flow.roles = [{ roleId: "role_ops", name: "运营", description: "运营角色", domainIds: ["domain_ops"] }];
+  flow.statusGroups = [{ statusGroupId: "status_review", title: "评审中", color: "#33aa55" }];
+  const request = {
+    nodes: [
+      {
+        title: "工作台",
+        pageType: "page" as const,
+        purpose: "处理运营任务。",
+        appSurfaceIds: ["app_admin", "app_missing"],
+        statusGroupId: "status_review",
+        domainIds: ["domain_ops", "domain_missing"],
+        roleIds: ["role_ops", "role_missing"],
+        permissions: ["role_ops", "role_missing"],
+        featureGroups: [{
+          groupId: "group_actions",
+          name: "操作区",
+          type: "section",
+          description: "页面操作。",
+          items: [{ itemId: "item_submit", name: "提交", type: "button", description: "提交数据。" }],
+          actions: [{ actionId: "action_submit", label: "提交", type: "user", targetNodeId: "page_external" }]
+        }],
+        offsetX: 0,
+        offsetY: 0
+      },
+      {
+        title: "详情页",
+        pageType: "page" as const,
+        purpose: "展示详情。",
+        appSurfaceIds: ["app_missing"],
+        statusGroupId: "status_missing",
+        domainIds: [],
+        roleIds: [],
+        permissions: [],
+        featureGroups: [],
+        offsetX: 420,
+        offsetY: 180
+      }
+    ],
+    primaryIndex: 1,
+    x: 1000,
+    y: 700
+  };
+
+  const result = applyFlowOperation(flow, { type: "node.paste", request });
+  assert.equal(result.type, "node.paste");
+  if (result.type !== "node.paste") {
+    throw new Error("Expected node.paste result.");
+  }
+  assert.equal(result.nodes.length, 2);
+  assert.notEqual(result.nodes[0]?.nodeId, result.nodes[1]?.nodeId);
+  assert.deepEqual(result.nodes.map((node) => node.title), ["工作台 副本", "详情页 副本"]);
+  assert.deepEqual(result.nodes.map((node) => node.view?.position), [{ x: 1000, y: 700 }, { x: 1420, y: 880 }]);
+  assert.deepEqual(result.nodes[0]?.appSurfaceIds, ["app_admin"]);
+  assert.deepEqual(result.nodes[0]?.domainIds, ["domain_ops"]);
+  assert.deepEqual(result.nodes[0]?.roleIds, ["role_ops"]);
+  assert.deepEqual(result.nodes[0]?.permissions, ["role_ops"]);
+  assert.equal(result.nodes[0]?.statusGroupId, "status_review");
+  assert.equal(result.nodes[1]?.statusGroupId, undefined);
+  assert.equal(result.nodes[0]?.featureGroups[0]?.actions?.[0]?.targetNodeId, undefined);
+  assert.deepEqual(result.nodes.flatMap((node) => [node.inputs, node.outputs]), [[], [], [], []]);
+  assert.equal(flow.edges.length, 0);
+  assert.deepEqual(result.selection.selectedNodeIds, result.nodes.map((node) => node.nodeId));
+  assert.equal(result.selection.selectedNodeId, result.nodes[1]?.nodeId);
+  assert.equal(validateProductFlow(flow).valid, true);
+});
+
+test("Atomic node paste rejects invalid batches without changing the flow", () => {
+  const flow = createEmptyProductFlow();
+  const before = JSON.stringify(flow);
+  assertThrows(
+    () => applyFlowOperations(flow, [{
+      type: "node.paste",
+      request: {
+        nodes: [{
+          title: "非法节点",
+          pageType: "unknown" as never,
+          purpose: "不会写入。",
+          appSurfaceIds: [],
+          domainIds: [],
+          roleIds: [],
+          permissions: [],
+          featureGroups: [],
+          offsetX: 0,
+          offsetY: 0
+        }],
+        primaryIndex: 0,
+        x: 100,
+        y: 100
+      }
+    }], { atomic: true }),
+    /pageType/
+  );
+  assert.equal(JSON.stringify(flow), before);
+});
+
 test("Flow operation batches apply auto layout positions atomically", () => {
   const flow = createEmptyProductFlow();
   flow.appSurfaces = [{
@@ -210,6 +309,51 @@ test("Flow operation batches apply auto layout positions atomically", () => {
   assert.deepEqual(applied.flow.appSurfaces?.[0]?.view?.position, { x: 520, y: 161 });
   assert.deepEqual(applied.flow.nodes[0]?.view?.position, { x: 1040, y: -21 });
   assert.equal(JSON.stringify(flow), beforeApply);
+});
+
+test("Flow operation batches remove selected nodes and their edges atomically", () => {
+  const flow = createEmptyProductFlow();
+  const first = createFlowNode(flow, { title: "列表页" });
+  const second = createFlowNode(flow, { title: "详情页" });
+  const remaining = createFlowNode(flow, { title: "工作台" });
+  applyFlowOperation(flow, {
+    type: "edge.upsert",
+    input: {
+      from: { kind: "node", nodeId: first.nodeId },
+      to: { kind: "node", nodeId: second.nodeId },
+      trigger: "打开详情",
+      type: "interaction"
+    }
+  });
+  applyFlowOperation(flow, {
+    type: "edge.upsert",
+    input: {
+      from: { kind: "node", nodeId: second.nodeId },
+      to: { kind: "node", nodeId: remaining.nodeId },
+      trigger: "返回工作台",
+      type: "interaction"
+    }
+  });
+
+  const beforeFailure = JSON.stringify(flow);
+  assertThrows(
+    () => applyFlowOperations(flow, [
+      { type: "node.remove", nodeId: first.nodeId },
+      { type: "node.remove", nodeId: "missing_node" }
+    ], { atomic: true }),
+    /Missing node/
+  );
+  assert.equal(JSON.stringify(flow), beforeFailure);
+
+  const applied = applyFlowOperations(flow, [
+    { type: "node.remove", nodeId: first.nodeId },
+    { type: "node.remove", nodeId: second.nodeId }
+  ], { atomic: true });
+  assert.equal(applied.flow.nodes.find((node) => node.nodeId === first.nodeId)?.status, "removed");
+  assert.equal(applied.flow.nodes.find((node) => node.nodeId === second.nodeId)?.status, "removed");
+  assert.equal(applied.flow.nodes.find((node) => node.nodeId === remaining.nodeId)?.status, "active");
+  assert.equal(applied.flow.edges.filter((edge) => edge.status === "active").length, 0);
+  assert.deepEqual(applied.selection, { selectedProjectOverview: false });
 });
 
 function assertThrows(fn: () => void, pattern: RegExp): void {

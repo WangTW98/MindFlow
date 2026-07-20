@@ -15,6 +15,8 @@ function hostMessageFromClientMessage(message) {
     case "selectStatusGroup":
     case "selectProjectOverview":
     case "clearSelection":
+    case "copyNodes":
+    case "pasteNodesAt":
       return message;
     case "deleteNode":
       return flowOperationMessage({ type: "node.remove", nodeId: message.nodeId });

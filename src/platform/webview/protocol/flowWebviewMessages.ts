@@ -1,5 +1,6 @@
 import { readEndpoint, readOptionalEdgeType } from "./messages/endpointPayload";
 import { readConnectedNodeRequest, readEdgeDetailsPatch, readTaxonomyRequest } from "./messages/messagePayloads";
+import { readMindFlowNodeClipboardPayload } from "./nodeClipboard";
 import type { FlowOperation, UpsertEdgeOperationInput } from "../../../product-flow/application/operations";
 import type { WebviewMessage, WebviewPosition } from "./messages/protocol";
 import { isRecord, readNumber, readOptionalNumber, readOptionalString, readOptionalStringArray, readRecord, readString } from "./messages/readers";
@@ -39,6 +40,15 @@ export function parseWebviewMessage(message: unknown): WebviewMessage | undefine
     case "selectProjectOverview":
     case "clearSelection":
       return { type: message.type };
+    case "copyNodes": {
+      const payload = readMindFlowNodeClipboardPayload(message.payload);
+      return payload ? { type: "copyNodes", payload } : undefined;
+    }
+    case "pasteNodesAt": {
+      const x = readNumber(message, "x");
+      const y = readNumber(message, "y");
+      return x !== undefined && y !== undefined ? { type: "pasteNodesAt", x, y } : undefined;
+    }
     case "deleteNode": {
       const nodeId = readString(message, "nodeId");
       return nodeId ? { type: "deleteNode", nodeId, nodeTitle: readOptionalString(message, "nodeTitle") } : undefined;

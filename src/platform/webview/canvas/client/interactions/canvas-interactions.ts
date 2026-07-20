@@ -55,27 +55,20 @@ function clearSelection() {
 }
 
 function handleKeyDown(event) {
+  if (handleSelectAllNodesShortcut(event)) {
+    return;
+  }
+  if (handleNodeClipboardShortcut(event)) {
+    return;
+  }
   if (event.key !== "Delete" && event.key !== "Backspace") {
     return;
   }
   if (isEditingTarget(event.target)) {
     return;
   }
-  if (selectedNodeIds.length > 1) {
+  if (deleteSelectedNodes()) {
     event.preventDefault();
-    return;
-  }
-  if (selectedNodeIds.length === 1) {
-    const nodeId = selectedNodeIds[0];
-    const node = state.flow.nodes.find((item) => item.nodeId === nodeId);
-    if (node && node.status !== "removed") {
-      event.preventDefault();
-      clearTimeout(nodeDetailsSaveTimer);
-      nodeDetailsSaveTimer = null;
-      clearNodeSelectionState();
-      selectedEdgeId = "";
-      postWebviewMessage({ type: "deleteNode", nodeId, nodeTitle: node.title });
-    }
     return;
   }
   if (selectedEdgeId) {
@@ -109,6 +102,48 @@ function handleKeyDown(event) {
   if (selectedStatusGroupId) {
     event.preventDefault();
     deleteSelectedTaxonomy("statusGroup", selectedStatusGroupId);
+  }
+}
+
+function deleteSelectedNodes() {
+  const nodeIds = activeSelectedNodeIds(state.flow, selectedNodeIds);
+  if (nodeIds.length === 0) {
+    return false;
+  }
+  clearTimeout(nodeDetailsSaveTimer);
+  nodeDetailsSaveTimer = null;
+  clearNodeSelectionState();
+  selectedEdgeId = "";
+  if (nodeIds.length === 1) {
+    postWebviewMessage({ type: "deleteNode", nodeId: nodeIds[0] });
+    return true;
+  }
+  postWebviewMessage({
+    type: "flow.operations",
+    operations: nodeIds.map((nodeId) => ({ type: "node.remove", nodeId }))
+  });
+  return true;
+}
+
+function handleSelectAllNodesShortcut(event) {
+  if (
+    isEditingTarget(event.target) ||
+    !isCanvasCommandModifier(event) ||
+    String(event.key || "").toLowerCase() !== "a"
+  ) {
+    return false;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  clearNativeDocumentSelection();
+  selectAllNodes();
+  return true;
+}
+
+function clearNativeDocumentSelection() {
+  const selection = window.getSelection?.();
+  if (selection && selection.rangeCount > 0) {
+    selection.removeAllRanges();
   }
 }
 

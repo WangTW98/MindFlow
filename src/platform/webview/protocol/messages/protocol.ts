@@ -1,6 +1,7 @@
 import type { FlowOperation, TaxonomyRequest } from "../../../../product-flow/application/operations";
 import type { EdgeType, FlowEndpoint, ProductFlow } from "../../../../product-flow/domain";
 import type { FlowSelectionState } from "../../../../product-flow/domain/selection";
+import type { MindFlowNodeClipboardPayload } from "../nodeClipboard";
 
 export type WebviewMessage =
   | { type: "flow.operation"; operation: FlowOperation }
@@ -13,6 +14,8 @@ export type WebviewMessage =
   | { type: "selectStatusGroup"; statusGroupId: string }
   | { type: "selectProjectOverview" }
   | { type: "clearSelection" }
+  | { type: "copyNodes"; payload: MindFlowNodeClipboardPayload }
+  | { type: "pasteNodesAt"; x: number; y: number }
   | { type: "deleteNode"; nodeId: string; nodeTitle?: string }
   | { type: "saveNodePosition"; nodeId: string; x: number; y: number }
   | { type: "saveAppSurfacePosition"; appId: string; x: number; y: number }

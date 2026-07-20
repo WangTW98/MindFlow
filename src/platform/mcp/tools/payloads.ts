@@ -63,6 +63,8 @@ export function operationPayload(result: FlowOperationResult): Record<string, un
     case "node.update":
     case "node.move":
       return { node: result.node };
+    case "node.paste":
+      return { nodes: result.nodes };
     case "node.remove":
       return { removedNodeId: result.removedNodeId, removedEdgeIds: result.removedEdgeIds };
     case "node.createConnected":
@@ -78,7 +80,9 @@ export function operationPayload(result: FlowOperationResult): Record<string, un
 
 export function resultNodes(results: readonly FlowOperationResult[]): PageNode[] {
   return results.flatMap((result) =>
-    result.type === "node.create" || result.type === "node.update" || result.type === "node.move" || result.type === "node.createConnected"
+    result.type === "node.paste"
+      ? result.nodes
+      : result.type === "node.create" || result.type === "node.update" || result.type === "node.move" || result.type === "node.createConnected"
       ? [result.node]
       : []
   );

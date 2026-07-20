@@ -106,6 +106,8 @@ export class FlowEditorSession {
       documentUri: this.document.uri,
       latestEdgeDetailsRevisions: this.latestEdgeDetailsRevisions,
       selectionController: this.selectionController,
+      clipboard: vscode.env.clipboard,
+      postCommandResult: (ok, message) => this.postCommandResult(ok, message),
       applyOperations: (label, operations, options) => this.applyCanvasOperations(label, operations, options)
     });
   }

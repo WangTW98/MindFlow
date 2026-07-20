@@ -26,6 +26,36 @@ function setCardPosition(kind, id, position) {
   positions.set(id, position);
 }
 
+function selectedNodeDragMembers(draggedNodeId) {
+  if (!isNodeSelected(draggedNodeId)) {
+    return [];
+  }
+  const nodeIds = activeSelectedNodeIds(state.flow, selectedNodeIds);
+  if (nodeIds.length < 2) {
+    return [];
+  }
+  const members = nodeIds
+    .map((nodeId) => {
+      const position = nodePositions.get(nodeId);
+      const card = getCardElement("node", nodeId);
+      return position && card
+        ? { id: nodeId, card, originX: position.x, originY: position.y }
+        : null;
+    })
+    .filter(Boolean);
+  return members.length === nodeIds.length ? members : [];
+}
+
+function nodeGroupDragPositions(members, screenDx, screenDy, currentZoom) {
+  const dx = Math.round(screenDx / currentZoom);
+  const dy = Math.round(screenDy / currentZoom);
+  return members.map((member) => ({
+    id: member.id,
+    x: member.originX + dx,
+    y: member.originY + dy
+  }));
+}
+
 function startCardDrag(event, kind) {
   if (event.button !== 0 || event.target.closest("button, input, textarea, select")) {
     return;
@@ -41,6 +71,7 @@ function startCardDrag(event, kind) {
   if (!id || !pos) {
     return;
   }
+  const groupMembers = kind === "node" ? selectedNodeDragMembers(id) : [];
   selectedEdgeId = "";
   selectedDomainId = "";
   selectedRoleId = "";
@@ -74,9 +105,13 @@ function startCardDrag(event, kind) {
     originX: pos.x,
     originY: pos.y,
     moved: false,
-    multiSelect: kind === "node" && isNodeMultiSelectEvent(event)
+    multiSelect: kind === "node" && isNodeMultiSelectEvent(event),
+    groupMembers
   };
-  card.classList.add("dragging");
+  const draggingCards = groupMembers.length > 1
+    ? groupMembers.map((member) => member.card)
+    : [card];
+  draggingCards.forEach((draggingCard) => draggingCard.classList.add("dragging"));
   card.setPointerCapture(event.pointerId);
   card.addEventListener("pointermove", moveCardDrag);
   card.addEventListener("pointerup", endCardDrag);
@@ -92,11 +127,23 @@ function moveCardDrag(event) {
   if (!dragState.moved && Math.hypot(screenDx, screenDy) <= CARD_DRAG_THRESHOLD_PX) {
     return;
   }
-  const dx = screenDx / zoom;
-  const dy = screenDy / zoom;
   if (!dragState.moved) {
     dragState.moved = true;
   }
+  if (dragState.groupMembers.length > 1) {
+    nodeGroupDragPositions(dragState.groupMembers, screenDx, screenDy, zoom).forEach((position, index) => {
+      const member = dragState.groupMembers[index];
+      nodePositions.set(position.id, { x: position.x, y: position.y });
+      if (member) {
+        member.card.style.left = `${position.x}px`;
+        member.card.style.top = `${position.y}px`;
+      }
+    });
+    scheduleDrawEdges();
+    return;
+  }
+  const dx = screenDx / zoom;
+  const dy = screenDy / zoom;
   const next = {
     x: Math.round(dragState.originX + dx),
     y: Math.round(dragState.originY + dy)
@@ -111,9 +158,12 @@ function endCardDrag(event) {
   if (!dragState || event.pointerId !== dragState.pointerId) {
     return;
   }
-  const { kind, id, card, moved, multiSelect } = dragState;
+  const { kind, id, card, moved, multiSelect, groupMembers } = dragState;
   const pos = getCardPosition(kind, id);
-  card.classList.remove("dragging");
+  const draggingCards = groupMembers.length > 1
+    ? groupMembers.map((member) => member.card)
+    : [card];
+  draggingCards.forEach((draggingCard) => draggingCard.classList.remove("dragging"));
   card.removeEventListener("pointermove", moveCardDrag);
   card.removeEventListener("pointerup", endCardDrag);
   card.removeEventListener("pointercancel", endCardDrag);
@@ -123,6 +173,19 @@ function endCardDrag(event) {
     // Pointer capture can be released by the webview before pointerup.
   }
   dragState = null;
+  if (moved && kind === "node" && groupMembers.length > 1) {
+    const operations = groupMembers.map((member) => {
+      const position = nodePositions.get(member.id);
+      return { type: "node.move", nodeId: member.id, x: position.x, y: position.y };
+    });
+    operations.forEach((operation) => {
+      autoLayoutUpdatePreviewPosition("node", operation.nodeId, { x: operation.x, y: operation.y });
+    });
+    selectedEdgeId = "";
+    suppressNextNodeCardGeneratedClick();
+    postWebviewMessage({ type: "flow.operations", operations });
+    return;
+  }
   if (moved && pos) {
     autoLayoutUpdatePreviewPosition(kind, id, pos);
     selectedEdgeId = "";
@@ -154,13 +217,9 @@ function endCardDrag(event) {
       postWebviewMessage({ type: "saveProjectOverviewPosition", x: pos.x, y: pos.y });
       postWebviewMessage({ type: "selectProjectOverview" });
     } else {
-      const multi = Boolean(multiSelect || isNodeMultiSelectEvent(event));
-      if (multi) {
-        event.preventDefault();
-      }
       suppressNextNodeCardGeneratedClick();
       postWebviewMessage({ type: "saveNodePosition", nodeId: id, x: pos.x, y: pos.y });
-      selectNode(id, false, { multi });
+      selectNode(id, false);
     }
     return;
   }

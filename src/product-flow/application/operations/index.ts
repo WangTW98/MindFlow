@@ -8,6 +8,8 @@ export type {
   CreateConnectedNodeOperationInput,
   FlowOperation,
   FlowOperationResult,
+  PasteNodeSnapshot,
+  PasteNodesOperationInput,
   UpsertEdgeOperationInput
 } from "./types";
 export type { CreateEdgeInput, CreateNodeInput, UpdateEdgeDetailsInput, UpdateNodeDetailsInput } from "../../domain/editing/graph";
