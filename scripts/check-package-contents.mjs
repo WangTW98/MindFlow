@@ -44,11 +44,12 @@ const [manifestText, licenseText, readmeText] = await Promise.all([
 ]);
 const manifest = JSON.parse(manifestText);
 const repositoryUrl = typeof manifest.repository === "string" ? manifest.repository : manifest.repository?.url;
+const normalizedLicenseText = licenseText.replace(/\r\n?/gu, "\n");
 const licensingErrors = [
   manifest.license === "AGPL-3.0-only" ? "" : "package.json must declare AGPL-3.0-only",
   repositoryUrl === "https://github.com/WangTW98/MindFlow.git" ? "" : "package.json must point to the public MindFlow source repository",
-  licenseText.includes("GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3, 19 November 2007") ? "" : "LICENSE.txt must contain the complete GNU AGPL v3 text",
-  /All rights reserved|proprietary|No permission is granted|UNLICENSED/iu.test(licenseText) ? "LICENSE.txt still contains proprietary licensing terms" : "",
+  normalizedLicenseText.includes("GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3, 19 November 2007") ? "" : "LICENSE.txt must contain the complete GNU AGPL v3 text",
+  /All rights reserved|proprietary|No permission is granted|UNLICENSED/iu.test(normalizedLicenseText) ? "LICENSE.txt still contains proprietary licensing terms" : "",
   readmeText.includes("## License") && readmeText.includes("AGPL-3.0-only") ? "" : "README.md must describe the AGPL-3.0-only license"
 ].filter(Boolean);
 

@@ -90,10 +90,12 @@ test("AGPL license and public source notice replace proprietary distribution ter
     fs.readFile(path.join(process.cwd(), "LICENSE.txt"), "utf8"),
     fs.readFile(path.join(process.cwd(), "README.md"), "utf8")
   ]);
-
-  assert.ok(licenseText.includes("GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3, 19 November 2007"));
-  assert.ok(licenseText.includes("13. Remote Network Interaction; Use with the GNU General Public License."));
-  assert.equal(/All rights reserved|proprietary|No permission is granted|UNLICENSED/iu.test(licenseText), false);
+  for (const candidate of [licenseText, licenseText.replace(/\n/gu, "\r\n")]) {
+    const normalizedLicenseText = candidate.replace(/\r\n?/gu, "\n");
+    assert.ok(normalizedLicenseText.includes("GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3, 19 November 2007"));
+    assert.ok(normalizedLicenseText.includes("13. Remote Network Interaction; Use with the GNU General Public License."));
+    assert.equal(/All rights reserved|proprietary|No permission is granted|UNLICENSED/iu.test(normalizedLicenseText), false);
+  }
   assert.ok(readmeText.includes("## License"));
   assert.ok(readmeText.includes("AGPL-3.0-only"));
   assert.ok(readmeText.includes("https://github.com/WangTW98/MindFlow"));
