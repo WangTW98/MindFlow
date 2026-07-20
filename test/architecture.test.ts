@@ -123,6 +123,8 @@ test("VS Code packaging ignores source and keeps assets", async () => {
   assert.ok(ignoreSource.includes("!assets/webview/media/**"));
   assert.ok(ignoreSource.includes("!assets/webview/canvas/media/**"));
   assert.ok(ignoreSource.includes("!assets/webview/sidebar/media/**"));
+  assert.ok(ignoreSource.includes("README.md"));
+  assert.equal(ignoreSource.includes("README.vscode.md"), false);
   assert.equal(ignoreSource.includes("src/adapters/"), false);
   assert.equal(ignoreSource.includes("src/platform/webview/canvas/client/**"), false);
 });
@@ -140,7 +142,7 @@ test("test and package scripts launch JavaScript CLIs without Windows cmd shims"
   assert.ok(testRunner.indexOf("if (!process.env.NODE_V8_COVERAGE)") < testRunner.indexOf('["--check"'));
 
   assert.ok(packageChecker.includes('"node_modules", "@vscode", "vsce", "vsce"'));
-  assert.ok(packageChecker.includes("run(process.execPath, [vsce, \"ls\"])"));
+  assert.ok(packageChecker.includes('run(process.execPath, [vsce, "ls", "--readme-path", marketplaceReadmePath])'));
   assert.equal(packageChecker.includes("vsce.cmd"), false);
 });
 

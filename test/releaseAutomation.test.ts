@@ -98,3 +98,17 @@ test("CI gates one snapshot artifact and release promotes only successful main p
   assert.ok(release.includes("AGPL-3.0-only"));
   assert.equal(release.includes("actions/checkout@"), false);
 });
+
+test("VSIX packaging uses the dedicated Chinese plugin README", async () => {
+  const [manifestText, packageChecker, vsixVerifier] = await Promise.all([
+    fs.readFile(path.join(process.cwd(), "package.json"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "scripts", "check-package-contents.mjs"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "scripts", "verify-vsix.mjs"), "utf8")
+  ]);
+  const manifest = JSON.parse(manifestText) as { scripts?: Record<string, string> };
+
+  assert.equal(manifest.scripts?.package, "vsce package --no-dependencies --readme-path README.vscode.md");
+  assert.ok(packageChecker.includes('"ls", "--readme-path", marketplaceReadmePath'));
+  assert.ok(vsixVerifier.includes('fs.readFile(path.join(root, "README.vscode.md"), "utf8")'));
+  assert.ok(vsixVerifier.includes("VSIX README does not match README.vscode.md"));
+});

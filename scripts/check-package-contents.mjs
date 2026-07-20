@@ -8,7 +8,7 @@ const vsce = path.join(root, "node_modules", "@vscode", "vsce", "vsce");
 
 const requiredFiles = new Set([
   "package.json",
-  "README.md",
+  "README.vscode.md",
   "LICENSE.txt",
   "out/mcp-runtime/mindflow-mcp-router.cjs",
   "out/mcp-runtime/mindflow-mcp-router.cjs.map",
@@ -25,7 +25,8 @@ const allowedPrefixes = [
   "agent-assets/skills/"
 ];
 
-const listing = await run(process.execPath, [vsce, "ls"]);
+const marketplaceReadmePath = "README.vscode.md";
+const listing = await run(process.execPath, [vsce, "ls", "--readme-path", marketplaceReadmePath]);
 const files = listing.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
 const unexpected = files.filter((file) => !requiredFiles.has(file) && !allowedPrefixes.some((prefix) => file.startsWith(prefix)));
 const missing = [...requiredFiles].filter((file) => !files.includes(file));
@@ -37,10 +38,11 @@ if (unexpected.length || missing.length) {
   ].filter(Boolean).join("\n\n"));
 }
 
-const [manifestText, licenseText, readmeText] = await Promise.all([
+const [manifestText, licenseText, githubReadmeText, marketplaceReadmeText] = await Promise.all([
   fs.readFile(path.join(root, "package.json"), "utf8"),
   fs.readFile(path.join(root, "LICENSE.txt"), "utf8"),
-  fs.readFile(path.join(root, "README.md"), "utf8")
+  fs.readFile(path.join(root, "README.md"), "utf8"),
+  fs.readFile(path.join(root, marketplaceReadmePath), "utf8")
 ]);
 const manifest = JSON.parse(manifestText);
 const repositoryUrl = typeof manifest.repository === "string" ? manifest.repository : manifest.repository?.url;
@@ -50,7 +52,15 @@ const licensingErrors = [
   repositoryUrl === "https://github.com/WangTW98/MindFlow.git" ? "" : "package.json must point to the public MindFlow source repository",
   normalizedLicenseText.includes("GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3, 19 November 2007") ? "" : "LICENSE.txt must contain the complete GNU AGPL v3 text",
   /All rights reserved|proprietary|No permission is granted|UNLICENSED/iu.test(normalizedLicenseText) ? "LICENSE.txt still contains proprietary licensing terms" : "",
-  readmeText.includes("## License") && readmeText.includes("AGPL-3.0-only") ? "" : "README.md must describe the AGPL-3.0-only license"
+  githubReadmeText.includes("## License") && githubReadmeText.includes("AGPL-3.0-only") && githubReadmeText.includes("https://github.com/WangTW98/MindFlow")
+    ? ""
+    : "README.md must contain the Chinese project overview and AGPL source notice",
+  marketplaceReadmeText.includes("# MindFlow 产品思维画布") && marketplaceReadmeText.includes("尚未发布到 VS Code Marketplace")
+    ? ""
+    : "README.vscode.md must contain the Chinese VSIX installation notice",
+  marketplaceReadmeText.includes("AGPL-3.0-only") && marketplaceReadmeText.includes("https://github.com/WangTW98/MindFlow")
+    ? ""
+    : "README.vscode.md must contain the AGPL source notice"
 ].filter(Boolean);
 
 if (licensingErrors.length) {

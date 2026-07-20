@@ -1,19 +1,33 @@
 {
   "name": "mindflow-canvas-editor",
-  "displayName": "MindFlow Canvas Editor",
-  "description": "Edit .mindflow ProductFlow node canvases locally in VS Code.",
+  "displayName": "MindFlow 产品思维画布",
+  "description": "面向产品经理的结构化产品思维画布：使用节点、连线、应用形态、业务域、角色与状态描述产品，并通过 MCP 与 Agent Skills 支持可审阅的 AI 辅助分析和渐进式编辑。",
   "version": "0.1.0",
   "publisher": "mindflow",
   "repository": {
     "type": "git",
     "url": "https://github.com/WangTW98/MindFlow.git"
   },
+  "homepage": "https://github.com/WangTW98/MindFlow#readme",
+  "bugs": {
+    "url": "https://github.com/WangTW98/MindFlow/issues"
+  },
   "license": "AGPL-3.0-only",
   "engines": {
     "vscode": "^1.92.0"
   },
   "categories": [
+    "Visualization",
     "Other"
+  ],
+  "keywords": [
+    "产品经理",
+    "思维导图",
+    "产品设计",
+    "业务流程",
+    "MCP",
+    "Agent",
+    "ProductFlow"
   ],
   "activationEvents": [
     "onStartupFinished",
@@ -67,7 +81,7 @@
     "customEditors": [
       {
         "viewType": "mindflow.productFlow",
-        "displayName": "MindFlow Product Flow",
+        "displayName": "MindFlow 产品思维画布",
         "selector": [
           {
             "filenamePattern": "*.mindflow"
@@ -87,31 +101,31 @@
     "commands": [
       {
         "command": "mindflow.newFlow",
-        "title": "MindFlow: New Blank Flow"
+        "title": "MindFlow: 新建空白画布"
       },
       {
         "command": "mindflow.openFlow",
-        "title": "MindFlow: Open Product Flow"
+        "title": "MindFlow: 打开产品流程"
       },
       {
         "command": "mindflow.saveFlowAs",
-        "title": "MindFlow: Save Flow As..."
+        "title": "MindFlow: 画布另存为..."
       },
       {
         "command": "mindflow.validateFlowJson",
-        "title": "MindFlow: Validate Flow JSON"
+        "title": "MindFlow: 校验画布 JSON"
       },
       {
         "command": "mindflow.copyGlobalMcpConfig",
-        "title": "MindFlow: Copy Global MCP Config"
+        "title": "MindFlow: 复制全局 MCP 配置"
       },
       {
         "command": "mindflow.exportAgentSkills",
-        "title": "MindFlow: Export Agent Skills"
+        "title": "MindFlow: 导出 Agent Skills"
       },
       {
         "command": "mindflow.showMcpConnectionStatus",
-        "title": "MindFlow: Show MCP Connection Status"
+        "title": "MindFlow: 查看 MCP 连接状态"
       }
     ],
     "configuration": {
@@ -120,13 +134,18 @@
         "mindflow.storage.flowDirectory": {
           "type": "string",
           "default": ".mindflow/flows",
-          "description": "Workspace-relative directory where MindFlow ProductFlow files are stored."
+          "description": "用于存放 MindFlow ProductFlow 文件的工作区相对目录。"
         },
         "mindflow.security.externalFileAccess": {
           "type": "string",
           "enum": ["prompt", "allow", "workspaceOnly"],
+          "enumDescriptions": [
+            "访问工作区外的本地 .mindflow 文件前询问用户。",
+            "允许 MCP 访问工作区外的本地 .mindflow 文件。",
+            "仅允许 MCP 访问当前工作区内的本地 .mindflow 文件。"
+          ],
           "default": "prompt",
-          "description": "Controls whether MCP may open .mindflow files outside the current VS Code workspace."
+          "description": "控制 MCP 是否可以打开当前 VS Code 工作区之外的本地 .mindflow 文件。"
         }
       }
     }
@@ -149,7 +168,7 @@
     "test:extension": "npm run compile && tsc -p ./tsconfig.test.json && node scripts/run-extension-e2e.mjs",
     "check": "npm run check:agent-skills && npm run lint && npm test && npm run typecheck && npm run smoke:webview && npm run compile && npm run check:package && npm run coverage",
     "watch": "npm run build:webview && tsc -watch -p ./",
-    "package": "vsce package --no-dependencies",
+    "package": "vsce package --no-dependencies --readme-path README.vscode.md",
     "test": "node scripts/run-tests.mjs"
   },
   "devDependencies": {

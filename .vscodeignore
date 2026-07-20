@@ -26,6 +26,7 @@ assets/**
 !assets/webview/sidebar/
 !assets/webview/sidebar/media/**
 eslint.config.mjs
+README.md
 plan.md
 todo.md
 tsconfig*.json
