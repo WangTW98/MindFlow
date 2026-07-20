@@ -19,7 +19,6 @@ export function createFlowEdge(flow: ProductFlow, input: CreateEdgeInput): FlowE
   validateEndpoint(flow, from);
   validateEndpoint(flow, to);
   const type = input.type === undefined ? "interaction" : requireEdgeType(input.type);
-  assertSingleTargetOutlet(flow, from, type);
   const trigger = sanitizeText(input.trigger, "连接");
   const fromId = endpointStorageId(from);
   const toId = endpointStorageId(to);
@@ -49,7 +48,6 @@ export function updateFlowEdgeDetails(flow: ProductFlow, edgeId: string, patch: 
   const nextFrom = patch.from === undefined ? edge.from : normalizeEndpoint(patch.from);
   const nextType = patch.type === undefined ? edge.type : requireEdgeType(patch.type);
   validateEndpoint(flow, nextFrom);
-  assertSingleTargetOutlet(flow, nextFrom, nextType, edge.edgeId);
   if (patch.from !== undefined) {
     edge.from = nextFrom;
     edge.fromNodeId = endpointStorageId(nextFrom);
@@ -79,35 +77,6 @@ export function updateFlowEdgeDetails(flow: ProductFlow, edgeId: string, patch: 
   return edge;
 }
 
-const SINGLE_TARGET_EDGE_TYPES = new Set(["interaction", "autoNavigate", "statusChange"]);
-
-function assertSingleTargetOutlet(flow: ProductFlow, from: FlowEdge["from"], type: FlowEdge["type"], excludeEdgeId?: string): void {
-  if ((from.kind !== "featureGroup" && from.kind !== "featureItem") || !SINGLE_TARGET_EDGE_TYPES.has(type)) {
-    return;
-  }
-  const conflict = flow.edges.find((edge) =>
-    edge.status === "active" &&
-    edge.edgeId !== excludeEdgeId &&
-    SINGLE_TARGET_EDGE_TYPES.has(edge.type) &&
-    sameOutlet(edge.from, from)
-  );
-  if (conflict) {
-    throw new Error(`Feature outlet ${outletKey(from)} already has active ${conflict.type} edge ${conflict.edgeId}; interaction, autoNavigate, and statusChange share a single-target limit.`);
-  }
-}
-
-function sameOutlet(left: FlowEdge["from"], right: FlowEdge["from"]): boolean {
-  if (left.kind !== right.kind || left.nodeId !== right.nodeId) return false;
-  if (left.kind === "featureGroup" && right.kind === "featureGroup") return left.groupId === right.groupId;
-  if (left.kind === "featureItem" && right.kind === "featureItem") return left.groupId === right.groupId && left.itemId === right.itemId;
-  return false;
-}
-
-function outletKey(endpoint: FlowEdge["from"]): string {
-  if (endpoint.kind === "featureGroup") return `${endpoint.nodeId}/${endpoint.groupId}`;
-  if (endpoint.kind === "featureItem") return `${endpoint.nodeId}/${endpoint.groupId}/${endpoint.itemId}`;
-  return endpoint.nodeId;
-}
 
 export function refreshFlowEdgeDerivedState(flow: ProductFlow, edge: FlowEdge): FlowEdge {
   edge.fromNodeId = endpointStorageId(edge.from);

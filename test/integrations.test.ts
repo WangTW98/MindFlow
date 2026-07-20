@@ -7,24 +7,32 @@ import test from "node:test";
 
 const root = process.cwd();
 const sharedSkills = path.join(root, "agent-assets/skills");
-const skillNames = ["mindflow-task-orchestrator", "mindflow-canvas-authoring", "mindflow-from-documents", "mindflow-from-code"];
+const skillNames = ["mindflow-product-analysis", "mindflow-task-orchestrator", "mindflow-from-documents", "mindflow-from-code", "mindflow-from-canvas", "mindflow-canvas-authoring"];
 
-test("standalone Agent assets retain the four canonical MindFlow skills without client plugins", async () => {
+test("packaged Agent assets retain six canonical MindFlow skills and generated client mirrors", async () => {
   for (const name of skillNames) {
     const canonical = await fs.readFile(path.join(sharedSkills, name, "SKILL.md"), "utf8");
     assert.equal(canonical.includes("[TODO:"), false);
+    for (const client of ["codex", "claude"]) {
+      const mirrored = await fs.readFile(path.join(root, "integrations", client, "mindflow-product-mapper", "skills", name, "SKILL.md"), "utf8");
+      assert.equal(mirrored, canonical);
+    }
   }
   await assert.rejects(() => fs.access(path.join(root, "integrations/codex/mindflow-product-mapper/.codex-plugin/plugin.json")));
   await assert.rejects(() => fs.access(path.join(root, "integrations/claude/mindflow-product-mapper/.claude-plugin/plugin.json")));
   const vscodeIgnore = await fs.readFile(path.join(root, ".vscodeignore"), "utf8");
-  assert.ok(vscodeIgnore.includes("agent-assets/**"));
+  assert.equal(vscodeIgnore.includes("agent-assets/**"), false);
 });
 
 test("MindFlow task script creates, checkpoints, validates, and ignores recoverable task state", async () => {
   const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-task-test-"));
   const script = path.join(sharedSkills, "mindflow-task-orchestrator/scripts/mindflow_task.py");
   try {
-    const initialized = await run("python3", [script, "init", "--workspace", workspace, "--title", "Order Management", "--source-type", "code", "--source-root", "src"], root);
+    const initialized = await run("python3", [
+      script, "init", "--workspace", workspace, "--title", "Order Management",
+      "--source-type", "code", "--source-root", "src", "--mode", "code-to-canvas",
+      "--output-target", "canvas"
+    ], root);
     const task = initialized.stdout.trim();
     await run("python3", [script, "validate", "--task", task], root);
     await assert.rejects(
@@ -39,13 +47,110 @@ test("MindFlow task script creates, checkpoints, validates, and ignores recovera
     const ignore = await fs.readFile(path.join(workspace, ".gitignore"), "utf8");
     assert.ok(main.includes('task_status: "analyzing"'));
     assert.ok(main.includes('next_action: "analyze part-002"'));
+    assert.ok(main.includes('mode: "code-to-canvas"'));
+    assert.ok(main.includes('output_target: "canvas"'));
     assert.ok(checkpoints.includes("part-001-orders"));
     assert.ok(ignore.includes(".mindflow/tasks/"));
-    for (const relative of ["source_inventory.md", "analysis_summary.md", "graph/graph_summary.md", "state/entity_index.md", "state/generation_state.md", "reports/final_validation.md"]) {
+    for (const relative of [
+      "source_inventory.md", "requirement_ledger.md", "analysis_summary.md", "analysis_packet.json",
+      "graph/graph_summary.md", "state/entity_index.md", "state/generation_state.md", "state/batch_plan.json",
+      "reports/semantic_validation.md", "reports/final_validation.md"
+    ]) {
       assert.equal((await fs.stat(path.join(task, relative))).isFile(), true);
     }
   } finally {
     await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("MindFlow deliverable tasks require analysis synthesis but not canvas graph generation", async () => {
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-deliverable-task-test-"));
+  const script = path.join(sharedSkills, "mindflow-task-orchestrator/scripts/mindflow_task.py");
+  try {
+    const initialized = await run("python3", [
+      script, "init", "--workspace", workspace, "--title", "Canvas PRD",
+      "--source-type", "canvas", "--mode", "canvas-to-deliverable", "--output-target", "prd"
+    ], root);
+    const task = initialized.stdout.trim();
+    await assert.rejects(
+      () => run("python3", [script, "checkpoint", "--task", task, "--phase", "delivering", "--part", "prd", "--next-action", "write PRD"], root),
+      /before at least one analysis partition exists/
+    );
+    await fs.writeFile(path.join(task, "analysis/part-001-canvas.md"), "# Canvas\n\nstatus: completed\n", "utf8");
+    await fs.writeFile(path.join(task, "analysis_summary.md"), "# Analysis Summary\n\nsynthesis_status: completed\n", "utf8");
+    await run("python3", [script, "checkpoint", "--task", task, "--phase", "delivering", "--part", "prd", "--next-action", "write PRD"], root);
+    await run("python3", [script, "checkpoint", "--task", task, "--phase", "completed", "--part", "prd-complete", "--next-action", "deliver PRD"], root);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("Product-analysis packet validation preserves evidence and inference boundaries", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-analysis-packet-test-"));
+  const validator = path.join(sharedSkills, "mindflow-product-analysis/scripts/validate_analysis_packet.py");
+  const template = path.join(sharedSkills, "mindflow-product-analysis/assets/analysis-packet.template.json");
+  try {
+    await run("python3", [validator, template], root);
+    const valid = JSON.parse(await fs.readFile(template, "utf8")) as Record<string, unknown>;
+    valid.requirements = [{
+      semanticKey: "requirement:approve-order",
+      origin: "explicit",
+      confidence: "high",
+      evidenceRefs: ["prd.md#approval"]
+    }, {
+      semanticKey: "requirement:approval-notification",
+      origin: "inferred",
+      confidence: "medium",
+      evidenceRefs: [],
+      reason: "The documented approval transition has no stated user feedback."
+    }];
+    const validPath = path.join(directory, "valid.json");
+    await fs.writeFile(validPath, `${JSON.stringify(valid, null, 2)}\n`, "utf8");
+    await run("python3", [validator, validPath], root);
+
+    (valid.requirements as Array<Record<string, unknown>>)[1]!.reason = "";
+    const invalidPath = path.join(directory, "invalid.json");
+    await fs.writeFile(invalidPath, `${JSON.stringify(valid, null, 2)}\n`, "utf8");
+    await assert.rejects(() => run("python3", [validator, invalidPath], root), /inferred records require reason/);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("Product-analysis graph batches are dependency ordered and respect progressive limits", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-progressive-batches-test-"));
+  const builder = path.join(sharedSkills, "mindflow-product-analysis/scripts/build_canvas_batches.py");
+  try {
+    const entities = [
+      { entity: "edge", localRef: "edge-a-b", from: { kind: "node", nodeRef: "a" }, to: { kind: "node", nodeRef: "b" } },
+      { entity: "node", localRef: "a", title: "A" },
+      { entity: "root", title: "Product" },
+      { entity: "appSurface", localRef: "web", name: "Web", type: "web" },
+      { entity: "node", localRef: "b", title: "B" },
+      { entity: "edge", localRef: "edge-b-a", from: { kind: "node", nodeRef: "b" }, to: { kind: "node", nodeRef: "a" } }
+    ];
+    const input = path.join(directory, "graph.json");
+    const output = path.join(directory, "batches.json");
+    await fs.writeFile(input, `${JSON.stringify({ entities }, null, 2)}\n`, "utf8");
+    await run("python3", [builder, input, "--output", output, "--max-operations", "3", "--max-nodes", "1", "--max-edges", "1"], root);
+    const plan = JSON.parse(await fs.readFile(output, "utf8")) as {
+      schemaVersion: number;
+      batches: Array<{ batchId: string; operations: Array<{ op: string }> }>;
+    };
+    assert.equal(plan.schemaVersion, 1);
+    assert.ok(plan.batches.length >= 3);
+    assert.deepEqual(plan.batches.map((batch) => batch.batchId), plan.batches.map((_, index) => `batch-${String(index + 1).padStart(3, "0")}`));
+    for (const batch of plan.batches) {
+      assert.ok(batch.operations.length <= 3);
+      assert.ok(batch.operations.filter((operation) => operation.op === "node.upsert").length <= 1);
+      assert.ok(batch.operations.filter((operation) => operation.op === "edge.upsert").length <= 1);
+    }
+    const operations = plan.batches.flatMap((batch) => batch.operations.map((operation) => operation.op));
+    assert.ok(operations.indexOf("root.update") < operations.indexOf("taxonomy.upsert"));
+    assert.ok(operations.indexOf("taxonomy.upsert") < operations.indexOf("node.upsert"));
+    assert.ok(operations.lastIndexOf("node.upsert") < operations.indexOf("edge.upsert"));
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
   }
 });
 

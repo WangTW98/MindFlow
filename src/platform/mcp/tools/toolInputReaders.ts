@@ -18,7 +18,6 @@ import {
 } from "./readers";
 import type { IdMaps } from "./types";
 import type { FlowSelectionPatch } from "../../../product-flow/domain/selection";
-import { assertMcpNodeFeatureGroups } from "./authoringValidation";
 
 export function taxonomyUpsertOperation(input: Record<string, unknown>, kind: TaxonomyKind): FlowOperation {
   const item = asRecord(input.item ?? input);
@@ -42,7 +41,6 @@ export function nodeUpsertOperations(flow: ProductFlow, input: Record<string, un
     }
     return operations;
   }
-  assertMcpNodeFeatureGroups(patch.featureGroups);
   const detailPatch: UpdateNodeDetailsInput = stripUndefined({
     statusGroupId: patch.statusGroupId,
     permissions: patch.permissions,
@@ -70,9 +68,6 @@ export function nodeUpsertOperations(flow: ProductFlow, input: Record<string, un
 
 export function readNodeDetailsPatch(input: Record<string, unknown>): UpdateNodeDetailsInput {
   const featureGroups = Array.isArray(input.featureGroups) ? input.featureGroups as FeatureGroup[] : undefined;
-  if (input.featureGroups !== undefined) {
-    assertMcpNodeFeatureGroups(featureGroups);
-  }
   return {
     title: readStringPatch(input, "title") ?? readStringPatch(input, "name"),
     pageType: readNodePageType(input.pageType),
@@ -130,6 +125,8 @@ export function schemaPayload(): Record<string, unknown> {
 
 export function capabilitiesPayload(): Record<string, unknown> {
   return {
+    modelVersion: 1,
+    skillContractVersion: 1,
     tools: MINDFLOW_MCP_TOOLS.map((tool) => tool.name),
     writesDirectFiles: false,
     requiresUserSave: true,
@@ -138,6 +135,13 @@ export function capabilitiesPayload(): Record<string, unknown> {
     supportsDryRun: true,
     supportsAtomicChangesets: true,
     supportsPagedEntityQuery: true,
+    supportsRevisionPinnedReads: true,
+    supportsSubgraphReads: true,
+    supportsPathTracing: true,
+    supportsCanvasReveal: true,
+    supportsDomMeasuredAutoLayout: true,
+    supportsNodeDuplication: true,
+    progressiveAuthoringDefaults: { maxOperations: 30, maxNodes: 8, maxEdges: 16 },
     genericNodePageTypes: [...NODE_PAGE_TYPES],
     edgeTypes: [...EDGE_TYPES],
     maxChangesetNodes: 40,

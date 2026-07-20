@@ -120,7 +120,7 @@ test("MindFlow MCP editor state is compact and returns complete selection", asyn
   assert.ok((state.capabilities as Record<string, unknown>).supportsBatchNodeOperations);
 });
 
-test("MindFlow MCP queries entities with pagination and validates authoring rules", async () => {
+test("MindFlow MCP queries entities with pagination while leaving authoring policy to skills", async () => {
   const flow = createEmptyProductFlow();
   createFlowNode(flow, { title: "A", pageType: "page" });
   createFlowNode(flow, { title: "B", pageType: "component" });
@@ -136,18 +136,16 @@ test("MindFlow MCP queries entities with pagination and validates authoring rule
   });
   assert.equal((second.items as unknown[]).length, 1);
 
-  for (const type of EDGE_TYPES) {
-    await assert.rejects(() => handlers.callTool("mindflow_upsert_edge", {
-      from: { kind: "node", nodeId: flow.nodes[0]!.nodeId },
-      to: { kind: "node", nodeId: flow.nodes[1]!.nodeId },
-      type,
-      cardOutletReason: "legacy whole-node reason"
-    }), /featureItem or featureGroup/);
-  }
-  await assert.rejects(() => handlers.callTool("mindflow_upsert_node", {
+  await handlers.callTool("mindflow_upsert_edge", {
+    from: { kind: "node", nodeId: flow.nodes[0]!.nodeId },
+    to: { kind: "node", nodeId: flow.nodes[1]!.nodeId },
+    type: "interaction",
+    cardOutletReason: "whole-node event"
+  });
+  await handlers.callTool("mindflow_upsert_node", {
     title: "缺少语义功能的页面",
     pageType: "page"
-  }), /explicit feature group/);
+  });
   await assert.rejects(() => handlers.callTool("mindflow_upsert_edge", {
     from: { kind: "featureItem", nodeId: flow.nodes[0]!.nodeId, groupId: "missing", itemId: "missing" },
     to: { kind: "node", nodeId: flow.nodes[1]!.nodeId }
@@ -193,6 +191,10 @@ test("MindFlow MCP changesets resolve nested local refs, dry-run, and commit ato
   assert.equal((dryRun.summary as { nodes: number }).nodes, 2);
   assert.equal((dryRun.idMap as Record<string, Record<string, string>>).featureItems?.["approve-item"]?.startsWith("item_"), true);
   assert.equal((dryRun.idMap as Record<string, Record<string, string>>).edges?.["approve-edge"]?.startsWith("edge_"), true);
+  const createdIds = (dryRun.changeSummary as { createdIds: string[] }).createdIds;
+  assert.ok(createdIds.includes((dryRun.idMap as Record<string, Record<string, string>>).statusGroups!["review-status"]!));
+  assert.ok(createdIds.includes((dryRun.idMap as Record<string, Record<string, string>>).nodes!["pending-node"]!));
+  assert.ok(createdIds.includes((dryRun.idMap as Record<string, Record<string, string>>).edges!["approve-edge"]!));
 
   const committed = await handlers.callTool("mindflow_apply_canvas_changes", {
     expectedRevision: 1, dryRun: false, operations
@@ -203,6 +205,7 @@ test("MindFlow MCP changesets resolve nested local refs, dry-run, and commit ato
   const statusEdge = bridge.flow.edges.find((edge) => edge.type === "statusChange");
   assert.equal(statusEdge?.type, "statusChange");
   assert.equal(statusEdge?.from.kind, "featureItem");
+  assert.equal(statusEdge?.edgeId, (committed.idMap as Record<string, Record<string, string>>).edges!["approve-edge"]);
 
   const conflict = handlers.callTool("mindflow_apply_canvas_changes", {
     expectedRevision: 1, dryRun: true, operations: [{ op: "root.update", title: "冲突" }]
@@ -210,7 +213,7 @@ test("MindFlow MCP changesets resolve nested local refs, dry-run, and commit ato
   await assert.rejects(() => conflict, /revision conflict/);
 });
 
-test("MindFlow MCP changeset dry-run reports invalid orange outlet without modifying the canvas", async () => {
+test("MindFlow MCP changeset accepts structurally valid card outlets without applying a dry-run", async () => {
   const flow = createEmptyProductFlow();
   const first = createFlowNode(flow, { title: "来源", pageType: "page" });
   const second = createFlowNode(flow, { title: "目标", pageType: "page" });
@@ -223,12 +226,13 @@ test("MindFlow MCP changeset dry-run reports invalid orange outlet without modif
     operations: [{ op: "edge.upsert", from: { kind: "node", nodeRef: first.nodeId }, to: { kind: "node", nodeRef: second.nodeId }, type: "interaction" }]
   });
   assert.equal(result.applied, false);
-  assert.ok((result.errors as string[]).some((item) => item.includes("featureItem or featureGroup")));
+  assert.deepEqual(result.errors ?? [], []);
+  assert.equal((result.validation as { valid: boolean }).valid, true);
   assert.equal(bridge.applyCount, 0);
   assert.equal(bridge.flow.edges.length, 0);
 });
 
-test("MindFlow MCP app-surface entry must target its unique skeleton", async () => {
+test("MindFlow MCP leaves application entry methodology to external skills", async () => {
   const flow = createEmptyProductFlow();
   flow.appSurfaces = [{
     appId: "app_admin",
@@ -265,15 +269,13 @@ test("MindFlow MCP app-surface entry must target its unique skeleton", async () 
   });
 
   assert.equal(result.applied, false);
-  assert.ok(
-    (result.errors as string[]).some((item) => item.includes("app-surface entry") && item.includes("skeleton")),
-    JSON.stringify(result.errors)
-  );
+  assert.deepEqual(result.errors ?? [], []);
+  assert.equal((result.validation as { valid: boolean }).valid, true);
   assert.equal(bridge.applyCount, 0);
   assert.equal(bridge.flow.edges.length, 0);
 });
 
-test("MindFlow MCP rejects orphan authored nodes while structural save validation permits them", async () => {
+test("MindFlow MCP validates the same structural contract as manual editing", async () => {
   const flow = createEmptyProductFlow();
   createFlowNode(flow, {
     title: "未连接页面",
@@ -291,8 +293,8 @@ test("MindFlow MCP rejects orphan authored nodes while structural save validatio
   const handlers = new MindFlowMcpToolHandlers(bridge);
 
   const validation = await handlers.callTool("mindflow_validate_flow", {});
-  assert.equal(validation.valid, false);
-  assert.ok((validation.errors as string[]).some((error) => error.includes("no active incoming edge")));
+  assert.equal(validation.valid, true);
+  assert.deepEqual(validation.errors, []);
 
   const dryRun = await handlers.callTool("mindflow_apply_canvas_changes", {
     expectedRevision: flow.revision,
@@ -306,11 +308,12 @@ test("MindFlow MCP rejects orphan authored nodes while structural save validatio
     }]
   });
   assert.equal(dryRun.applied, false);
-  assert.ok((dryRun.errors as string[]).some((error) => error.includes("no active incoming edge")));
+  assert.deepEqual(dryRun.errors ?? [], []);
+  assert.equal((dryRun.validation as { valid: boolean }).valid, true);
   assert.equal(bridge.applyCount, 0);
 });
 
-test("MindFlow MCP keeps layout components on skeletons but requires child navigation to come from its parent navigation", async () => {
+test("MindFlow MCP accepts alternate navigation models for skill-level review", async () => {
   const flow = createEmptyProductFlow();
   const handlers = new MindFlowMcpToolHandlers(new FakeBridge(flow));
   const operations = [
@@ -355,7 +358,8 @@ test("MindFlow MCP keeps layout components on skeletons but requires child navig
     }]
   });
   assert.equal(invalid.applied, false);
-  assert.ok((invalid.errors as string[]).some((error) => error.includes("multiple active hierarchy parents") || error.includes("exactly one active hierarchy parent")));
+  assert.deepEqual(invalid.errors ?? [], []);
+  assert.equal((invalid.validation as { valid: boolean }).valid, true);
 });
 
 test("MindFlow MCP can set and clear complete selection state", async () => {
@@ -451,6 +455,68 @@ test("MindFlow MCP covers root, app surface, taxonomy, generic nodes, and edges"
   assert.equal(bridge.flow.nodes.find((node) => node.nodeId === popupNode.nodeId)?.status, "removed");
 });
 
+test("MindFlow MCP duplicates nodes and partially updates edges with manual-equivalent operations", async () => {
+  const flow = createEmptyProductFlow();
+  const source = createFlowNode(flow, { title: "来源", pageType: "page", x: 10, y: 20 });
+  const target = createFlowNode(flow, { title: "目标", pageType: "page", x: 300, y: 200 });
+  const edge = createFlowEdge(flow, { from: { kind: "node", nodeId: source.nodeId }, to: { kind: "node", nodeId: target.nodeId }, type: "interaction", trigger: "打开" });
+  const bridge = new FakeBridge(flow);
+  const handlers = new MindFlowMcpToolHandlers(bridge);
+
+  await handlers.callTool("mindflow_update_edge", { edgeId: edge.edgeId, condition: "具有权限" });
+  assert.equal(bridge.flow.edges.find((item) => item.edgeId === edge.edgeId)?.condition, "具有权限");
+
+  const duplicated = await handlers.callTool("mindflow_duplicate_nodes", {
+    nodeIds: [source.nodeId, target.nodeId], primaryNodeId: target.nodeId, x: 800, y: 500
+  });
+  const copied = (duplicated.result as Record<string, unknown>).nodes as Array<{ nodeId: string; title: string; view?: { position?: { x: number; y: number } } }>;
+  assert.equal(copied.length, 2);
+  assert.deepEqual(copied.map((node) => node.title), ["来源 副本", "目标 副本"]);
+  assert.deepEqual(copied.map((node) => node.view?.position), [{ x: 800, y: 500 }, { x: 1090, y: 680 }]);
+  assert.equal(bridge.selection.selectedNodeId, copied[1]!.nodeId);
+  await assert.rejects(() => handlers.callTool("mindflow_duplicate_nodes", {
+    nodeIds: [source.nodeId], primaryNodeId: target.nodeId, x: 0, y: 0
+  }), /primaryNodeId must be included/);
+});
+
+test("MindFlow MCP reads revision-pinned subgraphs and traces directed paths", async () => {
+  const flow = createEmptyProductFlow();
+  const first = createFlowNode(flow, { title: "A", pageType: "page" });
+  const second = createFlowNode(flow, { title: "B", pageType: "page" });
+  const third = createFlowNode(flow, { title: "C", pageType: "page" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: first.nodeId }, to: { kind: "node", nodeId: second.nodeId }, type: "interaction" });
+  createFlowEdge(flow, { from: { kind: "node", nodeId: second.nodeId }, to: { kind: "node", nodeId: third.nodeId }, type: "autoNavigate" });
+  const handlers = new MindFlowMcpToolHandlers(new FakeBridge(flow));
+
+  const subgraph = await handlers.callTool("mindflow_get_subgraph", { expectedRevision: flow.revision, nodeIds: [first.nodeId], direction: "outgoing", depth: 1 });
+  assert.deepEqual((subgraph.nodes as Array<{ nodeId: string }>).map((node) => node.nodeId), [first.nodeId, second.nodeId]);
+  assert.equal((subgraph.edges as unknown[]).length, 1);
+  assert.deepEqual(subgraph.boundaryNodeIds, [second.nodeId]);
+  const traced = await handlers.callTool("mindflow_trace_paths", { expectedRevision: flow.revision, fromId: first.nodeId, toId: third.nodeId });
+  assert.deepEqual((traced.paths as Array<{ nodeIds: string[] }>)[0]?.nodeIds, [first.nodeId, second.nodeId, third.nodeId]);
+  await assert.rejects(() => handlers.callTool("mindflow_get_subgraph", { expectedRevision: flow.revision - 1, nodeIds: [first.nodeId] }), /revision conflict/);
+  await assert.rejects(() => handlers.callTool("mindflow_get_subgraph", { expectedRevision: flow.revision, nodeIds: ["missing"] }), /unknown ids/);
+});
+
+test("MindFlow MCP previews/applies DOM layout and reveals cards without changing selection", async () => {
+  const flow = createEmptyProductFlow();
+  const node = createFlowNode(flow, { title: "页面", pageType: "page", x: 10, y: 20 });
+  const bridge = new FakeBridge(flow);
+  const handlers = new MindFlowMcpToolHandlers(bridge);
+  const preview = await handlers.callTool("mindflow_preview_auto_layout", { expectedRevision: flow.revision });
+  assert.deepEqual((preview.layout as { nodePositions: Record<string, unknown> }).nodePositions[node.nodeId], { x: 640, y: 160 });
+  const applied = await handlers.callTool("mindflow_apply_auto_layout", { expectedRevision: flow.revision, dryRun: false });
+  assert.equal(applied.applied, true);
+  assert.deepEqual(bridge.flow.nodes.find((item) => item.nodeId === node.nodeId)?.view?.position, { x: 640, y: 160 });
+  const selectionBefore = { ...bridge.selection };
+  await handlers.callTool("mindflow_reveal_entities", { targets: [{ kind: "node", id: node.nodeId }] });
+  assert.deepEqual(bridge.revealed, [{ kind: "node", id: node.nodeId }]);
+  assert.deepEqual(bridge.selection, selectionBefore);
+  await assert.rejects(() => handlers.callTool("mindflow_reveal_entities", {
+    targets: [{ kind: "node", id: "missing" }]
+  }), /Cannot reveal unknown active node/);
+});
+
 test("MindFlow MCP batch node operations are atomic and support dry-run", async () => {
   const bridge = new FakeBridge(createEmptyProductFlow());
   const handlers = new MindFlowMcpToolHandlers(bridge);
@@ -512,6 +578,7 @@ test("MindFlow MCP batch node operations are atomic and support dry-run", async 
 class FakeBridge implements MindFlowEditorBridge {
   public applyCount = 0;
   public selection: FlowSelectionState;
+  public revealed: Array<{ kind: "projectOverview" | "appSurface" | "node"; id: string }> = [];
 
   public constructor(public flow: ProductFlow, selection: FlowSelectionPatch = {}) {
     this.selection = { ...emptyFlowSelection(), ...selection };
@@ -528,6 +595,18 @@ class FakeBridge implements MindFlowEditorBridge {
   public async setSelection(_flowUri: string, selection: FlowSelectionPatch): Promise<MindFlowEditorSnapshot> {
     this.selection = { ...emptyFlowSelection(), ...selection };
     return this.snapshot(true);
+  }
+
+  public async previewAutoLayout() {
+    return {
+      projectOverviewPosition: { x: 0, y: 0 },
+      appSurfacePositions: Object.fromEntries(this.flow.appSurfaces.map((surface, index) => [surface.appId, { x: 320, y: index * 200 }])),
+      nodePositions: Object.fromEntries(this.flow.nodes.filter((node) => node.status !== "removed").map((node, index) => [node.nodeId, { x: 640, y: index * 320 + 160 }]))
+    };
+  }
+
+  public async revealEntities(_flowUri: string, targets: Array<{ kind: "projectOverview" | "appSurface" | "node"; id: string }>): Promise<void> {
+    this.revealed = targets;
   }
 
   public async applyFlowEdit(_flowUri: string, flow: ProductFlow, selection?: FlowSelectionPatch): Promise<MindFlowEditorSnapshot> {

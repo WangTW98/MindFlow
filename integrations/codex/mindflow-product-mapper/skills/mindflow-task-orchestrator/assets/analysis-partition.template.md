@@ -8,6 +8,12 @@ status: pending
 
 ## Product conclusions
 
+## Requirements and acceptance evidence
+
+## Actors, ownership, permissions, and data boundaries
+
+## Journeys, alternatives, failures, and recovery
+
 ## Project overview and goal evidence
 
 ## Root, application, and generic-node candidates
@@ -27,5 +33,7 @@ For each application candidate, record positioning, users, responsibilities, jou
 ## Evidence
 
 ## Inferences and confidence
+
+## Conflicts and duplicates
 
 ## Unresolved

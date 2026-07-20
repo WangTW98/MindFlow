@@ -2,6 +2,8 @@ const SELECTION_RELATION_CARD_HIGHLIGHT_CLASS = "relation-card-highlight";
 const SELECTION_RELATION_CARD_HIGHLIGHT_DURATION_MS = 2400;
 let selectionRelationCardHighlightTimer = null;
 let highlightedSelectionRelationCard = null;
+let revealedEntityCards = [];
+let revealedEntityCardsTimer = null;
 
 function renderSelectionRelationsPanel(flow, selectedNode, selectedEdge) {
   const groups = getSelectionRelationGroups(flow, selectedNode, selectedEdge);
@@ -204,6 +206,27 @@ function clearSelectionRelationCardHighlight() {
   if (highlightedSelectionRelationCard) {
     highlightedSelectionRelationCard.classList.remove(SELECTION_RELATION_CARD_HIGHLIGHT_CLASS);
     highlightedSelectionRelationCard = null;
+  }
+}
+
+function flashRevealedEntityCards(cards) {
+  if (revealedEntityCardsTimer !== null) {
+    clearTimeout(revealedEntityCardsTimer);
+    revealedEntityCardsTimer = null;
+  }
+  revealedEntityCards.forEach((card) => card.classList.remove(SELECTION_RELATION_CARD_HIGHLIGHT_CLASS));
+  revealedEntityCards = Array.from(new Set((cards || []).filter(Boolean)));
+  revealedEntityCards.forEach((card) => {
+    card.classList.remove(SELECTION_RELATION_CARD_HIGHLIGHT_CLASS);
+    void card.offsetWidth;
+    card.classList.add(SELECTION_RELATION_CARD_HIGHLIGHT_CLASS);
+  });
+  if (revealedEntityCards.length > 0) {
+    revealedEntityCardsTimer = setTimeout(() => {
+      revealedEntityCards.forEach((card) => card.classList.remove(SELECTION_RELATION_CARD_HIGHLIGHT_CLASS));
+      revealedEntityCards = [];
+      revealedEntityCardsTimer = null;
+    }, SELECTION_RELATION_CARD_HIGHLIGHT_DURATION_MS);
   }
 }
 

@@ -18,12 +18,18 @@ import {
   createFlowWebviewHtml
 } from "./webviewShellHtml";
 import { parseWebviewMessage, type WebviewMessage } from "../../../webview/protocol/flowWebviewMessages";
+import type { MindFlowAutoLayoutPreview, MindFlowRevealTarget } from "../../../mcp/protocol/bridge";
 
 export class FlowEditorSession {
   private flow: ProductFlow | undefined;
   private hasRenderedHtml = false;
   private messageQueue: Promise<void> = Promise.resolve();
   private readonly latestEdgeDetailsRevisions = new Map<string, number>();
+  private readonly autoLayoutRequests = new Map<string, {
+    resolve(value: MindFlowAutoLayoutPreview): void;
+    reject(error: Error): void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
 
   public constructor(
     private readonly extensionUri: vscode.Uri,
@@ -87,6 +93,27 @@ export class FlowEditorSession {
     void this.panel.webview.postMessage({ type: "selectionChanged", selection });
   }
 
+  public requestAutoLayout(): Promise<MindFlowAutoLayoutPreview> {
+    const requestId = `layout_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.autoLayoutRequests.delete(requestId);
+        reject(new Error("MindFlow canvas did not return an auto-layout preview in time."));
+      }, 5000);
+      this.autoLayoutRequests.set(requestId, { resolve, reject, timer });
+      void this.panel.webview.postMessage({ type: "autoLayoutRequested", requestId }).then((posted) => {
+        if (posted) return;
+        clearTimeout(timer);
+        this.autoLayoutRequests.delete(requestId);
+        reject(new Error("MindFlow canvas is not available for auto layout."));
+      });
+    });
+  }
+
+  public revealEntities(targets: MindFlowRevealTarget[], animate = true): void {
+    void this.panel.webview.postMessage({ type: "revealEntities", targets, animate });
+  }
+
   private async replaceDocumentText(document: vscode.TextDocument, text: string): Promise<void> {
     const applied = await applyDocumentTextReplacement(document, text);
     if (!applied) {
@@ -102,6 +129,19 @@ export class FlowEditorSession {
   }
 
   private async handleMessage(message: WebviewMessage): Promise<void> {
+    if (message.type === "autoLayoutComputed") {
+      const pending = this.autoLayoutRequests.get(message.requestId);
+      if (pending) {
+        clearTimeout(pending.timer);
+        this.autoLayoutRequests.delete(message.requestId);
+        pending.resolve({
+          projectOverviewPosition: message.projectOverviewPosition,
+          appSurfacePositions: message.appSurfacePositions,
+          nodePositions: message.nodePositions
+        });
+      }
+      return;
+    }
     await dispatchFlowWebviewMessage(message, {
       documentUri: this.document.uri,
       latestEdgeDetailsRevisions: this.latestEdgeDetailsRevisions,

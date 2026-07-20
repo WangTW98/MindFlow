@@ -12,6 +12,7 @@ import { createQueryToolActions } from "./queryTools";
 import { createMcpToolRegistry, type McpToolActions, type McpToolInvoker, type McpToolResult } from "./registry";
 import { createSelectionToolActions } from "./selectionTools";
 import { createTaxonomyToolActions } from "./taxonomyTools";
+import { createViewToolActions } from "./viewTools";
 export { MCP_NODE_PAGE_TYPES, type McpNodePageType } from "./types";
 
 export class MindFlowMcpToolHandlers {
@@ -24,6 +25,7 @@ export class MindFlowMcpToolHandlers {
       ...createQueryToolActions(bridge),
       ...createChangesetToolActions(bridge),
       ...createSelectionToolActions(bridge),
+      ...createViewToolActions(bridge),
       ...createTaxonomyToolActions(runner),
       ...createNodeToolActions(runner),
       ...createEdgeToolActions(runner),

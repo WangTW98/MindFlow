@@ -843,6 +843,48 @@ test("Webview message parser rejects malformed messages before command dispatch"
     appSurfacePositions: { app_admin: { x: 120.4, y: 160.6 } },
     nodePositions: { node_a: { x: 520.1, y: -40.9 } }
   });
+  assert.deepEqual(parseWebviewMessage({
+    type: "autoLayoutComputed",
+    requestId: "layout-1",
+    projectOverviewPosition: { x: 0, y: 10 },
+    appSurfacePositions: { app_admin: { x: 400, y: 20 } },
+    nodePositions: { node_a: { x: 800, y: 30 } }
+  }), {
+    type: "autoLayoutComputed",
+    requestId: "layout-1",
+    projectOverviewPosition: { x: 0, y: 10 },
+    appSurfacePositions: { app_admin: { x: 400, y: 20 } },
+    nodePositions: { node_a: { x: 800, y: 30 } }
+  });
+  assert.equal(parseWebviewMessage({
+    type: "autoLayoutComputed",
+    requestId: "layout-1",
+    projectOverviewPosition: { x: 0, y: 10 },
+    appSurfacePositions: {},
+    nodePositions: { node_a: { x: Number.NaN, y: 30 } }
+  }), undefined);
+});
+
+test("MCP canvas view requests use DOM layout and transient reveal without changing selection", async () => {
+  const [uiStateSource, autoLayoutSource, cameraSource, relationSource] = await Promise.all([
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/data/canvas-ui-state.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/layout/canvas-auto-layout-dom.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/interactions/canvas-camera.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/rendering/canvas-selection-relations.ts"), "utf8")
+  ]);
+
+  assert.ok(uiStateSource.includes('message.type === "autoLayoutRequested"'));
+  assert.ok(uiStateSource.includes("autoLayoutRespondToHostRequest(message.requestId)"));
+  assert.ok(uiStateSource.includes('message.type === "revealEntities"'));
+  assert.ok(uiStateSource.includes("revealCanvasEntities(message.targets, message.animate !== false)"));
+  assert.ok(autoLayoutSource.includes("autoLayoutCollectMeasurements()"));
+  assert.ok(autoLayoutSource.includes('type: "autoLayoutComputed"'));
+  assert.ok(cameraSource.includes("flashRevealedEntityCards(cards)"));
+  assert.ok(cameraSource.includes("canvasViewportFitForBounds(bounds"));
+  assert.ok(cameraSource.includes("focusCanvas()"));
+  assert.ok(relationSource.includes("function flashRevealedEntityCards(cards)"));
+  assert.equal(cameraSource.includes("selectNode("), false);
+  assert.equal(cameraSource.includes("selectAppSurface("), false);
 });
 
 test("Node clipboard payload is versioned, strict, and accepted by webview messages", () => {

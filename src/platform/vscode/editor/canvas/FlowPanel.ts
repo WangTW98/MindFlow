@@ -4,6 +4,7 @@ import { FlowSelectionStore } from "../FlowSelectionStore";
 import type { ProductFlow } from "../../../../product-flow/domain";
 import { FlowEditorSession } from "./FlowEditorSession";
 import type { FlowSelectionPatch, FlowSelectionState } from "../../../../product-flow/domain/selection";
+import type { MindFlowAutoLayoutPreview, MindFlowRevealTarget } from "../../../mcp/protocol/bridge";
 
 type OpenFlowCallback = (flowUri: vscode.Uri) => void;
 
@@ -68,6 +69,14 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
 
   public static getOpenFlowUri(flowUri: vscode.Uri): vscode.Uri | undefined {
     return FlowPanel.registry.getOpenFlowUri(flowUri);
+  }
+
+  public static requestAutoLayout(flowUri: vscode.Uri | string): Promise<MindFlowAutoLayoutPreview> {
+    return FlowPanel.registry.requestAutoLayout(flowUri);
+  }
+
+  public static revealEntities(flowUri: vscode.Uri | string, targets: MindFlowRevealTarget[], animate?: boolean): boolean {
+    return FlowPanel.registry.revealEntities(flowUri, targets, animate);
   }
 
   private constructor(

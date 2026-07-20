@@ -1,0 +1,4 @@
+interface:
+  display_name: "MindFlow From Canvas"
+  short_description: "Read and understand existing MindFlow canvases"
+  default_prompt: "Read the current MindFlow canvas through revision-aware MCP queries, reconstruct its product model, and produce an evidence-backed analysis or audit without changing it unless requested."

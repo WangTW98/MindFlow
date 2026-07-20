@@ -50,6 +50,9 @@ function upsertEdgeInFlow(flow: ProductFlow, input: UpsertEdgeOperationInput): {
     condition: input.condition
   });
   if (conflict) {
+    if (edgeId && conflict.edgeId !== edgeId) {
+      throw new Error(`Edge id ${edgeId} cannot replace existing edge ${conflict.edgeId} with the same endpoints.`);
+    }
     if (conflict.type !== type) {
       throw new Error(`Refusing duplicate endpoints with different edge type. Existing edge ${conflict.edgeId} uses ${conflict.type}.`);
     }
@@ -65,6 +68,9 @@ function upsertEdgeInFlow(flow: ProductFlow, input: UpsertEdgeOperationInput): {
     type,
     condition: patch.condition
   });
+  if (edgeId) {
+    edge.edgeId = edgeId;
+  }
   return { edge, mode: "created" };
 }
 

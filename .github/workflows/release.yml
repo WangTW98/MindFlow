@@ -1,0 +1,99 @@
+name: Release Snapshot
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: mindflow-vsix
+          path: dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate release artifact
+        id: artifact
+        shell: bash
+        env:
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+        run: |
+          set -euo pipefail
+          mapfile -t vsix_files < <(find dist -maxdepth 1 -type f -name '*.vsix' -print)
+          test "${#vsix_files[@]}" -eq 1
+          vsix_path="${vsix_files[0]}"
+          vsix_name="$(basename "$vsix_path")"
+          checksum_name="$vsix_name.sha256"
+          test -f "dist/$checksum_name"
+          (
+            cd dist
+            sha256sum -c "$checksum_name"
+          )
+
+          if [[ ! "$vsix_name" =~ ^mindflow-canvas-editor-([0-9]+\.[0-9]+\.([0-9]+))-([0-9a-f]{12})\.vsix$ ]]; then
+            echo "Unexpected VSIX filename: $vsix_name" >&2
+            exit 1
+          fi
+          version="${BASH_REMATCH[1]}"
+          version_run_number="${BASH_REMATCH[2]}"
+          artifact_sha="${BASH_REMATCH[3]}"
+          expected_sha="${COMMIT_SHA:0:12}"
+          test "$version_run_number" = "$CI_RUN_NUMBER"
+          test "$artifact_sha" = "$expected_sha"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=snapshot-v${version}-${expected_sha}" >> "$GITHUB_OUTPUT"
+          echo "vsix_name=$vsix_name" >> "$GITHUB_OUTPUT"
+          echo "checksum_name=$checksum_name" >> "$GITHUB_OUTPUT"
+
+      - name: Create or verify GitHub pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          TAG: ${{ steps.artifact.outputs.tag }}
+          VERSION: ${{ steps.artifact.outputs.version }}
+          VSIX_NAME: ${{ steps.artifact.outputs.vsix_name }}
+          CHECKSUM_NAME: ${{ steps.artifact.outputs.checksum_name }}
+        run: |
+          set -euo pipefail
+          if existing="$(gh release view "$TAG" --json targetCommitish,isDraft,isPrerelease,assets 2>/dev/null)"; then
+            printf '%s' "$existing" | node -e '
+              const fs = require("node:fs");
+              const release = JSON.parse(fs.readFileSync(0, "utf8"));
+              const [expectedSha, vsixName, checksumName] = process.argv.slice(1);
+              const names = new Set(release.assets.map((asset) => asset.name));
+              if (release.targetCommitish !== expectedSha || release.isDraft || !release.isPrerelease || !names.has(vsixName) || !names.has(checksumName)) {
+                process.exitCode = 1;
+              }
+            ' "$COMMIT_SHA" "$VSIX_NAME" "$CHECKSUM_NAME"
+            existing_dir="$(mktemp -d)"
+            gh release download "$TAG" --pattern "$VSIX_NAME" --pattern "$CHECKSUM_NAME" --dir "$existing_dir"
+            cmp "dist/$VSIX_NAME" "$existing_dir/$VSIX_NAME"
+            cmp "dist/$CHECKSUM_NAME" "$existing_dir/$CHECKSUM_NAME"
+            echo "Release $TAG already exists with matching commit and artifacts."
+            exit 0
+          fi
+
+          source_url="https://github.com/${GITHUB_REPOSITORY}/tree/${COMMIT_SHA}"
+          gh release create "$TAG" "dist/$VSIX_NAME" "dist/$CHECKSUM_NAME" \
+            --target "$COMMIT_SHA" \
+            --title "MindFlow Snapshot v${VERSION}" \
+            --notes "This snapshot is distributed under AGPL-3.0-only. Corresponding source: ${source_url}" \
+            --generate-notes \
+            --prerelease \
+            --latest=false

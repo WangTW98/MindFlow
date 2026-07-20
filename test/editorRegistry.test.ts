@@ -49,6 +49,24 @@ test("FlowEditorRegistry renders all panels and reveals only the first", () => {
   assert.equal(first.revealCount + second.revealCount, 1);
 });
 
+test("FlowEditorRegistry delegates DOM layout reads and broadcasts non-selecting reveals", async () => {
+  const registry = new FlowEditorRegistry();
+  const uri = fakeUri("file:///workspace/test.mindflow");
+  const document = { uri } as vscode.TextDocument;
+  const first = new FakeSession();
+  const second = new FakeSession();
+  registry.register(uri, document, first);
+  registry.register(uri, document, second);
+
+  assert.deepEqual(await registry.requestAutoLayout(uri), first.layoutPreview);
+  const targets = [{ kind: "node" as const, id: "node_a" }, { kind: "appSurface" as const, id: "app_web" }];
+  assert.equal(registry.revealEntities(uri, targets, false), true);
+  assert.deepEqual(first.revealTargets, [{ targets, animate: false }]);
+  assert.deepEqual(second.revealTargets, [{ targets, animate: false }]);
+  assert.equal(first.selections.length + second.selections.length, 0);
+  assert.equal(first.revealCount + second.revealCount, 1);
+});
+
 test("FlowEditorRegistry treats a symlink alias as the same open editor", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-editor-key-"));
   try {
@@ -74,6 +92,12 @@ test("FlowEditorRegistry treats a symlink alias as the same open editor", async 
 
 class FakeSession implements RenderableFlowEditorSession {
   public readonly selections: FlowSelectionState[] = [];
+  public readonly revealTargets: Array<{ targets: Array<{ kind: "projectOverview" | "appSurface" | "node"; id: string }>; animate?: boolean }> = [];
+  public readonly layoutPreview = {
+    projectOverviewPosition: { x: 0, y: 0 },
+    appSurfacePositions: { app_web: { x: 400, y: 0 } },
+    nodePositions: { node_a: { x: 800, y: 0 } }
+  };
   public renderCount = 0;
   public revealCount = 0;
 
@@ -83,6 +107,14 @@ class FakeSession implements RenderableFlowEditorSession {
 
   public applySelection(selection: FlowSelectionState): void {
     this.selections.push(selection);
+  }
+
+  public async requestAutoLayout() {
+    return this.layoutPreview;
+  }
+
+  public revealEntities(targets: Array<{ kind: "projectOverview" | "appSurface" | "node"; id: string }>, animate?: boolean): void {
+    this.revealTargets.push({ targets, animate });
   }
 
   public reveal(): void {

@@ -6,9 +6,9 @@
 
 ```json
 {
+  "schemaVersion": 1,
   "entities": [],
   "unresolved": [],
   "staleCandidates": []
 }
 ```
-

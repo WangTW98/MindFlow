@@ -305,6 +305,24 @@ function applyCanvasViewport(nextViewport) {
   scheduleDrawEdges();
 }
 
+function revealCanvasEntities(targets, animate = true) {
+  const canvas = document.getElementById("canvas");
+  if (!canvas || !Array.isArray(targets)) return false;
+  const cards = targets.map((target) => getCardElement(target?.kind, target?.id)).filter(Boolean);
+  if (cards.length === 0) return false;
+  flashRevealedEntityCards(cards);
+  const bounds = boundsForRects(cards.map(cardBounds).filter(Boolean));
+  const nextViewport = canvasViewportFitForBounds(bounds, {
+    width: canvas.clientWidth,
+    height: canvas.clientHeight
+  }, RELATION_CARD_FOCUS_PADDING);
+  if (!nextViewport) return false;
+  if (animate) animateCanvasViewport(nextViewport);
+  else applyCanvasViewport(nextViewport);
+  focusCanvas();
+  return true;
+}
+
 function isFiniteBounds(bounds) {
   return Boolean(
     bounds &&

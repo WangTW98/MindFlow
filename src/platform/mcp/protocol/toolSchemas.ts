@@ -92,7 +92,7 @@ const changesetOperationSchema = {
       type: "string",
       enum: [
         "root.update", "root.move", "taxonomy.upsert", "taxonomy.remove", "appSurface.move",
-        "node.upsert", "node.move", "node.remove", "edge.upsert", "edge.remove"
+        "node.upsert", "node.move", "node.remove", "edge.upsert", "edge.update", "edge.remove"
       ]
     },
     kind: { type: "string", enum: ["domain", "role", "appSurface", "statusGroup"] },
@@ -134,6 +134,7 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
   })),
   tool("mindflow_query_entities", "Page through root, app surfaces, taxonomy, nodes, feature groups, feature items, or edges.", objectSchema({
     ...flowUriProperty,
+    expectedRevision: { type: "integer", minimum: 1 },
     entityKind: { type: "string", enum: ["root", "appSurface", "domain", "role", "statusGroup", "node", "featureGroup", "featureItem", "edge"] },
     cursor: { type: "string" },
     limit: { type: "number" },
@@ -142,11 +143,38 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
     appSurfaceIds: stringArray(),
     domainIds: stringArray(),
     roleIds: stringArray(),
+    statusGroupIds: stringArray(),
+    statuses: { type: "array", items: { type: "string", enum: [...ENTITY_STATUSES] } },
     edgeTypes: { type: "array", items: { type: "string", enum: [...EDGE_TYPES] } },
+    fromNodeIds: stringArray(),
+    toNodeIds: stringArray(),
+    text: { type: "string" },
     includeRemoved: { type: "boolean" }
   }, ["entityKind"])),
+  tool("mindflow_get_subgraph", "Read a revision-pinned local graph neighborhood around root, application, or generic-node seeds.", objectSchema({
+    ...flowUriProperty,
+    expectedRevision: { type: "integer", minimum: 1 },
+    nodeIds: stringArray(),
+    appSurfaceIds: stringArray(),
+    includeRoot: { type: "boolean" },
+    direction: { type: "string", enum: ["incoming", "outgoing", "both"] },
+    depth: { type: "integer", minimum: 1, maximum: 5 },
+    edgeTypes: { type: "array", items: { type: "string", enum: [...EDGE_TYPES] } },
+    includeRemoved: { type: "boolean" }
+  })),
+  tool("mindflow_trace_paths", "Trace bounded active directed paths between two root/application/node storage ids without interpreting product meaning.", objectSchema({
+    ...flowUriProperty,
+    expectedRevision: { type: "integer", minimum: 1 },
+    fromId: { type: "string" },
+    toId: { type: "string" },
+    maxDepth: { type: "integer", minimum: 1, maximum: 12 },
+    maxPaths: { type: "integer", minimum: 1, maximum: 50 },
+    edgeTypes: { type: "array", items: { type: "string", enum: [...EDGE_TYPES] } }
+  }, ["fromId", "toId"])),
   tool("mindflow_apply_canvas_changes", "Dry-run or atomically apply one bounded batch of cross-entity canvas changes with request-local references.", objectSchema({
     ...flowUriProperty,
+    batchId: { type: "string", minLength: 1 },
+    batchLabel: { type: "string", minLength: 1 },
     expectedRevision: { type: "integer", minimum: 1 },
     dryRun: { type: "boolean" },
     operations: { type: "array", minItems: 1, maxItems: 200, items: changesetOperationSchema },
@@ -173,6 +201,27 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
   tool("mindflow_clear_selection", "Clear all MindFlow selection state in the active editor.", objectSchema({
     ...flowUriProperty
   })),
+  tool("mindflow_preview_auto_layout", "Compute the same DOM-measured auto layout as the open canvas without changing the document.", objectSchema({
+    ...flowUriProperty,
+    expectedRevision: { type: "integer", minimum: 1 }
+  })),
+  tool("mindflow_apply_auto_layout", "Dry-run or atomically apply the current DOM-measured canvas auto layout.", objectSchema({
+    ...flowUriProperty,
+    expectedRevision: { type: "integer", minimum: 1 },
+    dryRun: { type: "boolean" }
+  }, ["expectedRevision", "dryRun"])),
+  tool("mindflow_reveal_entities", "Focus and temporarily highlight one or more canvas cards without changing document or selection state.", objectSchema({
+    ...flowUriProperty,
+    expectedRevision: { type: "integer", minimum: 1 },
+    animate: { type: "boolean" },
+    targets: {
+      type: "array", minItems: 1, maxItems: 100,
+      items: objectSchema({
+        kind: { type: "string", enum: ["projectOverview", "appSurface", "node"] },
+        id: { type: "string" }
+      }, ["kind", "id"])
+    }
+  }, ["targets"])),
   tool("mindflow_update_root", "Update root project title, overview summary, and goal.", objectSchema({
     ...flowUriProperty,
     title: { type: "string" },
@@ -219,8 +268,15 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
     color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }
   })),
   tool("mindflow_remove_status_group", "Remove a status group and clear node references.", idSchema(["statusGroupId", "id"])),
-  tool("mindflow_upsert_node", "Create or update a generic layout, navigation, page, popup, or component node. pageType is required; creation also requires explicit semantic featureGroups with at least one item.", objectSchema(typedNodeProperties, ["pageType"])),
-  tool("mindflow_create_connected_node", "Atomically create one generic node with explicit semantic featureGroups and connect an existing feature/app-surface endpoint to it.", objectSchema({
+  tool("mindflow_upsert_node", "Create or update a generic layout, navigation, page, popup, or component node. pageType is required.", objectSchema(typedNodeProperties, ["pageType"])),
+  tool("mindflow_duplicate_nodes", "Duplicate active generic nodes at a target canvas coordinate using the same semantics as manual paste.", objectSchema({
+    ...flowUriProperty,
+    nodeIds: { type: "array", minItems: 1, maxItems: 100, items: { type: "string" } },
+    primaryNodeId: { type: "string" },
+    x: { type: "number" },
+    y: { type: "number" }
+  }, ["nodeIds", "x", "y"])),
+  tool("mindflow_create_connected_node", "Atomically create one generic node and connect an existing endpoint to it.", objectSchema({
     ...typedNodeProperties,
     from: endpointSchema,
     to: endpointSchema,
@@ -244,6 +300,17 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
     condition: { type: "string" },
     cardOutletReason: { type: "string", minLength: 1 }
   }, ["type"], [{ required: ["edgeId"] }, { required: ["id"] }, { required: ["from", "to"] }])),
+  tool("mindflow_update_edge", "Partially update an existing edge without resending unchanged fields.", objectSchema({
+    ...flowUriProperty,
+    edgeId: { type: "string" },
+    id: { type: "string" },
+    from: endpointSchema,
+    to: endpointSchema,
+    trigger: { type: "string" },
+    action: { type: "string" },
+    type: { type: "string", enum: [...EDGE_TYPES] },
+    condition: { type: "string" }
+  }, [], [{ required: ["edgeId"] }, { required: ["id"] }])),
   tool("mindflow_remove_edge", "Soft-remove an edge.", idSchema(["edgeId", "id"])),
   tool("mindflow_batch_get_nodes", "Query nodes by ids, page types, app surfaces, domains, roles, status, or current selection.", objectSchema({
     ...flowUriProperty,
@@ -257,7 +324,7 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
     selection: { type: "boolean" },
     includeIncidentEdges: { type: "boolean" }
   })),
-  tool("mindflow_batch_upsert_nodes", "Atomically create or update multiple generic nodes. Each item must include pageType; new nodes also require explicit semantic featureGroups.", batchNodesSchema(batchNodeItemProperties, ["pageType"])),
+  tool("mindflow_batch_upsert_nodes", "Atomically create or update multiple generic nodes. Each item must include pageType.", batchNodesSchema(batchNodeItemProperties, ["pageType"])),
   tool("mindflow_batch_update_nodes", "Atomically update multiple existing nodes.", batchNodesSchema(nodePatchProperties)),
   tool("mindflow_batch_move_nodes", "Atomically move multiple existing nodes.", batchNodesSchema({
     nodeId: { type: "string" },
@@ -272,7 +339,7 @@ export const MINDFLOW_MCP_TOOLS: McpToolDefinition[] = [
 ];
 
 function tool(name: string, description: string, inputSchema: Record<string, unknown>): McpToolDefinition {
-  const readOnly = name.startsWith("mindflow_get_") || name === "mindflow_query_entities" || name === "mindflow_validate_flow";
+  const readOnly = name.startsWith("mindflow_get_") || name === "mindflow_query_entities" || name === "mindflow_trace_paths" || name === "mindflow_preview_auto_layout" || name === "mindflow_reveal_entities" || name === "mindflow_validate_flow";
   const destructive = name.includes("remove") || name === "mindflow_apply_canvas_changes";
   const idempotent = readOnly || name.includes("move") || name.includes("update") || name.includes("validate") || name.includes("query");
   return {

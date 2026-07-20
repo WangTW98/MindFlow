@@ -14,6 +14,21 @@ function autoLayoutApplyCanvasPreview() {
   });
 }
 
+function autoLayoutRespondToHostRequest(requestId) {
+  if (typeof requestId !== "string" || !requestId) {
+    return false;
+  }
+  const layout = autoLayoutComputePreview(state.flow, autoLayoutCollectMeasurements());
+  postWebviewMessage({
+    type: "autoLayoutComputed",
+    requestId,
+    projectOverviewPosition: layout.projectOverviewPosition,
+    appSurfacePositions: layout.appSurfacePositions,
+    nodePositions: layout.nodePositions
+  });
+  return true;
+}
+
 function autoLayoutApplyLayoutPositions(layout) {
   projectOverviewPosition = autoLayoutCopyPosition(layout.projectOverviewPosition);
   appSurfacePositions.clear();

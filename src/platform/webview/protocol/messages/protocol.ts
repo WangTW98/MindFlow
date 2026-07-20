@@ -16,6 +16,13 @@ export type WebviewMessage =
   | { type: "clearSelection" }
   | { type: "copyNodes"; payload: MindFlowNodeClipboardPayload }
   | { type: "pasteNodesAt"; x: number; y: number }
+  | {
+      type: "autoLayoutComputed";
+      requestId: string;
+      projectOverviewPosition: WebviewPosition;
+      appSurfacePositions: Record<string, WebviewPosition>;
+      nodePositions: Record<string, WebviewPosition>;
+    }
   | { type: "deleteNode"; nodeId: string; nodeTitle?: string }
   | { type: "saveNodePosition"; nodeId: string; x: number; y: number }
   | { type: "saveAppSurfacePosition"; appId: string; x: number; y: number }
@@ -38,7 +45,9 @@ export type WebviewMessage =
 export type FlowWebviewHostMessage =
   | { type: "selectionChanged"; selection: FlowSelectionState }
   | { type: "flowChanged"; flow: ProductFlow }
-  | { type: "commandResult"; ok: boolean; message: string; flow?: ProductFlow };
+  | { type: "commandResult"; ok: boolean; message: string; flow?: ProductFlow }
+  | { type: "autoLayoutRequested"; requestId: string }
+  | { type: "revealEntities"; targets: Array<{ kind: "projectOverview" | "appSurface" | "node"; id: string }>; animate?: boolean };
 
 export interface WebviewPosition {
   x: number;

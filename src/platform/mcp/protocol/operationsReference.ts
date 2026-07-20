@@ -4,7 +4,7 @@ export const MINDFLOW_OPERATIONS_REFERENCE_URI = "mindflow://operations-referenc
 export const MINDFLOW_MODEL_REFERENCE_URI = "mindflow://current-model";
 export const MINDFLOW_AUTHORING_REFERENCE_URI = "mindflow://authoring-rules";
 
-export const MINDFLOW_SERVER_INSTRUCTIONS = "MindFlow only reads and edits product mind-map canvases; it does not analyze requirements or code. Use root, app-surface, and generic nodes. Source-analysis agents must derive detailed root summary, root goals, and application descriptions from evidence without assuming a domain or application count. Generic nodes require pageType and explicit semantic feature groups. Use only the five advertised edge types and never default uncertainty to interaction. Every generic-node edge must originate from a feature-item or feature-group outlet; only root and app-surface cards may be MCP edge sources. Model skeleton layout regions as top-level navigation nodes or component nodes such as top bars, search bars, headers, and footers; child navigation is entered only from its parent navigation item. External agents must partition large work in resumable mindflow_task Markdown state: query, dry-run a bounded changeset, apply it, checkpoint ids/revision, then validate. MindFlow never saves files; the user reviews and saves in VS Code.";
+export const MINDFLOW_SERVER_INSTRUCTIONS = "MindFlow is a neutral operation layer for reading and editing open product mind-map canvases. It validates only the ProductFlow data contract and referential integrity; requirement analysis, product methodology, semantic review, authoring policy, batching strategy, and downstream deliverables belong to external agents and skills. Use revision-aware reads, dry-run bounded changesets, and let the user review and save the dirty VS Code document.";
 
 export const MINDFLOW_OPERATIONS_REFERENCE = `# MindFlow MCP Operations Reference
 
@@ -44,7 +44,9 @@ Edge types:
 ${EDGE_TYPES.map((type) => `- ${type}`).join("\n")}
 `;
 
-export const MINDFLOW_AUTHORING_REFERENCE = `# MindFlow Authoring Rules
+export const MINDFLOW_AUTHORING_REFERENCE = `# MindFlow Authoring Guidance
+
+The rules below are optional guidance for external agents. The MCP server does not enforce product methodology beyond ProductFlow structural integrity.
 
 Choose an edge type by business effect:
 

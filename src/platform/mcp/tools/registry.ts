@@ -17,6 +17,8 @@ export interface McpToolActions {
   openFlow(input: McpToolInput): Promise<McpToolResult>;
   validateFlow(input: McpToolInput): Promise<McpToolResult>;
   queryEntities(input: McpToolInput): Promise<McpToolResult>;
+  getSubgraph(input: McpToolInput): Promise<McpToolResult>;
+  tracePaths(input: McpToolInput): Promise<McpToolResult>;
   applyCanvasChanges(input: McpToolInput): Promise<McpToolResult>;
   createConnectedNode(input: McpToolInput): Promise<McpToolResult>;
   getEditorState(input: McpToolInput): Promise<McpToolResult>;
@@ -24,6 +26,9 @@ export interface McpToolActions {
   getSelection(input: McpToolInput): Promise<McpToolResult>;
   setSelection(input: McpToolInput): Promise<McpToolResult>;
   clearSelection(input: McpToolInput): Promise<McpToolResult>;
+  previewAutoLayout(input: McpToolInput): Promise<McpToolResult>;
+  applyAutoLayout(input: McpToolInput): Promise<McpToolResult>;
+  revealEntities(input: McpToolInput): Promise<McpToolResult>;
   updateRoot(input: McpToolInput): Promise<McpToolResult>;
   moveRoot(input: McpToolInput): Promise<McpToolResult>;
   upsertAppSurface(input: McpToolInput): Promise<McpToolResult>;
@@ -36,10 +41,12 @@ export interface McpToolActions {
   upsertStatusGroup(input: McpToolInput): Promise<McpToolResult>;
   removeStatusGroup(input: McpToolInput): Promise<McpToolResult>;
   upsertNode(input: McpToolInput): Promise<McpToolResult>;
+  duplicateNodes(input: McpToolInput): Promise<McpToolResult>;
   updateNode(input: McpToolInput): Promise<McpToolResult>;
   moveNode(input: McpToolInput): Promise<McpToolResult>;
   removeNode(input: McpToolInput): Promise<McpToolResult>;
   upsertEdge(input: McpToolInput): Promise<McpToolResult>;
+  updateEdge(input: McpToolInput): Promise<McpToolResult>;
   removeEdge(input: McpToolInput): Promise<McpToolResult>;
   batchGetNodes(input: McpToolInput): Promise<McpToolResult>;
   batchUpsertNodes(input: McpToolInput): Promise<McpToolResult>;

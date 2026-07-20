@@ -33,6 +33,7 @@ Submit, approve, reject, and CRUD meaning belongs in `trigger`, `action`, and `c
 | `MindFlow: Save Flow As...` | Save the active canvas |
 | `MindFlow: Validate Flow JSON` | Validate the active document |
 | `MindFlow: Copy Global MCP Config` | Copy a global stdio MCP configuration to the clipboard |
+| `MindFlow: Export Agent Skills` | Export the version-matched product-analysis Skills for an external Agent CLI |
 | `MindFlow: Show MCP Connection Status` | Show the Router, runtime, host, and session diagnostics |
 
 Canvas drag, detail, taxonomy, edge, and delete commands are internal custom-editor commands shared with the application operation layer.
@@ -44,9 +45,12 @@ The extension starts an authenticated loopback MCP session. MCP can:
 - create/open/validate a flow;
 - read compact editor state or explicitly request the full flow;
 - page through root, application, taxonomy, node, feature, and edge entities;
+- read revision-pinned local subgraphs and trace bounded directed paths;
 - update/move root and application cards;
 - create/update/move/remove generic nodes;
+- duplicate nodes with the same semantics as manual paste;
 - create connected nodes and edit the five edge types;
+- preview/apply the DOM-measured canvas auto layout and reveal changed entities without changing selection;
 - dry-run and atomically apply bounded revision-checked changesets using request-local references;
 - return id maps, operation plans, validation issues, entity/type/outlet counts, and the resulting revision.
 
@@ -75,14 +79,16 @@ MindFlow can open, edit, validate, and save local `.mindflow` files outside ever
 
 ## Agent workflow and resumable tasks
 
-The repository keeps four optional standalone Agent Skills under `agent-assets/skills/`:
+The VSIX ships six standalone Agent Skills under `agent-assets/skills/`; run `MindFlow: Export Agent Skills` and install/copy them according to the target Agent CLI:
 
+- `mindflow-product-analysis`
 - `mindflow-task-orchestrator`
 - `mindflow-canvas-authoring`
 - `mindflow-from-documents`
 - `mindflow-from-code`
+- `mindflow-from-canvas`
 
-Every new full analysis creates `.mindflow/tasks/YYYYMMDD-HHmmss-short-slug/`. The task uses summary, bounded analysis partitions, graph partitions, an entity index, generation state, append-only checkpoints, and validation reports. Analysis follows inventory → detailed partitions → cross-partition synthesis → graph design → bounded dry-run/apply batches → final reconciliation. Formal canvas generation is blocked until all analysis partitions and synthesis are complete.
+Every new full analysis creates `.mindflow/tasks/YYYYMMDD-HHmmss-short-slug/`. The task uses a requirement ledger, portable analysis packet, bounded analysis/graph partitions, entity index, progressive batch plan, append-only checkpoints, and validation reports. Analysis follows inventory → detailed partitions → cross-partition synthesis → graph design → small dry-run/apply/reveal batches → final reconciliation or downstream deliverable handoff. Formal canvas generation is blocked until all analysis partitions and synthesis are complete.
 
 Task state is local and ignored by Git by default. Initialize or validate it with:
 
@@ -92,6 +98,12 @@ python3 agent-assets/skills/mindflow-task-orchestrator/scripts/mindflow_task.py 
 python3 agent-assets/skills/mindflow-task-orchestrator/scripts/mindflow_task.py validate \
   --task .mindflow/tasks/<task-id>
 ```
+
+## License
+
+Copyright (c) 2026 MindFlow contributors.
+
+MindFlow is licensed solely under the [GNU Affero General Public License Version 3](LICENSE.txt), represented by the SPDX identifier `AGPL-3.0-only`. The complete source code for this release is available from the [MindFlow repository](https://github.com/WangTW98/MindFlow). If you modify MindFlow and make the modified program available for users to interact with remotely over a network, review the corresponding-source obligations in section 13 of the license.
 
 ## Development
 
@@ -107,7 +119,7 @@ Press F5 to launch the Extension Host. Source boundaries:
 - `src/product-flow/application/operations`: atomic operations shared by VS Code and MCP
 - `src/product-flow/infrastructure`: local persistence
 - `src/platform/vscode`, `src/platform/mcp`, `src/platform/webview`: platform adapters
-- `agent-assets`: optional standalone Skills, templates, draft schema, and validators; excluded from the VSIX
+- `agent-assets`: packaged standalone Skills, templates, schemas, and deterministic validators/export assets
 
 To package the extension:
 

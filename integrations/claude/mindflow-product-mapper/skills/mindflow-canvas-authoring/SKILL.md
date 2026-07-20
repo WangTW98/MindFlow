@@ -1,11 +1,11 @@
 ---
 name: mindflow-canvas-authoring
-description: Convert completed MindFlow task analysis into valid graph drafts and apply them through MindFlow MCP. Use for graph design, generic-node creation, feature outlet selection, five-type edge classification, dry-runs, bounded changesets, drift reconciliation, and final canvas validation.
+description: Convert a validated MindFlow product-analysis packet into graph drafts and progressively apply them through neutral MindFlow MCP operations. Use for graph design, semantic authoring policy, feature outlet selection, five-type edge classification, small revision-pinned batches, guided approvals, visible canvas reveal, drift reconciliation, and final structural plus semantic validation.
 ---
 
 # MindFlow Canvas Authoring
 
-Only use after the task orchestrator records completed analysis and synthesis. Do not perform product or code analysis in this skill.
+Only use after `mindflow-product-analysis` and the task orchestrator record completed analysis, synthesis, and a valid analysis packet. Do not perform source analysis in this skill. Product methodology in this file is Skill policy, not an MCP server restriction.
 
 ## Model nodes
 
@@ -40,9 +40,12 @@ For generic nodes use: feature item first; feature group only when the whole gro
 1. Validate fenced JSON graph drafts with `python3 scripts/validate_mindflow_draft.py <graph-files...>`.
 2. Query existing entities and preserve matched ids and all existing coordinates.
 3. Generate in order: source-grounded root narratives, taxonomy, source-discovered apps and their descriptions, skeletons, top-level navigation/layout components, child navigation, pages, business components/popups, states, features, then `nestedRelation`, `interaction`, `dataFlow`, `statusChange`, `autoNavigate`.
-4. Limit a batch to 40 generic nodes and 80 edges; keep a feature group with its items.
-5. Query current revision, dry-run with the required revision, inspect counts/types/outlets, then submit the same batch atomically.
-6. Record returned ids, revision, and a checkpoint. On mismatch, re-query and semantically reconcile before a new dry-run.
-7. Finish with `mindflow_validate_flow` plus paginated count reconciliation. Mark the canvas `dirty` and tell the user to save.
+4. Build ordered stages: root; taxonomy; applications; one skeleton/entry per application; coherent business slices; states/data/cross-app relations; layout. Default each batch to at most 30 operations, 8 nodes, and 16 edges; server limits are ceilings only.
+5. Give every batch `batchId` and `batchLabel`. Query and pin the current revision, dry-run, inspect `changeSummary`, then submit the identical batch atomically.
+6. Call `mindflow_reveal_entities` for affected cards, re-query changed ids at the returned revision, and checkpoint approval, dry-run, apply, reveal, ids, and next batch. On mismatch, reconcile before a new dry-run.
+7. Use guided mode by default: pause before first write, application milestones, and destructive batches. Continue automatically only after explicit continuous authorization; never mix destructive cleanup into constructive batches.
+8. Finish with structural `mindflow_validate_flow`, count reconciliation, and a Skill-owned semantic review. Use `mindflow_preview_auto_layout` then `mindflow_apply_auto_layout` as the final position stage. Mark the canvas `dirty` and tell the user to save.
+
+Read `mindflow-product-analysis/references/progressive-authoring.md` when planning batches.
 
 Read [references/authoring-contract.md](references/authoring-contract.md) for semantic keys and outlet endpoint shapes.

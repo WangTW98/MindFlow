@@ -26,6 +26,8 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and a
   const manifest = JSON.parse(raw) as {
     activationEvents?: string[];
     bin?: Record<string, string>;
+    license?: string;
+    repository?: { type?: string; url?: string };
     scripts?: Record<string, string>;
     contributes?: {
       viewsContainers?: { activitybar?: Array<{ id?: string; icon?: string }> };
@@ -57,6 +59,7 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and a
     "mindflow.saveFlowAs",
     "mindflow.validateFlowJson",
     "mindflow.copyGlobalMcpConfig",
+    "mindflow.exportAgentSkills",
     "mindflow.showMcpConnectionStatus"
   ]);
   assert.equal(
@@ -75,6 +78,25 @@ test("Extension manifest contributes standalone .mindflow editor, sidebar, and a
   assert.equal(manifest.activationEvents?.includes("onCommand:mindflow.copyMcpConfig"), false);
   assert.equal(manifest.activationEvents?.includes("onCommand:mindflow.copyGlobalMcpConfig"), true);
   assert.equal(manifest.activationEvents?.includes("onCommand:mindflow.showMcpConnectionStatus"), true);
+  assert.equal(manifest.license, "AGPL-3.0-only");
+  assert.deepEqual(manifest.repository, {
+    type: "git",
+    url: "https://github.com/WangTW98/MindFlow.git"
+  });
+});
+
+test("AGPL license and public source notice replace proprietary distribution terms", async () => {
+  const [licenseText, readmeText] = await Promise.all([
+    fs.readFile(path.join(process.cwd(), "LICENSE.txt"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "README.md"), "utf8")
+  ]);
+
+  assert.ok(licenseText.includes("GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3, 19 November 2007"));
+  assert.ok(licenseText.includes("13. Remote Network Interaction; Use with the GNU General Public License."));
+  assert.equal(/All rights reserved|proprietary|No permission is granted|UNLICENSED/iu.test(licenseText), false);
+  assert.ok(readmeText.includes("## License"));
+  assert.ok(readmeText.includes("AGPL-3.0-only"));
+  assert.ok(readmeText.includes("https://github.com/WangTW98/MindFlow"));
 });
 
 test("webview CSP nonces are cryptographically-sized and unique", () => {

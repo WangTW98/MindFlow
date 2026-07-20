@@ -2,7 +2,6 @@ import { normalizeFlowSelection } from "../../../product-flow/domain/selection";
 import { validateProductFlow, type ProductFlow } from "../../../product-flow/domain";
 import type { MindFlowEditorBridge } from "../protocol/bridge";
 import { snapshotToPayload } from "./payloads";
-import { validateMcpAuthoring } from "./authoringValidation";
 import { readOptionalBoolean, readOptionalString, readStringPatch, requireString } from "./readers";
 import { capabilitiesPayload, readRequiredPosition, schemaPayload } from "./toolInputReaders";
 import type { McpToolActions } from "./registry";
@@ -29,7 +28,7 @@ export function createEditorToolActions(
     },
     validateFlow: async (input) => {
       const snapshot = await bridge.getActiveEditor(readOptionalString(input, "flowUri"));
-      return { editor: snapshotToPayload(snapshot), ...validateMcpAuthoring(snapshot.flow, validateProductFlow(snapshot.flow)), counts: flowCounts(snapshot.flow) };
+      return { editor: snapshotToPayload(snapshot), ...validateProductFlow(snapshot.flow), counts: flowCounts(snapshot.flow) };
     },
     getEditorState: async (input) => {
       const snapshot = await bridge.getActiveEditor(readOptionalString(input, "flowUri"));

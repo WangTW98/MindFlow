@@ -49,6 +49,15 @@ export function parseWebviewMessage(message: unknown): WebviewMessage | undefine
       const y = readNumber(message, "y");
       return x !== undefined && y !== undefined ? { type: "pasteNodesAt", x, y } : undefined;
     }
+    case "autoLayoutComputed": {
+      const requestId = readOptionalString(message, "requestId");
+      const projectOverviewPosition = readPositionPayload(message.projectOverviewPosition);
+      const appSurfacePositions = readPositionRecordPayload(message.appSurfacePositions);
+      const nodePositions = readPositionRecordPayload(message.nodePositions);
+      return requestId && projectOverviewPosition && appSurfacePositions && nodePositions
+        ? { type: "autoLayoutComputed", requestId, projectOverviewPosition, appSurfacePositions, nodePositions }
+        : undefined;
+    }
     case "deleteNode": {
       const nodeId = readString(message, "nodeId");
       return nodeId ? { type: "deleteNode", nodeId, nodeTitle: readOptionalString(message, "nodeTitle") } : undefined;

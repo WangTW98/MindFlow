@@ -62,6 +62,14 @@ function handleHostMessage(message) {
     render();
     return;
   }
+  if (message.type === "autoLayoutRequested") {
+    autoLayoutRespondToHostRequest(message.requestId);
+    return;
+  }
+  if (message.type === "revealEntities") {
+    revealCanvasEntities(message.targets, message.animate !== false);
+    return;
+  }
   if (message.type === "flowChanged" && message.flow && typeof message.flow === "object") {
     state.flow = message.flow;
     resetLayoutCaches();

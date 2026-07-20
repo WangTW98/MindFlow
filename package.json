@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/WangTW98/MindFlow.git"
   },
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "engines": {
     "vscode": "^1.92.0"
   },
@@ -22,6 +22,7 @@
     "onCommand:mindflow.openFlow",
     "onCommand:mindflow.saveFlowAs",
     "onCommand:mindflow.copyGlobalMcpConfig",
+    "onCommand:mindflow.exportAgentSkills",
     "onCommand:mindflow.showMcpConnectionStatus",
     "onCustomEditor:mindflow.productFlow",
     "onLanguage:mindflow",
@@ -105,6 +106,10 @@
         "title": "MindFlow: Copy Global MCP Config"
       },
       {
+        "command": "mindflow.exportAgentSkills",
+        "title": "MindFlow: Export Agent Skills"
+      },
+      {
         "command": "mindflow.showMcpConnectionStatus",
         "title": "MindFlow: Show MCP Connection Status"
       }
@@ -135,12 +140,14 @@
     "build:extension": "node scripts/build-extension.mjs",
     "check:build": "node scripts/check-build-budgets.mjs",
     "check:package": "node scripts/check-package-contents.mjs",
+    "sync:agent-skills": "node scripts/sync-agent-skills.mjs",
+    "check:agent-skills": "node scripts/sync-agent-skills.mjs --check",
     "compile": "npm run clean && npm run build:webview && npm run build:mcp-router && tsc -p ./ --noEmit && npm run build:extension && npm run check:build",
     "typecheck": "npm run build:webview && npm run build:mcp-router && tsc -p ./ --noEmit && tsc -p ./tsconfig.webview.json && tsc -p ./tsconfig.test.json --noEmit",
     "lint": "eslint src test scripts",
     "coverage": "c8 --all --check-coverage --include='out-test/src/**/*.js' --exclude='out-test/src/platform/vscode/**' --exclude='out-test/src/platform/webview/canvas/client/**' --lines=70 --functions=70 --branches=60 node scripts/run-tests.mjs",
     "test:extension": "npm run compile && tsc -p ./tsconfig.test.json && node scripts/run-extension-e2e.mjs",
-    "check": "npm run lint && npm test && npm run typecheck && npm run smoke:webview && npm run compile && npm run check:package && npm run coverage",
+    "check": "npm run check:agent-skills && npm run lint && npm test && npm run typecheck && npm run smoke:webview && npm run compile && npm run check:package && npm run coverage",
     "watch": "npm run build:webview && tsc -watch -p ./",
     "package": "vsce package --no-dependencies",
     "test": "node scripts/run-tests.mjs"

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import re
 import sys
@@ -12,11 +13,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 TASK_STATUSES = {"pending", "analyzing", "designing", "generating", "validating", "completed", "blocked"}
-PHASES = {"initializing", "inventory", "analyzing", "synthesizing", "designing", "generating", "validating", "completed"}
+PHASES = {"initializing", "inventory", "analyzing", "synthesizing", "designing", "generating", "validating", "delivering", "completed"}
 REQUIRED_FILES = [
-    "mindflow_task.md", "source_inventory.md", "analysis_summary.md",
+    "mindflow_task.md", "source_inventory.md", "requirement_ledger.md", "analysis_summary.md", "analysis_packet.json",
     "graph/graph_summary.md", "state/entity_index.md", "state/generation_state.md",
-    "state/checkpoints.md", "reports/semantic_validation.md", "reports/final_validation.md",
+    "state/batch_plan.json", "state/checkpoints.md", "reports/semantic_validation.md", "reports/final_validation.md",
 ]
 IGNORED_PARTS = {".git", ".mindflow", "node_modules", "out", "out-test", "dist", "build", "coverage", ".cache", "__pycache__"}
 
@@ -56,6 +57,8 @@ def init_task(args: argparse.Namespace) -> int:
 task_id: {yaml_scalar(task_id)}
 title: {yaml_scalar(args.title)}
 source_type: {yaml_scalar(args.source_type)}
+mode: {yaml_scalar(args.mode)}
+output_target: {yaml_scalar(args.output_target)}
 source_roots: {roots_yaml}
 target_flow: {yaml_scalar(target)}
 task_status: pending
@@ -83,6 +86,7 @@ updated_at: {yaml_scalar(created)}
 - Use only interaction, autoNavigate, dataFlow, statusChange, nestedRelation.
 - Prefer feature-item, then feature-group orange outlets; card outlets are exceptional.
 - Complete all analysis partitions and synthesis before canvas generation.
+- Apply canvas changes in small revision-pinned batches; reveal and checkpoint each batch.
 
 ## Phase checklist
 
@@ -126,6 +130,17 @@ updated_at: {yaml_scalar(created)}
 | Source | Type | Range | Fingerprint | Application/module | Partition | Status | Ignored reason |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 """)
+    write(task / "requirement_ledger.md", """# Requirement Ledger
+
+| Requirement ID | Statement | Source/evidence | Explicit or inferred | Confidence | Conflict | Status | Canvas/deliverable mapping |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+""")
+    write(task / "analysis_packet.json", json.dumps({
+        "schemaVersion": 1, "mode": args.mode,
+        "sources": [], "terminology": [], "applications": [], "domains": [], "roles": [],
+        "requirements": [], "screens": [], "features": [], "states": [], "businessFlows": [],
+        "dataFlows": [], "permissions": [], "constraints": [], "conflicts": [], "unresolved": []
+    }, ensure_ascii=False, indent=2))
     write(task / "analysis_summary.md", """# Analysis Summary
 
 synthesis_status: pending
@@ -183,6 +198,12 @@ This semantic-key to MindFlow-id index is a cache. Confirm every mapping against
 - staleCandidates: []
 - canvas_save_status: not_created
 """)
+    write(task / "state/batch_plan.json", """{
+  "schemaVersion": 1,
+  "policy": "guided",
+  "limits": { "operations": 30, "nodes": 8, "edges": 16 },
+  "batches": []
+}""")
     write(task / "state/checkpoints.md", f"""# Checkpoints
 
 ## {created} — task-created
@@ -236,7 +257,7 @@ def validate_task(args: argparse.Namespace) -> int:
     if main.is_file():
         text = main.read_text(encoding="utf-8")
         data = parse_frontmatter(text)
-        required = {"task_id", "title", "source_type", "source_roots", "target_flow", "task_status", "current_phase", "current_part", "next_action", "created_at", "updated_at"}
+        required = {"task_id", "title", "source_type", "mode", "output_target", "source_roots", "target_flow", "task_status", "current_phase", "current_part", "next_action", "created_at", "updated_at"}
         errors.extend(f"missing frontmatter field: {field}" for field in sorted(required - data.keys()))
         if data.get("task_status") not in TASK_STATUSES:
             errors.append(f"invalid task_status: {data.get('task_status')}")
@@ -248,6 +269,13 @@ def validate_task(args: argparse.Namespace) -> int:
         size = len(file.read_text(encoding="utf-8"))
         if size > 20_000:
             errors.append(f"analysis partition exceeds 20000 characters: {file.name} ({size})")
+    for relative in ("analysis_packet.json", "state/batch_plan.json"):
+        path = task / relative
+        if path.is_file():
+            try:
+                json.loads(path.read_text(encoding="utf-8"))
+            except ValueError as error:
+                errors.append(f"invalid JSON in {relative}: {error}")
     if errors:
         print("\n".join(f"ERROR: {item}" for item in errors), file=sys.stderr)
         return 1
@@ -284,7 +312,7 @@ def checkpoint(args: argparse.Namespace) -> int:
 
 
 def ensure_phase_ready(task: Path, phase: str) -> None:
-    if phase not in {"designing", "generating", "validating", "completed"}:
+    if phase not in {"designing", "generating", "validating", "delivering", "completed"}:
         return
     partitions = sorted((task / "analysis").glob("*.md"))
     if not partitions:
@@ -295,7 +323,9 @@ def ensure_phase_ready(task: Path, phase: str) -> None:
     summary = (task / "analysis_summary.md").read_text(encoding="utf-8")
     if not re.search(r"(?m)^synthesis_status:\s*completed\s*$", summary):
         raise ValueError("Cannot enter graph design or generation before cross-partition synthesis is completed.")
-    if phase in {"generating", "validating", "completed"}:
+    main_data = parse_frontmatter((task / "mindflow_task.md").read_text(encoding="utf-8"))
+    canvas_mode = main_data.get("mode") in {"documents-to-canvas", "code-to-canvas", "canvas-to-canvas-update"}
+    if canvas_mode and phase in {"generating", "validating", "completed"}:
         graph = (task / "graph/graph_summary.md").read_text(encoding="utf-8")
         if not re.search(r"(?m)^design_status:\s*completed\s*$", graph):
             raise ValueError("Cannot enter generation before graph design is completed.")
@@ -303,7 +333,7 @@ def ensure_phase_ready(task: Path, phase: str) -> None:
 
 def update_main(path: Path, args: argparse.Namespace, timestamp: str) -> None:
     text = path.read_text(encoding="utf-8")
-    status = {"analyzing": "analyzing", "synthesizing": "analyzing", "designing": "designing", "generating": "generating", "validating": "validating", "completed": "completed"}.get(args.phase, "pending")
+    status = {"analyzing": "analyzing", "synthesizing": "analyzing", "designing": "designing", "generating": "generating", "validating": "validating", "delivering": "validating", "completed": "completed"}.get(args.phase, "pending")
     replacements = {"task_status": status, "current_phase": args.phase, "current_part": args.part, "next_action": args.next_action, "updated_at": timestamp}
     for key, value in replacements.items():
         text = re.sub(rf"(?m)^{re.escape(key)}:.*$", f"{key}: {yaml_scalar(str(value))}", text, count=1)
@@ -335,7 +365,9 @@ def parser() -> argparse.ArgumentParser:
     init = commands.add_parser("init")
     init.add_argument("--workspace", required=True)
     init.add_argument("--title", required=True)
-    init.add_argument("--source-type", required=True, choices=["documents", "code", "mixed"])
+    init.add_argument("--source-type", required=True, choices=["documents", "code", "canvas", "mixed"])
+    init.add_argument("--mode", default="documents-to-canvas", choices=["documents-to-canvas", "code-to-canvas", "canvas-to-canvas-update", "canvas-audit", "canvas-to-deliverable"])
+    init.add_argument("--output-target", default="canvas", choices=["canvas", "audit", "prd", "html", "figma", "pencil"])
     init.add_argument("--source-root", action="append")
     init.add_argument("--target-flow")
     init.add_argument("--task-id")

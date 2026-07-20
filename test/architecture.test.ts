@@ -127,6 +127,23 @@ test("VS Code packaging ignores source and keeps assets", async () => {
   assert.equal(ignoreSource.includes("src/platform/webview/canvas/client/**"), false);
 });
 
+test("test and package scripts launch JavaScript CLIs without Windows cmd shims", async () => {
+  const root = process.cwd();
+  const testRunner = await fs.readFile(path.join(root, "scripts", "run-tests.mjs"), "utf8");
+  const packageChecker = await fs.readFile(path.join(root, "scripts", "check-package-contents.mjs"), "utf8");
+
+  assert.ok(testRunner.includes('"node_modules", "typescript", "bin", "tsc"'));
+  assert.ok(testRunner.includes('run(process.execPath, [tsc, "-p", "./", "--noEmit"])'));
+  assert.equal(testRunner.includes("tsc.cmd"), false);
+  assert.equal(testRunner.includes('"node_modules", ".bin"'), false);
+  assert.ok(testRunner.includes("if (!process.env.NODE_V8_COVERAGE)"));
+  assert.ok(testRunner.indexOf("if (!process.env.NODE_V8_COVERAGE)") < testRunner.indexOf('["--check"'));
+
+  assert.ok(packageChecker.includes('"node_modules", "@vscode", "vsce", "vsce"'));
+  assert.ok(packageChecker.includes("run(process.execPath, [vsce, \"ls\"])"));
+  assert.equal(packageChecker.includes("vsce.cmd"), false);
+});
+
 test("legacy compatibility re-export shims are removed", async () => {
   const root = process.cwd();
   const shimFiles: string[] = [];

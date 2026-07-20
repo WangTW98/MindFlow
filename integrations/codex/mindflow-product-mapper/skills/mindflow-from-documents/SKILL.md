@@ -5,7 +5,7 @@ description: Analyze user-provided text, Markdown, PDF, Word, Excel, PowerPoint,
 
 # MindFlow From Documents
 
-Use `mindflow-task-orchestrator` first. This skill analyzes sources; it never edits the canvas directly.
+Use `mindflow-product-analysis` and `mindflow-task-orchestrator` first. This skill analyzes sources; it never edits the canvas directly.
 
 ## Inventory and partition
 
@@ -16,9 +16,11 @@ Use `mindflow-task-orchestrator` first. This skill analyzes sources; it never ed
 
 Do not assume a fixed number or kind of applications. A source may describe one application, several applications, or no separately modeled application surface. Existing canvas entities are reconciliation targets only and must never substitute for source analysis.
 
+Before synthesis, maintain a terminology map, requirement ledger, duplicate matrix, and conflict matrix across all documents. Preserve explicit priorities, exclusions, acceptance criteria, non-functional constraints, and unresolved stakeholder decisions.
+
 ## Analyze a partition
 
-Write scope and source evidence, product conclusions, root/app/generic-node candidates, independent state nodes, feature groups/items, business events, edge type with rationale, outlet strategy, inference confidence, unresolved items, and completion state.
+Write scope and source evidence, product conclusions, requirements and acceptance evidence, actors/ownership, journeys and alternatives, root/app/generic-node candidates, applicable independent states, feature groups/items, business and data events, permissions, constraints, edge rationale, outlet strategy, inference confidence, conflicts, unresolved items, and completion state.
 
 For the root, synthesize two source-grounded narratives before graph design:
 
@@ -29,6 +31,6 @@ For every discovered application surface, synthesize a PRD-level `appSurface.des
 
 Distinguish explicit evidence from inference. Record an inference as `origin: inferred`, with reason and confidence. Never reproduce full attachments or sensitive source content.
 
-After every partition, checkpoint it. Only after all partitions are complete, synthesize the root narratives, application descriptions, duplicates, naming, cross-partition relations, status groups, data direction, edge types, and feature outlets in `analysis_summary.md`. Then hand off to `mindflow-canvas-authoring`.
+After every partition, checkpoint it. Only after all partitions are complete, synthesize the root narratives, application descriptions, normalized terminology, requirements, conflicts, cross-partition relations, states, data direction, permissions, constraints, edge types, and feature outlets in `analysis_summary.md` and the shared `analysis_packet.json`. Validate the packet before handing off to `mindflow-canvas-authoring` or a deliverable generator.
 
 Read [references/document-evidence.md](references/document-evidence.md) for evidence locator conventions.

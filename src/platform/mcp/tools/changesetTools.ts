@@ -22,7 +22,6 @@ import {
 import { nodeUpsertOperations, readEndpoint, readMcpEdgeType, readSelectionPatch } from "./toolInputReaders";
 import type { McpToolActions } from "./registry";
 import type { IdMaps } from "./types";
-import { assertMcpEdgeSource, validateMcpAuthoring } from "./authoringValidation";
 
 interface ChangeMaps extends IdMaps {
   domains: Map<string, string>;
@@ -58,22 +57,26 @@ export function createChangesetToolActions(bridge: MindFlowEditorBridge): Pick<M
         if (!dryRun) throw error;
         return {
           editor: snapshotToPayload(snapshot), applied: false, dryRun: true,
+          batch: batchPayload(input),
           idMap: maps ? publicIdMap(maps) : {}, operations: [],
           errors: [error instanceof Error ? error.message : String(error)], warnings: [],
+          changeSummary: summarizeChange([], snapshot.flow, snapshot.flow.revision),
           change: { operationCount: 0, revision: snapshot.flow.revision }
         };
       }
       if (!maps) {
         throw new Error("MindFlow changeset reference maps were not initialized.");
       }
-      const validation = validateMcpAuthoring(applied.flow, validateProductFlow(applied.flow));
+      const validation = validateProductFlow(applied.flow);
       if (!validation.valid) {
         if (dryRun) {
           return {
             editor: snapshotToPayload(snapshot), applied: false, dryRun: true,
+            batch: batchPayload(input),
             idMap: publicIdMap(maps), operations: applied.results.map(operationPayload),
             errors: validation.errors, warnings: validation.warnings,
             summary: summarize(applied.flow),
+            changeSummary: summarizeChange(applied.results, snapshot.flow, applied.flow.revision),
             change: { operationCount: applied.results.length, revision: applied.flow.revision }
           };
         }
@@ -82,10 +85,12 @@ export function createChangesetToolActions(bridge: MindFlowEditorBridge): Pick<M
       const result = {
         applied: !dryRun,
         dryRun,
+        batch: batchPayload(input),
         idMap: publicIdMap(maps),
         operations: applied.results.map(operationPayload),
         validation,
         summary: summarize(applied.flow),
+        changeSummary: summarizeChange(applied.results, snapshot.flow, applied.flow.revision),
         change: { operationCount: applied.results.length, revision: applied.flow.revision }
       };
       if (dryRun) {
@@ -100,11 +105,60 @@ export function createChangesetToolActions(bridge: MindFlowEditorBridge): Pick<M
       return {
         editor: snapshotToPayload(next),
         ...result,
+        changeSummary: summarizeChange(applied.results, snapshot.flow, next.flow.revision),
         change: { operationCount: applied.results.length, revision: next.flow.revision },
         ...(readOptionalBoolean(input, "includeFlow") === true ? { flow: next.flow } : {})
       };
     }
   };
+}
+
+function batchPayload(input: Record<string, unknown>): Record<string, string | undefined> {
+  return { id: readOptionalString(input, "batchId"), label: readOptionalString(input, "batchLabel") };
+}
+
+function summarizeChange(results: ReturnType<typeof applyFlowOperations>["results"], beforeFlow: ProductFlow, afterRevision: number): Record<string, unknown> {
+  const createdIds: string[] = [];
+  const updatedIds: string[] = [];
+  const movedIds: string[] = [];
+  const removedIds: string[] = [];
+  const cascadedRemovedEdgeIds = new Set<string>();
+  for (const result of results) {
+    if (result.type === "node.create" || result.type === "node.createConnected") createdIds.push(result.node.nodeId);
+    else if (result.type === "node.paste") createdIds.push(...result.nodes.map((node) => node.nodeId));
+    else if (result.type === "node.update") updatedIds.push(result.node.nodeId);
+    else if (result.type === "node.move") movedIds.push(result.node.nodeId);
+    else if (result.type === "node.remove") {
+      removedIds.push(result.removedNodeId);
+      result.removedEdgeIds.forEach((edgeId) => cascadedRemovedEdgeIds.add(edgeId));
+    } else if (result.type === "edge.upsert") {
+      (result.mode === "created" ? createdIds : updatedIds).push(result.edge.edgeId);
+    } else if (result.type === "edge.update") updatedIds.push(result.edge.edgeId);
+    else if (result.type === "edge.remove") removedIds.push(result.removedEdgeId);
+    else if (result.type === "taxonomy.upsert") {
+      (taxonomyExists(beforeFlow, result.taxonomy.kind, result.taxonomy.id) ? updatedIds : createdIds).push(result.taxonomy.id);
+    }
+    else if (result.type === "taxonomy.remove") removedIds.push(result.removedId);
+    else if (result.type === "appSurface.move") movedIds.push(result.appSurface.appId);
+    else if (result.type === "project.move") movedIds.push("projectOverview");
+    else if (result.type === "project.update") updatedIds.push("projectOverview");
+  }
+  return {
+    beforeRevision: beforeFlow.revision,
+    afterRevision,
+    createdIds: [...new Set(createdIds)],
+    updatedIds: [...new Set(updatedIds)],
+    movedIds: [...new Set(movedIds)],
+    removedIds: [...new Set(removedIds)],
+    cascadedRemovedEdgeIds: [...cascadedRemovedEdgeIds]
+  };
+}
+
+function taxonomyExists(flow: ProductFlow, kind: "domain" | "role" | "appSurface" | "statusGroup", id: string): boolean {
+  if (kind === "domain") return flow.domains.some((item) => item.domainId === id);
+  if (kind === "role") return flow.roles.some((item) => item.roleId === id);
+  if (kind === "appSurface") return flow.appSurfaces.some((item) => item.appId === id);
+  return flow.statusGroups.some((item) => item.statusGroupId === id);
 }
 
 function prepareMaps(flow: ProductFlow, operations: Record<string, unknown>[]): ChangeMaps {
@@ -202,7 +256,6 @@ function buildOperations(flow: ProductFlow, operation: Record<string, unknown>, 
     const existing = edgeId ? flow.edges.find((edge) => edge.edgeId === edgeId) : undefined;
     const from = resolveChangesetEndpoint(operation.from, maps) ?? existing?.from;
     const type = readMcpEdgeType(operation, existing?.type);
-    assertMcpEdgeSource(from, type, readOptionalString(operation, "cardOutletReason"));
     return [{ type: "edge.upsert", input: stripUndefined({
       edgeId,
       from,
@@ -211,6 +264,21 @@ function buildOperations(flow: ProductFlow, operation: Record<string, unknown>, 
       action: readOptionalString(operation, "action"),
       type,
       condition: readOptionalString(operation, "condition")
+    }) }];
+  }
+  if (op === "edge.update") {
+    const edgeId = resolveRef(requireStringFrom(operation, ["edgeId", "id", "edgeRef"]), maps.edges);
+    const existing = flow.edges.find((edge) => edge.edgeId === edgeId);
+    if (!existing) {
+      throw new Error(`Unknown edge: ${edgeId}`);
+    }
+    return [{ type: "edge.update", edgeId, patch: stripUndefined({
+      from: operation.from === undefined ? undefined : resolveChangesetEndpoint(operation.from, maps),
+      to: operation.to === undefined ? undefined : resolveChangesetEndpoint(operation.to, maps),
+      trigger: typeof operation.trigger === "string" ? operation.trigger.trim() : undefined,
+      action: typeof operation.action === "string" ? operation.action.trim() : undefined,
+      type: operation.type === undefined ? undefined : readMcpEdgeType(operation, existing.type),
+      condition: typeof operation.condition === "string" ? operation.condition.trim() : undefined
     }) }];
   }
   if (op === "edge.remove") {

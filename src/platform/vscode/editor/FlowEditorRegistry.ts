@@ -1,6 +1,7 @@
 import type * as vscode from "vscode";
 import type { ProductFlow } from "../../../product-flow/domain";
 import type { FlowSelectionState } from "../../../product-flow/domain/selection";
+import type { MindFlowAutoLayoutPreview, MindFlowRevealTarget } from "../../mcp/protocol/bridge";
 import { canonicalFileKey } from "../../../shared/canonicalFileKey";
 
 export interface OpenFlowEditorSession {
@@ -12,6 +13,8 @@ export interface OpenFlowEditorSession {
 export interface RenderableFlowEditorSession {
   renderWithFallback(fallbackFlow: ProductFlow): void;
   applySelection(selection: FlowSelectionState): void;
+  requestAutoLayout?(): Promise<MindFlowAutoLayoutPreview>;
+  revealEntities?(targets: MindFlowRevealTarget[], animate?: boolean): void;
   reveal(): void;
 }
 
@@ -85,6 +88,20 @@ export class FlowEditorRegistry {
     for (const session of this.entries.get(key)?.sessions ?? []) {
       session.applySelection(selection);
     }
+  }
+
+  public requestAutoLayout(flowUri: vscode.Uri | string): Promise<MindFlowAutoLayoutPreview> {
+    const session = this.entries.get(canonicalFileKey(flowUri))?.sessions.values().next().value;
+    if (!session?.requestAutoLayout) throw new Error("MindFlow auto layout requires an open canvas webview.");
+    return session.requestAutoLayout();
+  }
+
+  public revealEntities(flowUri: vscode.Uri | string, targets: MindFlowRevealTarget[], animate?: boolean): boolean {
+    const sessions = this.entries.get(canonicalFileKey(flowUri))?.sessions;
+    if (!sessions || sessions.size === 0) return false;
+    for (const session of sessions) session.revealEntities?.(targets, animate);
+    sessions.values().next().value?.reveal();
+    return true;
   }
 
   public renderSession(flowUri: vscode.Uri, fallbackFlow: ProductFlow): boolean {

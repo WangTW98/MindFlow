@@ -4,7 +4,7 @@ import type { FlowSelectionPatch } from "../../../product-flow/domain/selection"
 import type { ProductFlow } from "../../../product-flow/domain";
 import { createEmptyProductFlow } from "../../../product-flow/domain/model/factory";
 import { parseProductFlowText } from "../../../product-flow/domain/serialization/codec";
-import type { MindFlowEditorBridge, MindFlowEditorSnapshot } from "../../mcp/protocol/bridge";
+import type { MindFlowAutoLayoutPreview, MindFlowEditorBridge, MindFlowEditorSnapshot, MindFlowRevealTarget } from "../../mcp/protocol/bridge";
 import { applyFlowDocumentEdit, loadMindFlowFile } from "../documents/flowDocumentService";
 import { flowDisplayName, normalizeFlowUri, resolveInputFlowPath } from "../documents/flowUri";
 import { createUntitledMindFlowDocumentOptions } from "../documents/untitledMindFlowDocument";
@@ -65,6 +65,18 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
     const uri = requireOpenFlowUri(flowUri);
     FlowPanel.setSelection(uri, selection);
     return this.readSnapshot(uri, true);
+  }
+
+  public async previewAutoLayout(flowUri: string): Promise<MindFlowAutoLayoutPreview> {
+    const uri = requireOpenFlowUri(flowUri);
+    return FlowPanel.requestAutoLayout(uri);
+  }
+
+  public async revealEntities(flowUri: string, targets: MindFlowRevealTarget[], animate?: boolean): Promise<void> {
+    const uri = requireOpenFlowUri(flowUri);
+    if (!FlowPanel.revealEntities(uri, targets, animate)) {
+      throw new Error("MindFlow reveal requires an open canvas webview.");
+    }
   }
 
   public async applyFlowEdit(flowUri: string, flow: ProductFlow, selection?: FlowSelectionPatch, expectedRevision?: number): Promise<MindFlowEditorSnapshot> {

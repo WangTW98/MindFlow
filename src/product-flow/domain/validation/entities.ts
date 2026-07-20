@@ -278,59 +278,6 @@ export function validateEdges(
     checkEndpoint(edge.to, `edges[${index}].to`, nodeIndex.nodeIds, nodeIndex.nodesById, appSurfaceIds, errors);
     validateEdgeConsistency(flow, edge, index, nodeIndex, errors);
   }
-  validateSingleTargetOutlets(edges, errors);
-  validateNavigationParents(edges, nodeIndex, errors);
-}
-
-const SINGLE_TARGET_EDGE_TYPES = new Set(["interaction", "autoNavigate", "statusChange"]);
-
-function validateSingleTargetOutlets(edges: unknown[], errors: string[]): void {
-  const sources = new Map<string, string>();
-  for (const edge of edges) {
-    if (!isRecord(edge) || edge.status !== "active" || !SINGLE_TARGET_EDGE_TYPES.has(String(edge.type)) || !isRecord(edge.from)) continue;
-    const key = featureOutletKey(edge.from);
-    if (!key) continue;
-    const previous = sources.get(key);
-    if (previous) {
-      errors.push(`Active feature outlet ${key} has multiple interaction/autoNavigate/statusChange targets: ${previous}, ${String(edge.edgeId)}.`);
-    } else {
-      sources.set(key, String(edge.edgeId));
-    }
-  }
-}
-
-function validateNavigationParents(edges: unknown[], nodeIndex: NodeValidationIndex, errors: string[]): void {
-  const activeNavigationIds = new Set<string>();
-  for (const [nodeId, node] of nodeIndex.nodesById) {
-    if (node.status !== "removed" && node.pageType === "navigation") activeNavigationIds.add(nodeId);
-  }
-  const parents = new Map<string, string[]>();
-  for (const edge of edges) {
-    if (!isRecord(edge) || edge.status !== "active" || !isRecord(edge.to) || typeof edge.to.nodeId !== "string" || !activeNavigationIds.has(edge.to.nodeId)) continue;
-    const targetId = edge.to.nodeId;
-    const list = parents.get(targetId) ?? [];
-    list.push(String(edge.edgeId));
-    parents.set(targetId, list);
-    const source = endpointNodeRecord(edge.from, nodeIndex);
-    const validSkeletonParent = source?.pageType === "skeleton" && edge.type === "nestedRelation";
-    const validNavigationParent = source?.pageType === "navigation" && edge.type === "interaction";
-    if (!validSkeletonParent && !validNavigationParent) {
-      errors.push(`Navigation node ${targetId} edge ${String(edge.edgeId)} must come from a skeleton nestedRelation or navigation interaction.`);
-    }
-  }
-  for (const [nodeId, edgeIds] of parents) {
-    if (edgeIds.length > 1) errors.push(`Navigation node ${nodeId} has multiple active hierarchy parents: ${edgeIds.join(", ")}.`);
-  }
-}
-
-function featureOutletKey(endpoint: Record<string, unknown>): string | undefined {
-  if (endpoint.kind === "featureGroup" && typeof endpoint.nodeId === "string" && typeof endpoint.groupId === "string") {
-    return `${endpoint.nodeId}/${endpoint.groupId}`;
-  }
-  if (endpoint.kind === "featureItem" && typeof endpoint.nodeId === "string" && typeof endpoint.groupId === "string" && typeof endpoint.itemId === "string") {
-    return `${endpoint.nodeId}/${endpoint.groupId}/${endpoint.itemId}`;
-  }
-  return undefined;
 }
 
 function validateActionTargets(value: unknown, path: string, nodeIndex: NodeValidationIndex, errors: string[]): void {

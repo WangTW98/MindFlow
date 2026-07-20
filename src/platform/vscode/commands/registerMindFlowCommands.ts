@@ -7,6 +7,7 @@ import { rememberRecentFlow } from "../state/recentFlowState";
 import { applyAutoLayoutPositions, createEdge, createConnectedNodeAt, createNodeAt, deleteNode, disconnectEdge, saveProjectOverviewPosition, updateAppSurfacePosition, updateEdgeDetails, updateNodeDetails, updateNodePosition, updateProjectOverviewDetails, type CreateConnectedNodeRequest } from "./canvasCommands";
 import { newFlow, openFlow, saveFlowAs, validateFlowJson } from "./fileCommands";
 import { updateTaxonomy } from "./taxonomyCommands";
+import { exportAgentSkills } from "./agentSkillCommands";
 
 export function registerMindFlowCommands(
   context: vscode.ExtensionContext,
@@ -22,6 +23,7 @@ export function registerMindFlowCommands(
     vscode.commands.registerCommand("mindflow.openFlow", (flowPath?: string) => openFlow(context, sidebarView, flowPath)),
     vscode.commands.registerCommand("mindflow.saveFlowAs", (flowUri?: FlowUriArgument) => saveFlowAs(context, sidebarView, flowUri)),
     vscode.commands.registerCommand("mindflow.validateFlowJson", () => validateFlowJson(context)),
+    vscode.commands.registerCommand("mindflow.exportAgentSkills", () => exportAgentSkills(context)),
     vscode.commands.registerCommand("mindflow.updateNodePosition", (nodeId?: string, x?: number, y?: number, flowUri?: FlowUriArgument) =>
       updateNodePosition(nodeId, x, y, flowUri)
     ),

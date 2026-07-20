@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "target": "prd",
+  "product": {},
+  "audiences": [],
+  "journeys": [],
+  "screens": [],
+  "states": [],
+  "interactions": [],
+  "components": [],
+  "dataBindings": [],
+  "permissions": [],
+  "constraints": [],
+  "acceptance": [],
+  "unresolved": [],
+  "evidenceRefs": []
+}

@@ -1,11 +1,11 @@
 ---
 name: mindflow-task-orchestrator
-description: Create, validate, resume, and checkpoint partitioned MindFlow product or code analysis tasks under .mindflow/tasks. Use whenever a request analyzes non-trivial documents or code before drawing a MindFlow canvas, continues an earlier MindFlow task, or needs context-safe phased generation.
+description: Create, validate, resume, and checkpoint partitioned MindFlow product-analysis tasks under .mindflow/tasks for documents, code, existing canvases, audits, canvas updates, PRDs, and design handoffs. Use whenever a non-trivial MindFlow workflow needs evidence traceability, bounded context, progressive generation, revision recovery, or resumable delivery.
 ---
 
 # MindFlow Task Orchestrator
 
-Use this skill before document/code analysis and before `mindflow-canvas-authoring`. MindFlow MCP is only the canvas operation layer; this skill owns analysis state and recovery.
+Use this skill after `mindflow-product-analysis` selects a mode and before source analysis or `mindflow-canvas-authoring`. MindFlow MCP is only the canvas operation layer; this skill owns analysis state and recovery.
 
 ## Start or resume
 
@@ -13,7 +13,7 @@ Use this skill before document/code analysis and before `mindflow-canvas-authori
 2. For a new task run:
 
    ```bash
-   python3 scripts/mindflow_task.py init --workspace <workspace> --title <title> --source-type <documents|code|mixed> --source-root <path-or-url>
+   python3 scripts/mindflow_task.py init --workspace <workspace> --title <title> --source-type <documents|code|canvas|mixed> --mode <mode> --source-root <path-or-url> [--output-target <canvas|audit|prd|html|figma|pencil>]
    ```
 
 3. For recovery, read only `mindflow_task.md`, the latest checkpoint, `state/generation_state.md`, the relevant summary section, and the current partition.
@@ -21,7 +21,7 @@ Use this skill before document/code analysis and before `mindflow-canvas-authori
 
 ## Enforce phases
 
-Use this fixed order: `initializing`, `inventory`, `analyzing`, `synthesizing`, `designing`, `generating`, `validating`. Do not formally generate until every planned analysis partition is complete and cross-partition synthesis is complete.
+Use this fixed order: `initializing`, `inventory`, `analyzing`, `synthesizing`, `designing`, `generating`, `validating`, `delivering`, `completed`. Do not formally generate until every planned analysis partition is complete and cross-partition synthesis is complete.
 
 Task status must be one of `pending`, `analyzing`, `designing`, `generating`, `validating`, `completed`, `blocked`. Canvas save status is separate: `not_created`, `dirty`, or `saved`.
 
@@ -30,6 +30,8 @@ After each analysis partition or generation batch, run `checkpoint` and set exac
 ```bash
 python3 scripts/mindflow_task.py checkpoint --task <task-dir> --phase <phase> --part <id> --next-action <one-action> [--flow-uri <uri>] [--revision-before N] [--revision-after N]
 ```
+
+For every generation batch record its id/label, dry-run revision, applied revision, affected ids, reveal result, approval state, and next batch in `state/batch_plan.json`. Keep destructive batches separate.
 
 ## Keep context bounded
 
@@ -40,4 +42,3 @@ python3 scripts/mindflow_task.py checkpoint --task <task-dir> --phase <phase> --
 - On changed source fingerprint, invalidate only dependent partitions and graph drafts; list vanished entities as `staleCandidates` rather than deleting them.
 
 Run `python3 scripts/mindflow_task.py validate --task <task-dir>` before a phase transition. Read [references/task-contract.md](references/task-contract.md) when implementing recovery, drift, or conflict handling.
-

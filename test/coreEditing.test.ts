@@ -188,7 +188,7 @@ test("ensureAppSurfaceEntryEdges does not guess when an app has zero or multiple
   assert.deepEqual(ensureAppSurfaceEntryEdges(flow).addedEdgeIds, []);
 });
 
-test("Manual feature outlet allows only one interaction, auto-navigation, or status target", () => {
+test("Manual feature outlets remain structurally valid with multiple semantic targets", () => {
   const flow = createProcurementFlow();
   const compare = requireNodeByTitle(flow, "报价对比页");
   const approval = requireNodeByTitle(flow, "审批发起页");
@@ -204,14 +204,9 @@ test("Manual feature outlet allows only one interaction, auto-navigation, or sta
     groupId: group.groupId,
     itemId: item.itemId
   };
-  const first = createFlowEdge(flow, { from, toNodeId: approval.nodeId, trigger: "生成比价报告后审批", type: "interaction" });
-  assert.throws(
-    () => createFlowEdge(flow, { from, toNodeId: plan.nodeId, trigger: "生成比价报告后回看计划", type: "autoNavigate" }),
-    /single-target limit/
-  );
+  createFlowEdge(flow, { from, toNodeId: approval.nodeId, trigger: "生成比价报告后审批", type: "interaction" });
+  createFlowEdge(flow, { from, toNodeId: plan.nodeId, trigger: "生成比价报告后回看计划", type: "autoNavigate" });
   createFlowEdge(flow, { from, toNodeId: plan.nodeId, trigger: "同步比价报告", type: "dataFlow" });
-  removeFlowEdge(flow, first.edgeId);
-  createFlowEdge(flow, { from, toNodeId: plan.nodeId, trigger: "回看采购计划", type: "interaction" });
 
   const sameOutletEdges = flow.edges.filter((edge) =>
     edge.status === "active" &&
@@ -221,10 +216,11 @@ test("Manual feature outlet allows only one interaction, auto-navigation, or sta
     edge.from.itemId === from.itemId
   );
   assert.ok(sameOutletEdges.some((edge) => edge.toNodeId === plan.nodeId));
-  assert.equal(sameOutletEdges.filter((edge) => edge.type !== "dataFlow" && edge.type !== "nestedRelation").length, 1);
+  assert.equal(sameOutletEdges.length, 3);
+  assert.equal(validateProductFlow(flow).valid, true);
 });
 
-test("Manual save validation permits orphan nodes but rejects invalid navigation parents", () => {
+test("Manual save validation leaves navigation methodology to external skills", () => {
   const flow = createEmptyProductFlow();
   const orphan = createFlowNode(flow, { title: "人工暂存页面", pageType: "page" });
   assert.equal(validateProductFlow(flow).valid, true);
@@ -246,8 +242,8 @@ test("Manual save validation permits orphan nodes but rejects invalid navigation
     type: "interaction"
   });
   const validation = validateProductFlow(flow);
-  assert.equal(validation.valid, false);
-  assert.ok(validation.errors.some((error) => error.includes("multiple active hierarchy parents")));
+  assert.equal(validation.valid, true);
+  assert.deepEqual(validation.errors, []);
 });
 
 test("Manual target node inlet can accept multiple source outlets", () => {

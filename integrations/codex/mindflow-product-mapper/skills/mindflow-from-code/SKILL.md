@@ -5,7 +5,7 @@ description: Reverse engineer an existing codebase into partitioned, evidence-ba
 
 # MindFlow From Code
 
-Use `mindflow-task-orchestrator` first. Code inspection is read-only; canvas generation waits for complete analysis and synthesis.
+Use `mindflow-product-analysis` and `mindflow-task-orchestrator` first. Code inspection is read-only; canvas generation waits for complete analysis and synthesis.
 
 ## Inventory
 
@@ -28,5 +28,4 @@ Separate executable evidence from names/comments. Mark assumptions `origin: infe
 
 ## Partition and synthesize
 
-Split by application, module, route group, large page/component tree, or complete business flow. Keep each partition below 20,000 characters and 50 candidate nodes. Checkpoint each completed partition. After every partition is complete, deduplicate semantic entities, reconcile cross-module behavior and unresolved items, and hand the synthesized result to `mindflow-canvas-authoring`.
-
+Split by application, module, route group, large page/component tree, or complete business flow. Keep each partition below 20,000 characters and 50 candidate nodes. Checkpoint each completed partition. After every partition is complete, deduplicate semantic entities, reconcile cross-module behavior and unresolved items, populate and validate the shared `analysis_packet.json`, then hand it to `mindflow-canvas-authoring` or a requested deliverable generator.
