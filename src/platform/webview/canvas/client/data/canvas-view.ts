@@ -49,7 +49,7 @@ function selectNode(nodeId, center, options = {}) {
   requestAnimationFrame(() => {
     focusCanvas();
     if (center && selectedNodeIds.includes(nodeId)) {
-      centerCard("node", nodeId);
+      centerCard("node", nodeId, { fitToViewport: true, animate: true });
     }
   });
 }
@@ -167,17 +167,38 @@ function focusCanvas() {
   document.getElementById("canvas")?.focus({ preventScroll: true });
 }
 
-function centerCard(kind, id) {
+function centerCard(kind, id, options: { fitToViewport?: boolean; animate?: boolean } = {}) {
   const canvas = document.getElementById("canvas");
   const card = getCardElement(kind, id);
   const pos = getCardPosition(kind, id);
   if (!canvas || !card || !pos) {
     return;
   }
-  camera.x = canvas.clientWidth / 2 - (pos.x + card.offsetWidth / 2) * zoom;
-  camera.y = canvas.clientHeight / 2 - (pos.y + card.offsetHeight / 2) * zoom;
-  applyCamera();
-  scheduleDrawEdges();
+  let nextViewport = null;
+  if (options.fitToViewport === true) {
+    nextViewport = canvasViewportFocusForCard({
+      x: pos.x,
+      y: pos.y,
+      width: card.offsetWidth,
+      height: card.offsetHeight
+    }, {
+      width: canvas.clientWidth,
+      height: canvas.clientHeight
+    });
+  }
+  nextViewport ||= {
+    zoom,
+    camera: {
+      x: canvas.clientWidth / 2 - (pos.x + card.offsetWidth / 2) * zoom,
+      y: canvas.clientHeight / 2 - (pos.y + card.offsetHeight / 2) * zoom
+    }
+  };
+  if (options.animate === true) {
+    animateCanvasViewport(nextViewport);
+    return;
+  }
+  cancelCanvasViewportAnimation(false);
+  applyCanvasViewport(nextViewport);
 }
 
 function centerNode(nodeId) {

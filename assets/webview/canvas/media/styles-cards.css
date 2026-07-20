@@ -64,6 +64,49 @@
   box-shadow: var(--card-shadow-strong);
 }
 
+.node-card.relation-card-highlight::after,
+.app-surface-card.relation-card-highlight::after,
+.project-overview-card.relation-card-highlight::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border: 2px solid var(--vscode-focusBorder, var(--accent));
+  border-radius: 12px;
+  opacity: 0.28;
+  pointer-events: none;
+  transform: scale(0.99);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--vscode-focusBorder, var(--accent)), transparent 72%);
+  animation: relation-card-highlight-pulse 800ms ease-in-out 3;
+}
+
+@keyframes relation-card-highlight-pulse {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.99);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--vscode-focusBorder, var(--accent)), transparent 72%);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.012);
+    box-shadow:
+      0 0 0 6px color-mix(in srgb, var(--vscode-focusBorder, var(--accent)), transparent 76%),
+      0 0 20px color-mix(in srgb, var(--vscode-focusBorder, var(--accent)), transparent 42%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-card.relation-card-highlight::after,
+  .app-surface-card.relation-card-highlight::after,
+  .project-overview-card.relation-card-highlight::after {
+    opacity: 1;
+    transform: none;
+    animation: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--vscode-focusBorder, var(--accent)), transparent 74%);
+  }
+}
+
 .origin-dot,
 .target-dot {
   position: relative;

@@ -1,7 +1,7 @@
 .canvas {
   position: relative;
   overflow: hidden;
-  cursor: grab;
+  cursor: default;
   touch-action: none;
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--border), transparent 70%) 1px, transparent 1px),

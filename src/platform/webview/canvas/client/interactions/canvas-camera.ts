@@ -1,4 +1,10 @@
 const INITIAL_VIEWPORT_FIT_PADDING = 72;
+const RELATION_CARD_FOCUS_PADDING = 64;
+const CAMERA_ANIMATION_MIN_DURATION_MS = 280;
+const CAMERA_ANIMATION_MAX_DURATION_MS = 600;
+const CAMERA_ANIMATION_DISTANCE_FACTOR = 0.18;
+const CAMERA_ANIMATION_ZOOM_DISTANCE = 600;
+let canvasViewportAnimationFrame = null;
 
 function seedProjectOverviewPosition(flow) {
   if (projectOverviewPosition) {
@@ -175,6 +181,130 @@ function canvasViewportFitForBounds(bounds, viewport, padding = INITIAL_VIEWPORT
   };
 }
 
+function canvasViewportFocusForCard(card, viewport, padding = RELATION_CARD_FOCUS_PADDING) {
+  const viewportWidth = Number(viewport?.width);
+  const viewportHeight = Number(viewport?.height);
+  const cardX = Number(card?.x);
+  const cardY = Number(card?.y);
+  const cardWidth = Number(card?.width);
+  const cardHeight = Number(card?.height);
+  if (
+    !Number.isFinite(viewportWidth) ||
+    !Number.isFinite(viewportHeight) ||
+    viewportWidth <= 0 ||
+    viewportHeight <= 0 ||
+    !Number.isFinite(cardX) ||
+    !Number.isFinite(cardY) ||
+    !Number.isFinite(cardWidth) ||
+    !Number.isFinite(cardHeight) ||
+    cardWidth <= 0 ||
+    cardHeight <= 0
+  ) {
+    return null;
+  }
+  const safePadding = Math.max(0, Number.isFinite(Number(padding)) ? Number(padding) : 0);
+  const availableWidth = Math.max(1, viewportWidth - safePadding * 2);
+  const availableHeight = Math.max(1, viewportHeight - safePadding * 2);
+  const nextZoom = clamp(Math.min(1, availableWidth / cardWidth, availableHeight / cardHeight), MIN_ZOOM, MAX_ZOOM);
+  return {
+    zoom: nextZoom,
+    camera: {
+      x: Math.round(viewportWidth / 2 - (cardX + cardWidth / 2) * nextZoom),
+      y: Math.round(viewportHeight / 2 - (cardY + cardHeight / 2) * nextZoom)
+    }
+  };
+}
+
+function canvasViewportAnimationDuration(from, to) {
+  const panDistance = Math.hypot(
+    Number(to?.camera?.x) - Number(from?.camera?.x),
+    Number(to?.camera?.y) - Number(from?.camera?.y)
+  );
+  const zoomDistance = Math.abs(Number(to?.zoom) - Number(from?.zoom)) * CAMERA_ANIMATION_ZOOM_DISTANCE;
+  const distance = Number.isFinite(panDistance + zoomDistance) ? panDistance + zoomDistance : 0;
+  return Math.round(clamp(
+    CAMERA_ANIMATION_MIN_DURATION_MS + distance * CAMERA_ANIMATION_DISTANCE_FACTOR,
+    CAMERA_ANIMATION_MIN_DURATION_MS,
+    CAMERA_ANIMATION_MAX_DURATION_MS
+  ));
+}
+
+function canvasViewportAnimationState(from, to, progress) {
+  const normalized = clamp(Number(progress), 0, 1);
+  const eased = 1 - Math.pow(1 - normalized, 3);
+  return {
+    zoom: from.zoom + (to.zoom - from.zoom) * eased,
+    camera: {
+      x: from.camera.x + (to.camera.x - from.camera.x) * eased,
+      y: from.camera.y + (to.camera.y - from.camera.y) * eased
+    }
+  };
+}
+
+function canvasViewportAnimationIsSettled(from, to) {
+  return (
+    Math.abs(to.zoom - from.zoom) < 0.001 &&
+    Math.abs(to.camera.x - from.camera.x) < 0.5 &&
+    Math.abs(to.camera.y - from.camera.y) < 0.5
+  );
+}
+
+function prefersReducedCanvasMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+}
+
+function animateCanvasViewport(nextViewport) {
+  cancelCanvasViewportAnimation(false);
+  const initialViewport = {
+    zoom,
+    camera: { x: camera.x, y: camera.y }
+  };
+  if (prefersReducedCanvasMotion() || canvasViewportAnimationIsSettled(initialViewport, nextViewport)) {
+    applyCanvasViewport(nextViewport);
+    return;
+  }
+  const duration = canvasViewportAnimationDuration(initialViewport, nextViewport);
+  const startedAt = performance.now();
+  const step = (timestamp) => {
+    const progress = clamp((timestamp - startedAt) / duration, 0, 1);
+    const frameViewport = progress >= 1
+      ? nextViewport
+      : canvasViewportAnimationState(initialViewport, nextViewport, progress);
+    zoom = frameViewport.zoom;
+    camera = frameViewport.camera;
+    const complete = progress >= 1;
+    if (complete) {
+      canvasViewportAnimationFrame = null;
+    }
+    applyCamera({ persist: complete });
+    scheduleDrawEdges();
+    if (!complete) {
+      canvasViewportAnimationFrame = requestAnimationFrame(step);
+    }
+  };
+  canvasViewportAnimationFrame = requestAnimationFrame(step);
+}
+
+function cancelCanvasViewportAnimation(persist = true) {
+  if (canvasViewportAnimationFrame === null) {
+    return false;
+  }
+  cancelAnimationFrame(canvasViewportAnimationFrame);
+  canvasViewportAnimationFrame = null;
+  if (persist) {
+    applyCamera();
+    scheduleDrawEdges();
+  }
+  return true;
+}
+
+function applyCanvasViewport(nextViewport) {
+  zoom = nextViewport.zoom;
+  camera = nextViewport.camera;
+  applyCamera();
+  scheduleDrawEdges();
+}
+
 function isFiniteBounds(bounds) {
   return Boolean(
     bounds &&
@@ -198,7 +328,7 @@ function finitePositiveNumberOr(value, fallback) {
   return Number.isFinite(fallback) && fallback > 0 ? fallback : Number.NaN;
 }
 
-function applyCamera() {
+function applyCamera(options: { persist?: boolean } = {}) {
   const world = document.getElementById("world");
   const canvas = document.getElementById("canvas");
   const pill = document.querySelector(".zoom-pill");
@@ -213,7 +343,9 @@ function applyCamera() {
   if (pill) {
     pill.textContent = `${Math.round(zoom * 100)}%`;
   }
-  persistUiState();
+  if (options.persist !== false) {
+    persistUiState();
+  }
 }
 
 function shouldLetPanelHandleWheel(target) {
@@ -225,6 +357,7 @@ function handleWheel(event) {
     return;
   }
   event.preventDefault();
+  cancelCanvasViewportAnimation();
   if (event.ctrlKey || event.metaKey) {
     const factor = event.deltaY < 0 ? 1.08 : 0.92;
     zoomAt(event.clientX, event.clientY, zoom * factor);

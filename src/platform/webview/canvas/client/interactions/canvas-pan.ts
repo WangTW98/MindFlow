@@ -12,6 +12,7 @@ function startPan(event) {
   ) {
     return;
   }
+  cancelCanvasViewportAnimation();
   const canvas = document.getElementById("canvas");
   panState = {
     pointerId: event.pointerId,

@@ -348,6 +348,20 @@ export interface SelectionRelationHelpers {
   getSelectionRelationGroups(flow: unknown, selectedNode: unknown, selectedEdge: unknown): SelectionRelationGroups | null;
 }
 
+export interface SelectionRelationHighlightCard {
+  offsetWidth: number;
+  classList: {
+    add(value: string): void;
+    remove(value: string): void;
+  };
+}
+
+export interface SelectionRelationHighlightHelpers {
+  flashSelectionRelationCard(kind: string, id: string): boolean;
+  clearSelectionRelationCardHighlight(): void;
+  durationMs: number;
+}
+
 export interface CanvasViewportBounds {
   minX: number;
   minY: number;
@@ -368,8 +382,19 @@ export interface CanvasViewportFit {
   };
 }
 
+export interface CanvasCardBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface CanvasViewportHelpers {
   canvasViewportFitForBounds(bounds: CanvasViewportBounds | null, viewport: CanvasViewportSize, padding?: number): CanvasViewportFit | null;
+  canvasViewportFocusForCard(card: CanvasCardBounds, viewport: CanvasViewportSize, padding?: number): CanvasViewportFit | null;
+  canvasViewportAnimationDuration(from: CanvasViewportFit, to: CanvasViewportFit): number;
+  canvasViewportAnimationState(from: CanvasViewportFit, to: CanvasViewportFit, progress: number): CanvasViewportFit;
+  canvasViewportAnimationIsSettled(from: CanvasViewportFit, to: CanvasViewportFit): boolean;
 }
 
 export interface AutoLayoutPosition {
@@ -424,13 +449,34 @@ export async function loadSelectionRelationHelpers(): Promise<SelectionRelationH
   return factory("projectOverview");
 }
 
+export async function loadSelectionRelationHighlightHelpers(options: {
+  getCardElement(kind: string, id: string): SelectionRelationHighlightCard | null;
+  setTimeout(callback: () => void, durationMs: number): unknown;
+  clearTimeout(timer: unknown): void;
+}): Promise<SelectionRelationHighlightHelpers> {
+  const source = await readWebviewRuntimeFile("rendering", "canvas-selection-relations.js");
+  const factory = new Function(
+    "PROJECT_OVERVIEW_NODE_ID",
+    "getCardElement",
+    "setTimeout",
+    "clearTimeout",
+    `${source}\nreturn { flashSelectionRelationCard, clearSelectionRelationCardHighlight, durationMs: SELECTION_RELATION_CARD_HIGHLIGHT_DURATION_MS };`
+  ) as (
+    projectOverviewNodeId: string,
+    getCardElement: typeof options.getCardElement,
+    setTimeoutCallback: typeof options.setTimeout,
+    clearTimeoutCallback: typeof options.clearTimeout
+  ) => SelectionRelationHighlightHelpers;
+  return factory("projectOverview", options.getCardElement, options.setTimeout, options.clearTimeout);
+}
+
 export async function loadCanvasViewportHelpers(): Promise<CanvasViewportHelpers> {
   const source = await readWebviewRuntimeFile("interactions", "canvas-camera.js");
   const factory = new Function(
     "MIN_ZOOM",
     "MAX_ZOOM",
     "clamp",
-    `${source}\nreturn { canvasViewportFitForBounds };`
+    `${source}\nreturn { canvasViewportFitForBounds, canvasViewportFocusForCard, canvasViewportAnimationDuration, canvasViewportAnimationState, canvasViewportAnimationIsSettled };`
   ) as (minZoom: number, maxZoom: number, clamp: (value: number, min: number, max: number) => number) => CanvasViewportHelpers;
   return factory(0.05, 2.6, (value, min, max) => Math.min(max, Math.max(min, value)));
 }

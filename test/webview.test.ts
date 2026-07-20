@@ -33,6 +33,7 @@ import {
   loadAutoLayoutHelpers,
   loadCanvasViewportHelpers,
   loadEndpointCodecHelpers,
+  loadSelectionRelationHighlightHelpers,
   loadSelectionRelationHelpers,
   requireNodeByTitle
 } from "./helpers";
@@ -225,6 +226,123 @@ test("Selection relation panel filters removed relations and deduplicates node c
   assert.deepEqual(groups?.to, [{ kind: "node", id: target.nodeId, title: "目标节点" }]);
 });
 
+test("Selection relation card highlight is transient, exclusive, and restarts without changing selection", async () => {
+  const createCard = () => {
+    const classes = new Set<string>(["selected"]);
+    return {
+      offsetWidth: 300,
+      classList: {
+        add(value: string) {
+          classes.add(value);
+        },
+        remove(value: string) {
+          classes.delete(value);
+        }
+      },
+      hasClass(value: string) {
+        return classes.has(value);
+      }
+    };
+  };
+  const cards = {
+    "node:node_a": createCard(),
+    "appSurface:app_admin": createCard(),
+    "projectOverview:projectOverview": createCard()
+  };
+  const timers = new Map<number, { callback: () => void; durationMs: number }>();
+  const clearedTimers: number[] = [];
+  let nextTimerId = 1;
+  const highlight = await loadSelectionRelationHighlightHelpers({
+    getCardElement(kind, id) {
+      return cards[`${kind}:${id}` as keyof typeof cards] || null;
+    },
+    setTimeout(callback, durationMs) {
+      const timerId = nextTimerId;
+      nextTimerId += 1;
+      timers.set(timerId, { callback, durationMs });
+      return timerId;
+    },
+    clearTimeout(timer) {
+      const timerId = Number(timer);
+      clearedTimers.push(timerId);
+      timers.delete(timerId);
+    }
+  });
+
+  assert.equal(highlight.durationMs, 2400);
+  assert.equal(highlight.flashSelectionRelationCard("node", "node_a"), true);
+  assert.equal(cards["node:node_a"].hasClass("relation-card-highlight"), true);
+  assert.equal(cards["node:node_a"].hasClass("selected"), true);
+  assert.equal(timers.get(1)?.durationMs, 2400);
+
+  assert.equal(highlight.flashSelectionRelationCard("appSurface", "app_admin"), true);
+  assert.equal(cards["node:node_a"].hasClass("relation-card-highlight"), false);
+  assert.equal(cards["appSurface:app_admin"].hasClass("relation-card-highlight"), true);
+  assert.deepEqual(clearedTimers, [1]);
+
+  assert.equal(highlight.flashSelectionRelationCard("appSurface", "app_admin"), true);
+  assert.equal(cards["appSurface:app_admin"].hasClass("relation-card-highlight"), true);
+  assert.deepEqual(clearedTimers, [1, 2]);
+
+  assert.equal(highlight.flashSelectionRelationCard("projectOverview", "projectOverview"), true);
+  assert.equal(cards["appSurface:app_admin"].hasClass("relation-card-highlight"), false);
+  assert.equal(cards["projectOverview:projectOverview"].hasClass("relation-card-highlight"), true);
+  timers.get(4)?.callback();
+  assert.equal(cards["projectOverview:projectOverview"].hasClass("relation-card-highlight"), false);
+  assert.equal(cards["projectOverview:projectOverview"].hasClass("selected"), true);
+
+  assert.equal(highlight.flashSelectionRelationCard("node", "missing"), false);
+});
+
+test("Relation and node-list focus share smooth adaptive camera behavior without sharing highlight state", async () => {
+  const [relationSource, canvasViewSource, bindingsSource, cameraSource, panSource, cardStyles] = await Promise.all([
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/rendering/canvas-selection-relations.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/data/canvas-view.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/interactions/canvas-element-bindings.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/interactions/canvas-camera.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "src/platform/webview/canvas/client/interactions/canvas-pan.ts"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "assets/webview/canvas/media/styles-cards.css"), "utf8")
+  ]);
+
+  assert.ok(relationSource.includes('centerCard(button.dataset.relationCardKind, button.dataset.relationCardId, { fitToViewport: true, animate: true })'));
+  assert.ok(canvasViewSource.includes('centerCard("node", nodeId, { fitToViewport: true, animate: true });'));
+  assert.ok(canvasViewSource.includes("if (center && selectedNodeIds.includes(nodeId))"));
+  assert.ok(bindingsSource.includes("selectNode(nodeId, true, { multi });"));
+  assert.ok(bindingsSource.includes("selectNode(nodeId, false, { multi });"));
+  assert.ok(cameraSource.includes('requestAnimationFrame(step)'));
+  assert.ok(cameraSource.includes('cancelCanvasViewportAnimation();'));
+  assert.ok(cameraSource.includes('applyCamera({ persist: complete })'));
+  assert.ok(cameraSource.includes('window.matchMedia?.("(prefers-reduced-motion: reduce)")'));
+  assert.ok(panSource.includes('cancelCanvasViewportAnimation();'));
+  assert.ok(relationSource.includes("flashSelectionRelationCard(button.dataset.relationCardKind, button.dataset.relationCardId)"));
+  assert.equal(canvasViewSource.includes("flashSelectionRelationCard"), false);
+  assert.equal(relationSource.includes("selectNode(button.dataset.relationCardId"), false);
+  assert.ok(cardStyles.includes(".node-card.relation-card-highlight::after"));
+  assert.ok(cardStyles.includes(".app-surface-card.relation-card-highlight::after"));
+  assert.ok(cardStyles.includes(".project-overview-card.relation-card-highlight::after"));
+  assert.ok(cardStyles.includes("animation: relation-card-highlight-pulse 800ms ease-in-out 3"));
+  assert.ok(cardStyles.includes("@media (prefers-reduced-motion: reduce)"));
+  assert.ok(cardStyles.includes("pointer-events: none"));
+});
+
+test("Canvas blank space uses the default pointer while interactive states keep their cursors", async () => {
+  const [canvasStyles, cardStyles, overviewStyles, inspectorStyles] = await Promise.all([
+    fs.readFile(path.join(process.cwd(), "assets/webview/canvas/media/styles-canvas.css"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "assets/webview/canvas/media/styles-cards.css"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "assets/webview/canvas/media/styles-project-overview.css"), "utf8"),
+    fs.readFile(path.join(process.cwd(), "assets/webview/canvas/media/styles-inspector.css"), "utf8")
+  ]);
+
+  assert.match(canvasStyles, /\.canvas\s*\{[^}]*cursor:\s*default;/s);
+  assert.match(canvasStyles, /\.canvas\.panning\s*\{[^}]*cursor:\s*grabbing;/s);
+  assert.match(canvasStyles, /\.edge-hitarea\s*\{[^}]*cursor:\s*pointer;/s);
+  assert.match(cardStyles, /\.node-card\s*\{[^}]*cursor:\s*grab;/s);
+  assert.match(cardStyles, /\.app-surface-card\s*\{[^}]*cursor:\s*pointer;/s);
+  assert.match(cardStyles, /\.origin-dot,[\s\S]*?\.target-dot\s*\{[^}]*cursor:\s*crosshair;/s);
+  assert.match(overviewStyles, /\.project-overview-card\s*\{[^}]*cursor:\s*grab;/s);
+  assert.match(inspectorStyles, /\.inspector h2\.inline-title-editor\s*\{[^}]*cursor:\s*text;/s);
+});
+
 test("Canvas viewport fit brings saved offscreen content into view", async () => {
   const { canvasViewportFitForBounds } = await loadCanvasViewportHelpers();
   const bounds = { minX: 2000, minY: 1000, maxX: 2600, maxY: 1400 };
@@ -254,6 +372,74 @@ test("Canvas viewport fit ignores empty bounds and unavailable canvas sizes", as
 
   assert.equal(canvasViewportFitForBounds(null, { width: 800, height: 600 }, 72), null);
   assert.equal(canvasViewportFitForBounds({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, { width: 0, height: 600 }, 72), null);
+});
+
+test("Relation card focus uses 100% for normal cards and centers them", async () => {
+  const { canvasViewportFocusForCard } = await loadCanvasViewportHelpers();
+  const focused = canvasViewportFocusForCard(
+    { x: 2000, y: 1000, width: 300, height: 220 },
+    { width: 800, height: 600 }
+  );
+
+  assert.deepEqual(focused, {
+    zoom: 1,
+    camera: { x: -1750, y: -810 }
+  });
+});
+
+test("Relation card focus shrinks tall cards to preserve 64px viewport padding", async () => {
+  const { canvasViewportFocusForCard } = await loadCanvasViewportHelpers();
+  const card = { x: 400, y: 300, width: 300, height: 900 };
+  const focused = canvasViewportFocusForCard(card, { width: 800, height: 600 });
+
+  assert.ok(focused);
+  assert.equal(focused.zoom, 472 / 900);
+  assert.equal(Math.round(card.y * focused.zoom + focused.camera.y), 64);
+  assert.equal(Math.round((card.y + card.height) * focused.zoom + focused.camera.y), 536);
+});
+
+test("Relation card focus respects zoom bounds and rejects unavailable geometry", async () => {
+  const { canvasViewportFocusForCard } = await loadCanvasViewportHelpers();
+
+  assert.equal(canvasViewportFocusForCard(
+    { x: 0, y: 0, width: 1000, height: 1000 },
+    { width: 10, height: 10 }
+  )?.zoom, 0.05);
+  assert.equal(canvasViewportFocusForCard(
+    { x: 0, y: 0, width: 100, height: 100 },
+    { width: 1000, height: 1000 }
+  )?.zoom, 1);
+  assert.equal(canvasViewportFocusForCard(
+    { x: 0, y: 0, width: 0, height: 100 },
+    { width: 1000, height: 1000 }
+  ), null);
+});
+
+test("Relation card camera animation uses distance-aware timing within 280-600ms", async () => {
+  const { canvasViewportAnimationDuration } = await loadCanvasViewportHelpers();
+  const start = { zoom: 1, camera: { x: 0, y: 0 } };
+
+  assert.equal(canvasViewportAnimationDuration(start, start), 280);
+  assert.equal(canvasViewportAnimationDuration(start, { zoom: 0.5, camera: { x: 1000, y: 0 } }), 514);
+  assert.equal(canvasViewportAnimationDuration(start, { zoom: 0.1, camera: { x: 5000, y: 5000 } }), 600);
+});
+
+test("Relation card camera animation eases pan and zoom to the exact target", async () => {
+  const { canvasViewportAnimationState, canvasViewportAnimationIsSettled } = await loadCanvasViewportHelpers();
+  const start = { zoom: 0.5, camera: { x: 0, y: 100 } };
+  const target = { zoom: 1, camera: { x: 800, y: -300 } };
+
+  assert.deepEqual(canvasViewportAnimationState(start, target, 0), start);
+  assert.deepEqual(canvasViewportAnimationState(start, target, 0.5), {
+    zoom: 0.9375,
+    camera: { x: 700, y: -250 }
+  });
+  assert.deepEqual(canvasViewportAnimationState(start, target, 1), target);
+  assert.equal(canvasViewportAnimationIsSettled(start, target), false);
+  assert.equal(canvasViewportAnimationIsSettled(target, {
+    zoom: 1.0005,
+    camera: { x: 800.2, y: -300.2 }
+  }), true);
 });
 
 test("Canvas auto layout previews hierarchy, lanes, spacing, and collision-free positions", async () => {

@@ -1,3 +1,8 @@
+const SELECTION_RELATION_CARD_HIGHLIGHT_CLASS = "relation-card-highlight";
+const SELECTION_RELATION_CARD_HIGHLIGHT_DURATION_MS = 2400;
+let selectionRelationCardHighlightTimer = null;
+let highlightedSelectionRelationCard = null;
+
 function renderSelectionRelationsPanel(flow, selectedNode, selectedEdge) {
   const groups = getSelectionRelationGroups(flow, selectedNode, selectedEdge);
   if (!groups) {
@@ -164,10 +169,42 @@ function bindSelectionRelations(root: any = document) {
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      centerCard(button.dataset.relationCardKind, button.dataset.relationCardId);
+      centerCard(button.dataset.relationCardKind, button.dataset.relationCardId, { fitToViewport: true, animate: true });
+      flashSelectionRelationCard(button.dataset.relationCardKind, button.dataset.relationCardId);
       focusCanvas();
     });
   });
+}
+
+function flashSelectionRelationCard(kind, id) {
+  const card = getCardElement(kind, id);
+  clearSelectionRelationCardHighlight();
+  if (!card) {
+    return false;
+  }
+  card.classList.remove(SELECTION_RELATION_CARD_HIGHLIGHT_CLASS);
+  void card.offsetWidth;
+  card.classList.add(SELECTION_RELATION_CARD_HIGHLIGHT_CLASS);
+  highlightedSelectionRelationCard = card;
+  selectionRelationCardHighlightTimer = setTimeout(() => {
+    if (highlightedSelectionRelationCard === card) {
+      card.classList.remove(SELECTION_RELATION_CARD_HIGHLIGHT_CLASS);
+      highlightedSelectionRelationCard = null;
+      selectionRelationCardHighlightTimer = null;
+    }
+  }, SELECTION_RELATION_CARD_HIGHLIGHT_DURATION_MS);
+  return true;
+}
+
+function clearSelectionRelationCardHighlight() {
+  if (selectionRelationCardHighlightTimer !== null) {
+    clearTimeout(selectionRelationCardHighlightTimer);
+    selectionRelationCardHighlightTimer = null;
+  }
+  if (highlightedSelectionRelationCard) {
+    highlightedSelectionRelationCard.classList.remove(SELECTION_RELATION_CARD_HIGHLIGHT_CLASS);
+    highlightedSelectionRelationCard = null;
+  }
 }
 
 function refreshSelectionRelationsPanel() {
