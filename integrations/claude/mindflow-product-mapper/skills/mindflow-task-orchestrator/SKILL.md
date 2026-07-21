@@ -1,46 +1,30 @@
 ---
 name: mindflow-task-orchestrator
-description: Create, validate, resume, and checkpoint partitioned MindFlow product-analysis tasks under .mindflow/tasks for documents, code, existing canvases, audits, canvas updates, PRDs, and design handoffs. Use whenever a non-trivial MindFlow workflow needs evidence traceability, bounded context, progressive generation, revision recovery, or resumable delivery.
+description: Create, validate, resume, and checkpoint MindFlow product-analysis tasks. Use whenever a MindFlow workflow needs evidence traceability, progressive generation, or resumable delivery.
 ---
 
 # MindFlow Task Orchestrator
 
-Use this skill after `mindflow-product-analysis` selects a mode and before source analysis or `mindflow-canvas-authoring`. MindFlow MCP is only the canvas operation layer; this skill owns analysis state and recovery.
+Use this skill to orchestrate MindFlow canvas generation tasks. MCP handles canvas operations, while this skill manages analysis state and task progression.
 
-## Start or resume
+## Consolidated 3-Stage Workflow
 
-1. If the user gives a task id or explicitly asks to continue, inspect `.mindflow/tasks/<task-id>/mindflow_task.md`; otherwise create a new task.
-2. For a new task run:
+Tasks execute through 3 core logical stages:
 
-   ```bash
-   python3 scripts/mindflow_task.py init --workspace <workspace> --title <title> --source-type <documents|code|canvas|mixed> --mode <mode> --source-root <path-or-url> [--output-target <canvas|audit|prd|html|figma|pencil>]
-   ```
+1. `extraction`: Analyze input sources (documents, code, canvas) into a structured `ProductAnalysisPacket` containing root narratives, taxonomy (domains/roles/statusGroups), applications, and page index.
+2. `draft_design`: Perform complete graph architecture and edge design in memory. Validate 5 edge types, orange feature outlets, and structural integrity using `mindflow_validate_flow`.
+3. `applying`: Apply changes to the canvas in 2 coherent batches (`Batch 1: Skeletons & Core Nodes`, `Batch 2: States & Edge Relations`), then preview and apply auto layout.
 
-3. For recovery, read only `mindflow_task.md`, the latest checkpoint, `state/generation_state.md`, the relevant summary section, and the current partition.
-4. Confirm current canvas revision and indexed entities before resuming generation. The canvas wins if it differs from `entity_index.md`.
+## Start or Resume
 
-## Enforce phases
+1. If resuming a task, inspect `.mindflow/tasks/<task-id>/mindflow_task.md` or recent checkpoints; otherwise start a new task context.
+2. Maintain task state cleanly in `.mindflow/tasks/<task-id>/`:
+   - `mindflow_task.md`: Task status and execution log.
+   - `analysis_packet.json`: Unified analysis output (root narratives, taxonomy, appSurfaces, page index).
+3. Confirm current canvas revision (`mindflow_get_editor_state`) before submitting changesets.
 
-New canvas tasks use workflow version 3 and this fixed order: `initializing`, `inventory`, `framework_analyzing`, `product_prd`, `page_prds`, `framework_designing`, `framework_generating`, `page_enriching`, `validating`, `delivering`, `completed`. Workflow version 2 remains resumable and legacy tasks without `workflow_version` retain the original phase vocabulary. Do not enter framework design until every analysis partition, the schema-version 2 analysis packet, the comprehensive PRD, every indexed page PRD, and the one-way export are complete and valid. Version 3 page PRDs must pass visual-composition and page-specificity gates.
+## Keep Context Bounded
 
-Task status must be one of `pending`, `analyzing`, `designing`, `generating`, `validating`, `completed`, `blocked`. Canvas save status is separate: `not_created`, `dirty`, or `saved`.
-
-After each analysis partition or generation batch, run `checkpoint` and set exactly one next action:
-
-```bash
-python3 scripts/mindflow_task.py checkpoint --task <task-dir> --phase <phase> --part <id> --next-action <one-action> [--flow-uri <uri>] [--revision-before N] [--revision-after N]
-```
-
-For every generation batch record its id/label, dry-run revision, applied revision, affected ids, reveal result, approval state, and next batch in `state/batch_plan.json`. Keep destructive batches separate.
-
-## Keep context bounded
-
-- One analysis partition: at most 20,000 characters and 50 candidate nodes.
-- Main task file: at most 400 lines.
-- Summaries link to details and do not repeat them.
-- Inventory stores fingerprints and evidence locations, never complete sources, credentials, tokens, or sensitive configuration.
-- On changed source fingerprint, invalidate only dependent partitions and graph drafts; list vanished entities as `staleCandidates` rather than deleting them.
-
-Run `python3 scripts/mindflow_task.py validate --task <task-dir>` before a phase transition. Read [references/task-contract.md](references/task-contract.md) when implementing recovery, drift, or conflict handling.
-
-For workflow-version 2 or 3, run `python3 scripts/mindflow_task.py export-prd --task <task-dir> --output <workspace>/docs/mindflow/<task-id>` after page PRDs validate. Generated exports are deliverables, never inputs to the same task.
+- Main task log: concise, at most 300 lines.
+- Partition large inputs (>20,000 chars or >50 candidate nodes) during extraction.
+- Avoid creating redundant intermediate page PRD files unless explicitly requested by the user.
