@@ -25,6 +25,12 @@ export class FlowRepository {
     await this.ensureDirectories();
     const fileName = `${slugify(flow.title, "flow")}-${flow.flowId}${FLOW_FILE_EXTENSION}`;
     const absolutePath = path.join(this.directoryPath, fileName);
+    const existingFiles = await this.list().catch(() => []);
+    for (const existingFile of existingFiles) {
+      if (existingFile !== absolutePath && existingFile.endsWith(`-${flow.flowId}${FLOW_FILE_EXTENSION}`)) {
+        await fs.rm(existingFile, { force: true }).catch(() => undefined);
+      }
+    }
     flow.updatedAt = nowIso();
     await writeTextAtomic(absolutePath, serializeProductFlow(flow));
     return absolutePath;

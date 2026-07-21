@@ -3,6 +3,8 @@ import * as path from "node:path";
 
 export type MindFlowExternalFileAccessMode = "prompt" | "allow" | "workspaceOnly";
 
+const pendingConfirmations = new Map<string, Promise<boolean>>();
+
 export async function authorizeMcpFileOpen(
   flowPath: string,
   workspaceRoots: readonly string[],
@@ -16,7 +18,14 @@ export async function authorizeMcpFileOpen(
   if (mode === "workspaceOnly") {
     throw new Error(`MindFlow MCP external file access is restricted to open workspaces: ${realPath}`);
   }
-  if (!await confirmExternal(realPath)) {
+  let confirmation = pendingConfirmations.get(realPath);
+  if (!confirmation) {
+    confirmation = confirmExternal(realPath).finally(() => {
+      pendingConfirmations.delete(realPath);
+    });
+    pendingConfirmations.set(realPath, confirmation);
+  }
+  if (!await confirmation) {
     throw new Error(`User declined MindFlow MCP access to external file: ${realPath}`);
   }
   return realPath;

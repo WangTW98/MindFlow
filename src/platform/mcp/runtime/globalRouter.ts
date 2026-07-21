@@ -350,8 +350,7 @@ function toolResult(value: Record<string, unknown>): Record<string, unknown> {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }], structuredContent: value };
 }
 
-function annotateBackendToolResult(result: Record<string, unknown>, host: MindFlowMcpHostRecord, toolName: string): Record<string, unknown> {
-  if (toolName !== "mindflow_create_flow" && toolName !== "mindflow_open_flow") return result;
+function annotateBackendToolResult(result: Record<string, unknown>, host: MindFlowMcpHostRecord, _toolName: string): Record<string, unknown> {
   const structured = readStructuredContent(result);
   if (!isRecord(structured.editor)) return result;
   return toolResult({ ...structured, editor: { ...structured.editor, hostId: host.hostId, hostName: host.displayName } });

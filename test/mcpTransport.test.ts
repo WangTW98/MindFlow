@@ -112,12 +112,14 @@ test("global MCP Router discovers a live host and aggregates its editors", async
   const port = await listen(server);
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-mcp-router-"));
   const now = new Date().toISOString();
-  await fs.writeFile(path.join(directory, "host-a.json"), JSON.stringify({
+  const hostAPath = path.join(directory, "host-a.json");
+  await fs.writeFile(hostAPath, JSON.stringify({
     hostId: "host-a", displayName: "VS Code Window", environment: "local",
     endpoint: `http://127.0.0.1:${port}/mcp`, token, pid: process.pid,
     createdAt: now, lastSeenAt: now, extensionVersion: "0.1.0", contractVersion: MINDFLOW_MCP_CONTRACT_VERSION, contractHash: mindflowMcpContractHash(),
     windowFocused: true, lastFocusedAt: now
   }), { encoding: "utf8", mode: 0o600 });
+  if (process.platform !== "win32") await fs.chmod(hostAPath, 0o600);
 
   try {
     const router = new MindFlowGlobalRouter(directory);
@@ -149,7 +151,6 @@ test("global MCP Router discovers a live host and aggregates its editors", async
       jsonrpc: "2.0", id: 4, method: "tools/call",
       params: { name: "mindflow_open_flow", arguments: { flowPath: externalPath } }
     });
-    console.error("DEBUG FULL OPENED:", JSON.stringify(opened));
     assert.equal((readStructuredToolResult(opened).editor as Record<string, unknown>).path, externalPath);
     assert.deepEqual(bridge.openedPaths, [externalPath]);
 
@@ -225,12 +226,14 @@ test("global MCP Router uses recent focus, accepts hostId override, and routes b
       const port = await listen(server);
       const now = new Date(Date.now() + index * 1000).toISOString();
       const hostId = `host-${index}`;
-      await fs.writeFile(path.join(directory, `${hostId}.json`), JSON.stringify({
+      const hostPath = path.join(directory, `${hostId}.json`);
+      await fs.writeFile(hostPath, JSON.stringify({
         hostId, displayName: `host-window-${index}`, environment: "local",
         endpoint: `http://127.0.0.1:${port}/mcp`, token, pid: process.pid,
         createdAt: now, lastSeenAt: now, extensionVersion: "0.1.0", contractVersion: MINDFLOW_MCP_CONTRACT_VERSION, contractHash: mindflowMcpContractHash(),
         windowFocused: index === 0, lastFocusedAt: now
       }), { mode: 0o600 });
+      if (process.platform !== "win32") await fs.chmod(hostPath, 0o600);
     }
 
     const router = new MindFlowGlobalRouter(directory);
@@ -313,12 +316,14 @@ test("global MCP Router rejects modifying a flow opened by multiple hosts", asyn
       backends.push(server);
       const port = await listen(server);
       const now = new Date(Date.now() + index).toISOString();
-      await fs.writeFile(path.join(directory, `duplicate-${index}.json`), JSON.stringify({
+      const duplicatePath = path.join(directory, `duplicate-${index}.json`);
+      await fs.writeFile(duplicatePath, JSON.stringify({
         hostId: `duplicate-${index}`, displayName: `duplicate-${index}`, environment: "local",
         endpoint: `http://127.0.0.1:${port}/mcp`, token, pid: process.pid,
         createdAt: now, lastSeenAt: now, extensionVersion: "0.1.0", contractVersion: MINDFLOW_MCP_CONTRACT_VERSION, contractHash: mindflowMcpContractHash(),
         windowFocused: index === 0, lastFocusedAt: now
       }), { mode: 0o600 });
+      if (process.platform !== "win32") await fs.chmod(duplicatePath, 0o600);
     }
 
     const router = new MindFlowGlobalRouter(directory);
@@ -365,8 +370,15 @@ function close(server: http.Server): Promise<void> {
 }
 
 function readStructuredToolResult(response: Record<string, unknown> | undefined): Record<string, unknown> {
+  if (response?.error) {
+    const errorObj = response.error as Record<string, unknown>;
+    throw new Error(`MCP tool call returned error: ${String(errorObj.message)}`);
+  }
   const result = response?.result as Record<string, unknown> | undefined;
-  return result?.structuredContent as Record<string, unknown>;
+  if (!result || typeof result !== "object" || !result.structuredContent) {
+    throw new Error(`MCP response result has no structuredContent: ${JSON.stringify(response)}`);
+  }
+  return result.structuredContent as Record<string, unknown>;
 }
 
 function readErrorMessage(response: Record<string, unknown> | undefined): string {

@@ -45,9 +45,6 @@ __pycache__/
 htmlcov/
 
 # Generated example and sample outputs; source Markdown remains tracked
-samples/generated/
-samples/output/
-samples/.tmp/
 examples/generated/
 examples/output/
 examples/.tmp/

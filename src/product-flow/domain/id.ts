@@ -22,8 +22,7 @@ export function slugify(input: string, fallback = "item"): string {
     return ascii.slice(0, 48);
   }
 
-  const compact = input.replace(/\s+/g, "").slice(0, 12);
-  return compact.length > 0 ? `${fallback}-${shortHash(input, 6)}` : fallback;
+  return input.trim().length > 0 ? `${fallback}-${shortHash(input, 6)}` : fallback;
 }
 
 export function makeFlowId(title: string): string {

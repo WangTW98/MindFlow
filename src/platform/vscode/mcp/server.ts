@@ -236,7 +236,9 @@ async function writeSessionFile(sessionPath: string, session: MindFlowMcpHostRec
   if (process.platform !== "win32") await fs.chmod(directory, 0o700);
   try {
     await fs.writeFile(temporaryPath, `${JSON.stringify(session, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+    if (process.platform !== "win32") await fs.chmod(temporaryPath, 0o600);
     await fs.rename(temporaryPath, sessionPath);
+    if (process.platform !== "win32") await fs.chmod(sessionPath, 0o600);
   } catch (error) {
     await fs.rm(temporaryPath, { force: true });
     throw error;

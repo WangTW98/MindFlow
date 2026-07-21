@@ -7,9 +7,20 @@ export function applyStatusGroupRequest(flow: ProductFlow, request: TaxonomyRequ
   if (request.action === "delete") {
     const statusGroupId = requireRequestId(request);
     flow.statusGroups = flow.statusGroups.filter((item) => item.statusGroupId !== statusGroupId);
+    const affectedNodeIds = new Set<string>();
     for (const node of flow.nodes) {
       if (node.statusGroupId === statusGroupId) {
         delete node.statusGroupId;
+        affectedNodeIds.add(node.nodeId);
+      }
+    }
+    for (const edge of flow.edges) {
+      if (edge.type === "statusChange") {
+        const fromNodeId = edge.from?.kind === "node" ? edge.from.nodeId : undefined;
+        const toNodeId = edge.to?.kind === "node" ? edge.to.nodeId : undefined;
+        if ((fromNodeId && affectedNodeIds.has(fromNodeId)) || (toNodeId && affectedNodeIds.has(toNodeId))) {
+          edge.type = "interaction";
+        }
       }
     }
     return;

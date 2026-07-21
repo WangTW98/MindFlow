@@ -59,11 +59,12 @@ export function updateFlowEdgeDetails(flow: ProductFlow, edgeId: string, patch: 
     edge.toNodeId = endpointStorageId(to);
   }
   if (patch.trigger !== undefined) {
-    edge.trigger = typeof patch.trigger === "string" ? patch.trigger.trim() : edge.trigger ?? edge.action;
+    const trimmed = typeof patch.trigger === "string" ? patch.trigger.trim() : "";
+    edge.trigger = trimmed || edge.trigger || edge.action || "连接";
     edge.action = edge.trigger;
   }
   if (patch.action !== undefined && patch.trigger === undefined) {
-    edge.action = sanitizeText(patch.action, edge.action);
+    edge.action = sanitizeText(patch.action, edge.action) || "连接";
     edge.trigger = edge.action;
   }
   if (patch.type !== undefined) {
@@ -81,6 +82,9 @@ export function updateFlowEdgeDetails(flow: ProductFlow, edgeId: string, patch: 
 export function refreshFlowEdgeDerivedState(flow: ProductFlow, edge: FlowEdge): FlowEdge {
   edge.fromNodeId = endpointStorageId(edge.from);
   edge.toNodeId = endpointStorageId(edge.to);
+  if (edge.status === "removed") {
+    return edge;
+  }
   edge.appSurfaceIds = mergeUnique(endpointAppSurfaceIds(flow, edge.from), endpointAppSurfaceIds(flow, edge.to));
   edge.domainIds = mergeUnique(endpointDomainIds(flow, edge.from), endpointDomainIds(flow, edge.to));
   edge.roleIds = mergeUnique(endpointRoleIds(flow, edge.from), endpointRoleIds(flow, edge.to));
@@ -104,6 +108,20 @@ export function removeFlowNode(flow: ProductFlow, nodeId: string): RemoveNodeRes
   const node = requireNode(flow, nodeId);
   node.status = "removed";
   node.removedAt = nowIso();
+
+  for (const otherNode of flow.nodes) {
+    if (otherNode.featureGroups) {
+      for (const group of otherNode.featureGroups) {
+        if (group.actions) {
+          for (const action of group.actions) {
+            if (action.targetNodeId === nodeId) {
+              delete action.targetNodeId;
+            }
+          }
+        }
+      }
+    }
+  }
 
   const removedEdges: FlowEdge[] = [];
   for (const edge of flow.edges) {

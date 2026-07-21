@@ -56,5 +56,7 @@ function readLocalFilePath(value: string | FileIdentityUriLike): string | undefi
 }
 
 function comparisonPath(value: string): string {
-  return process.platform === "win32" ? value.toLocaleLowerCase("en-US") : value;
+  return process.platform === "win32" || process.platform === "darwin"
+    ? value.toLocaleLowerCase("en-US")
+    : value;
 }

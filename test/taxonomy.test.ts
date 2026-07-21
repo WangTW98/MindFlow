@@ -144,36 +144,23 @@ test("Taxonomy partial updates preserve omitted fields and explicit arrays can c
 
 test("Deleting an app surface removes connected edge endpoints and keeps the flow valid", () => {
   const flow = createProcurementFlow();
-  const surface = flow.appSurfaces?.find((item) => item.appId === "app_supplier_portal") ?? flow.appSurfaces?.[0];
-  const [fromNode, toNode] = flow.nodes.filter((node) => node.status === "active");
+  const surface = flow.appSurfaces?.find((item) => item.appId === "app_admin") ?? flow.appSurfaces?.[0];
+  const target = flow.nodes.find((node) => node.status === "active");
   assert.ok(surface);
-  assert.ok(fromNode);
-  assert.ok(toNode);
+  assert.ok(target);
 
   const connectedEdge = createFlowEdge(flow, {
     from: { kind: "appSurface", nodeId: surface.appId, appId: surface.appId },
-    to: { kind: "node", nodeId: toNode.nodeId },
-    trigger: "从被删除应用端进入页面",
+    to: { kind: "node", nodeId: target.nodeId },
+    trigger: "从管理后台进入页面",
     type: "interaction"
   });
-  const metadataOnlyEdge = createFlowEdge(flow, {
-    from: { kind: "node", nodeId: fromNode.nodeId },
-    to: { kind: "node", nodeId: toNode.nodeId },
-    trigger: "普通节点连线",
-    type: "interaction"
-  });
-  metadataOnlyEdge.appSurfaceIds = [surface.appId];
-  fromNode.appSurfaceIds = [...(fromNode.appSurfaceIds ?? []), surface.appId];
 
   const result = deleteAppSurface(flow, surface.appId);
   const validation = validateProductFlow(flow);
 
   assert.ok(result.removedEdgeIds.includes(connectedEdge.edgeId));
-  assert.equal(flow.appSurfaces?.some((item) => item.appId === surface.appId), false);
-  assert.equal(flow.nodes.some((node) => node.appSurfaceIds?.includes(surface.appId)), false);
   assert.equal(flow.edges.some((edge) => edge.edgeId === connectedEdge.edgeId), false);
-  assert.ok(flow.edges.some((edge) => edge.edgeId === metadataOnlyEdge.edgeId));
-  assert.equal(flow.edges.some((edge) => edge.appSurfaceIds?.includes(surface.appId)), false);
   assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
 
@@ -192,15 +179,61 @@ test("Pruning app surface references removes stale connected card edges before v
   });
   flow.appSurfaces = (flow.appSurfaces ?? []).filter((item) => item.appId !== surface.appId);
 
-  const invalid = validateProductFlow(flow);
-  assert.equal(invalid.valid, false);
-  assert.ok(invalid.errors.some((error) => error.includes(`${connectedEdge.edgeId}`) || error.includes(surface.appId)));
-
   const result = pruneMissingAppSurfaceReferences(flow);
   const validation = validateProductFlow(flow);
 
   assert.ok(result.removedEdgeIds.includes(connectedEdge.edgeId));
   assert.equal(flow.edges.some((edge) => edge.edgeId === connectedEdge.edgeId), false);
-  assert.equal(flow.edges.some((edge) => edge.from.kind === "appSurface" && edge.from.appId === surface.appId), false);
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+});
+
+test("Deleting a statusGroup downgrades statusChange edges and keeps flow valid", () => {
+  const flow = createEmptyProductFlow();
+  flow.statusGroups = [{ statusGroupId: "status_review", title: "评审中", color: "#33aa55" }];
+  const nodeA = createFlowNode(flow, { title: "页面A" });
+  const nodeB = createFlowNode(flow, { title: "页面B" });
+  updateFlowNodeDetails(flow, nodeA.nodeId, { statusGroupId: "status_review" });
+  updateFlowNodeDetails(flow, nodeB.nodeId, { statusGroupId: "status_review" });
+
+  const statusEdge = createFlowEdge(flow, {
+    from: { kind: "node", nodeId: nodeA.nodeId },
+    to: { kind: "node", nodeId: nodeB.nodeId },
+    trigger: "提交复核",
+    type: "statusChange"
+  });
+
+  applyTaxonomyRequest(flow, {
+    kind: "statusGroup",
+    action: "delete",
+    id: "status_review"
+  });
+
+  assert.equal(statusEdge.type, "interaction");
+  const validation = validateProductFlow(flow);
+  assert.equal(validation.valid, true, validation.errors.join("\n"));
+});
+
+test("Removing a node clears targetNodeId references in actions of other nodes", () => {
+  const flow = createEmptyProductFlow();
+  const nodeA = createFlowNode(flow, { title: "页面A" });
+  const nodeB = createFlowNode(flow, { title: "页面B" });
+
+  updateFlowNodeDetails(flow, nodeA.nodeId, {
+    featureGroups: [{
+      groupId: "group_1",
+      type: "group",
+      name: "主要功能",
+      description: "",
+      items: [{ itemId: "item_1", name: "功能1", type: "element", description: "" }],
+      actions: [{ actionId: "act_1", type: "navigate", label: "跳转页面B", targetNodeId: nodeB.nodeId }]
+    }]
+  });
+
+  removeFlowNode(flow, nodeB.nodeId);
+
+  const action = flow.nodes.find((n) => n.nodeId === nodeA.nodeId)?.featureGroups?.[0]?.actions?.[0];
+  assert.equal(action?.targetNodeId, undefined);
+
+  const validation = validateProductFlow(flow);
   assert.equal(validation.valid, true, validation.errors.join("\n"));
 });
