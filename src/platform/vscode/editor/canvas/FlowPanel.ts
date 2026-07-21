@@ -14,6 +14,8 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
   private static provider: FlowPanel | undefined;
   private static readonly selections = new FlowSelectionStore();
   private static readonly registry = new FlowEditorRegistry();
+  private static readonly sessionRegisteredEmitter = new vscode.EventEmitter<vscode.Uri>();
+  public static readonly onDidRegisterSession = FlowPanel.sessionRegisteredEmitter.event;
 
   public static register(
     context: vscode.ExtensionContext,
@@ -71,6 +73,10 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
     return FlowPanel.registry.getOpenFlowUri(flowUri);
   }
 
+  public static handleDocumentSave(oldUri: vscode.Uri, newUri: vscode.Uri): void {
+    FlowPanel.registry.handleDocumentSave(oldUri, newUri);
+  }
+
   public static requestAutoLayout(flowUri: vscode.Uri | string): Promise<MindFlowAutoLayoutPreview> {
     return FlowPanel.registry.requestAutoLayout(flowUri);
   }
@@ -118,6 +124,7 @@ export class FlowPanel implements vscode.CustomTextEditorProvider {
       }
     );
     FlowPanel.registry.register(document.uri, document, session);
+    FlowPanel.sessionRegisteredEmitter.fire(document.uri);
 
     const changeListener = vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.document.uri.toString() === document.uri.toString()) {

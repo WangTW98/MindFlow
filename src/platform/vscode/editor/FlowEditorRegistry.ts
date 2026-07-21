@@ -25,6 +25,7 @@ interface FlowEditorEntry {
 
 export class FlowEditorRegistry {
   private readonly entries = new Map<string, FlowEditorEntry>();
+  private readonly aliasMap = new Map<string, vscode.Uri>();
   private activeFlowKey: string | undefined;
 
   public setActive(flowUri: vscode.Uri): void {
@@ -39,6 +40,20 @@ export class FlowEditorRegistry {
     this.entries.set(key, entry);
   }
 
+  public handleDocumentSave(oldUri: vscode.Uri, newUri: vscode.Uri): void {
+    const oldKey = canonicalFileKey(oldUri);
+    const newKey = canonicalFileKey(newUri);
+    const entry = this.entries.get(oldKey);
+    if (entry) {
+      this.entries.delete(oldKey);
+      this.entries.set(newKey, entry);
+      this.aliasMap.set(oldKey, newUri);
+      if (this.activeFlowKey === oldKey) {
+        this.activeFlowKey = newKey;
+      }
+    }
+  }
+
   public remove(flowUri: vscode.Uri, session: RenderableFlowEditorSession): boolean {
     const key = canonicalFileKey(flowUri);
     const entry = this.entries.get(key);
@@ -49,6 +64,7 @@ export class FlowEditorRegistry {
       return false;
     }
     this.entries.delete(key);
+    this.aliasMap.delete(key);
     if (this.activeFlowKey === key) {
       this.activeFlowKey = this.entries.keys().next().value;
     }
@@ -69,11 +85,16 @@ export class FlowEditorRegistry {
   }
 
   public hasSession(flowUri: vscode.Uri): boolean {
-    return (this.entries.get(canonicalFileKey(flowUri))?.sessions.size ?? 0) > 0;
+    const key = canonicalFileKey(flowUri);
+    return (this.entries.get(key)?.sessions.size ?? 0) > 0 || (this.aliasMap.has(key) && (this.entries.get(canonicalFileKey(this.aliasMap.get(key)!))?.sessions.size ?? 0) > 0);
   }
 
   public getOpenFlowUri(flowUri: vscode.Uri): vscode.Uri | undefined {
-    return this.entries.get(canonicalFileKey(flowUri))?.document.uri;
+    const key = canonicalFileKey(flowUri);
+    const directMatch = this.entries.get(key)?.document.uri;
+    if (directMatch) return directMatch;
+    const aliased = this.aliasMap.get(key);
+    return aliased ? this.entries.get(canonicalFileKey(aliased))?.document.uri : undefined;
   }
 
   public revealSession(flowUri: vscode.Uri): boolean {

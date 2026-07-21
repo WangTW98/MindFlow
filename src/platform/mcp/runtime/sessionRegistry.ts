@@ -76,6 +76,7 @@ export async function discoverMindFlowSessions(
       }
       const record = parseMindFlowSessionRecord(JSON.parse(await fs.readFile(filePath, "utf8")), entry.name);
       if (!isProcessAlive(record.pid)) {
+        void fs.rm(filePath, { force: true }).catch(() => undefined);
         throw new Error("Extension Host process is not running.");
       }
       const lastSeenMs = Date.parse(record.lastSeenAt);
@@ -83,6 +84,7 @@ export async function discoverMindFlowSessions(
         throw new Error("Extension Host heartbeat is implausibly far in the future.");
       }
       if (nowMs - lastSeenMs > MINDFLOW_SESSION_STALE_AFTER_MS) {
+        void fs.rm(filePath, { force: true }).catch(() => undefined);
         throw new Error("Extension Host heartbeat is stale.");
       }
       if (expectedContractHash && record.contractHash !== expectedContractHash) {

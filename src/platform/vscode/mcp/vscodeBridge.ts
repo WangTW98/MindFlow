@@ -48,19 +48,35 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
   }
 
   private async waitForOpenEditor(uri: vscode.Uri, timeoutMs = 3000): Promise<vscode.Uri> {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      const openUri = FlowPanel.getOpenFlowUri(uri);
-      if (openUri) {
-        return openUri;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 50));
+    const existingUri = FlowPanel.getOpenFlowUri(uri);
+    if (existingUri) {
+      return existingUri;
     }
-    const openUri = FlowPanel.getOpenFlowUri(uri);
-    if (openUri) {
-      return openUri;
-    }
-    throw new Error(`Timed out waiting for MindFlow Custom Editor to register session for: ${uri.toString()}`);
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        disposable.dispose();
+        const fallbackUri = FlowPanel.getOpenFlowUri(uri);
+        if (fallbackUri) {
+          resolve(fallbackUri);
+        } else {
+          reject(new Error(`Timed out waiting for MindFlow Custom Editor to register session for: ${uri.toString()}`));
+        }
+      }, timeoutMs);
+
+      const disposable = FlowPanel.onDidRegisterSession((registeredUri) => {
+        const matchUri = FlowPanel.getOpenFlowUri(uri) ?? (registeredUri.toString() === uri.toString() ? registeredUri : undefined);
+        if (matchUri) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          disposable.dispose();
+          resolve(matchUri);
+        }
+      });
+    });
   }
 
   public async getOpenEditors(): Promise<MindFlowEditorSnapshot[]> {
