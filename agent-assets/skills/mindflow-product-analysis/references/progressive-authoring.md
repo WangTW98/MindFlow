@@ -2,7 +2,7 @@
 
 Server limits are safety ceilings, not batch targets. Default to at most 30 operations, 8 generic nodes, and 16 edges per batch.
 
-For workflow version 2, stage writes as: comprehensive-PRD framework (root, taxonomy, applications, skeleton/navigation, all indexed stubs, true containment); page-PRD enrichment in index order; cross-page reconciliation; states/data/cross-application relations; layout. Root-to-application membership is a rendered system line and is never a stored edge.
+For workflow version 2 or 3, stage writes as: comprehensive-PRD framework (root, taxonomy, applications, skeleton/navigation, all indexed stubs, true containment); page-PRD enrichment in index order; cross-page reconciliation; states/data/cross-application relations; layout. Version 3 enrichment maps ordered PRD regions to feature groups and UI elements to feature items without flattening them. Root-to-application membership is a rendered system line and is never a stored edge.
 
 For every batch: pin the revision, attach `batchId` and `batchLabel`, dry-run, inspect `changeSummary`, apply the identical operations, call `mindflow_reveal_entities`, re-query changed ids at the returned revision, checkpoint, and announce the next batch. A batch is one undo unit. Never combine unrelated applications or destructive cleanup with constructive writes.
 

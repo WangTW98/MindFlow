@@ -1,7 +1,7 @@
 # Product PRD: {{title}}
 
 - status: pending
-- workflow_version: 2
+- workflow_version: {{workflow_version}}
 - evidence_refs: []
 
 ## Product context and positioning
@@ -25,4 +25,3 @@
 ## Acceptance criteria
 
 ## Conflicts and unresolved decisions
-

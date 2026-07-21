@@ -20,7 +20,9 @@ Before synthesis, maintain a terminology map, requirement ledger, duplicate matr
 
 ## Analyze a partition
 
-Write scope and source evidence, product conclusions, requirements and acceptance evidence, actors/ownership, journeys and alternatives, root/app/generic-node candidates, applicable independent states, feature groups/items, business and data events, permissions, constraints, edge rationale, outlet strategy, inference confidence, conflicts, unresolved items, and completion state.
+Write scope and source evidence, product conclusions, requirements and acceptance evidence, actors/ownership, journeys and alternatives, root/app/generic-node candidates, applicable independent states, ordered visual regions, concrete UI elements, business and data events, permissions, constraints, edge rationale, outlet strategy, inference confidence, conflicts, unresolved items, and completion state.
+
+Preserve UI facts at source fidelity. Tables, lists, screenshots, and prose commonly name fields, columns, card contents, buttons, options, notices, placement, or order; retain those facts instead of reducing them to capability verbs. Model one feature as one visible UI block or interactive control and place its internal displayed fields in `contentSpec`. When the document defines only a capability, a conventional product structure may be inferred, but every inferred region or feature requires a reason and confidence and low-confidence or high-impact choices stay unresolved.
 
 For the root, synthesize two source-grounded narratives before graph design:
 
@@ -31,6 +33,6 @@ For every discovered application surface, synthesize a PRD-level `appSurface.des
 
 Distinguish explicit evidence from inference. Record an inference as `origin: inferred`, with reason and confidence. Never reproduce full attachments or sensitive source content.
 
-After every partition, checkpoint it. Only after all partitions are complete, synthesize the root narratives, application descriptions, normalized terminology, requirements, conflicts, cross-partition relations, states, data direction, permissions, constraints, edge types, and feature outlets in `analysis_summary.md` and the shared `analysis_packet.json`. For workflow-version 2 canvas tasks, next write the comprehensive PRD, lock its page index, then write one PRD for each indexed page, popup, or independent business state. Each page PRD uses the comprehensive PRD as its scope contract and retains original evidence locators. Do not draw before the complete PRD bundle validates and exports.
+After every partition, checkpoint it. Only after all partitions are complete, synthesize the root narratives, application descriptions, normalized terminology, requirements, conflicts, cross-partition relations, states, data direction, permissions, constraints, edge types, ordered regions, and feature outlets in `analysis_summary.md` and the shared `analysis_packet.json`. For workflow-version 2 or 3 canvas tasks, next write the comprehensive PRD, lock its page index, then write one PRD for each indexed page, popup, or independent business state. Version 3 page PRDs must preserve the normalized visual composition and original evidence locators. Do not draw before the complete PRD bundle validates and exports.
 
 Read [references/document-evidence.md](references/document-evidence.md) for evidence locator conventions.

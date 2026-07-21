@@ -12,3 +12,5 @@ Interpret endpoint ownership mechanically:
 Check revision on every paged or scoped read. If a canvas changes during analysis, invalidate only dependent partitions and record both revisions.
 
 An audit finding records `classification`, `severity`, `confidence`, `evidenceRefs`, `affectedEntityIds`, `observation`, `reasoning`, and `recommendation`. Use `confirmedIssue` only when the graph proves the defect. Use `probableGap` for evidence-supported omissions and `unresolvedQuestion` when product intent is unavailable.
+
+For workflow-version 3 semantics, preserve feature-group and feature-item order. Interpret groups as visual regions and items as UI blocks or controls only when their names, types, and descriptions substantively support that reading. Never treat item count alone as composition completeness.

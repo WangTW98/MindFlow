@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a workflow-version 2 MindFlow hierarchical PRD bundle."""
+"""Validate workflow-version 2 and 3 MindFlow hierarchical PRD bundles."""
 
 from __future__ import annotations
 
@@ -11,6 +11,12 @@ import sys
 from pathlib import Path
 
 PAGE_TYPES = {"page", "popup"}
+V3_COMPOSITION_HEADINGS = ("## Visual composition", "## 视觉构成")
+V3_FORBIDDEN_BOILERPLATE = (
+    "输入来自综合 PRD 指定的用户资料、业务记录或后台配置；输出仅写入该页面职责范围内的业务对象，并通过页面事件传递到下游。",
+    "空数据、权限不足、网络或第三方失败时展示明确提示；可重试操作保留当前输入，不将未决产品规则实现为确定行为。",
+    "无新增未决项；继承综合 PRD 的全局未决清单。",
+)
 
 
 def metadata(path: Path) -> dict[str, str]:
@@ -38,7 +44,7 @@ def safe_file(task: Path, relative: object, label: str, errors: list[str]) -> Pa
     return candidate
 
 
-def bundle_files(task: Path, index: dict, errors: list[str]) -> list[tuple[str, Path]]:
+def bundle_files(task: Path, index: dict, errors: list[str], workflow_version: int) -> list[tuple[str, Path]]:
     files: list[tuple[str, Path]] = []
     product = index.get("productPrd")
     if not isinstance(product, dict):
@@ -123,9 +129,109 @@ def bundle_files(task: Path, index: dict, errors: list[str]) -> list[tuple[str, 
                 errors.append(f"{prefix} document requires product_prd_refs")
             if not values.get("evidence_refs") or values["evidence_refs"] == "[]":
                 errors.append(f"{prefix} document requires evidence_refs")
+            if workflow_version == 3:
+                validate_v3_page_prd(path, key, errors)
     if seen_orders and seen_orders != set(range(1, len(pages) + 1)):
         errors.append("page order must be contiguous from 1")
     return files
+
+
+def validate_v3_page_prd(path: Path, semantic_key: object, errors: list[str]) -> None:
+    text = path.read_text(encoding="utf-8")
+    if not any(heading in text for heading in V3_COMPOSITION_HEADINGS):
+        errors.append(f"{path}: workflow-version 3 page PRD requires a Visual composition section")
+        return
+    if any(phrase in text for phrase in V3_FORBIDDEN_BOILERPLATE):
+        errors.append(f"{path}: contains generic inherited boilerplate instead of page-specific behavior")
+    rows = composition_rows(text)
+    if not rows:
+        errors.append(f"{path}: visual composition table has no data rows")
+        return
+    region_keys = []
+    feature_keys = []
+    for columns in rows:
+        if len(columns) < 9:
+            errors.append(f"{path}: visual composition row requires 9 columns")
+            continue
+        region_keys.append(columns[1])
+        feature_keys.append(columns[4])
+        if not columns[5] or not columns[6]:
+            errors.append(f"{path}: visual composition row requires UI type and visible content")
+        if not columns[8]:
+            errors.append(f"{path}: visual composition row requires evidence/origin/confidence")
+    if len(set(region_keys)) < 2:
+        errors.append(f"{path}: page/popup requires at least two visual regions")
+    if len(feature_keys) != len(set(feature_keys)):
+        errors.append(f"{path}: visual composition contains duplicate feature keys")
+    if isinstance(semantic_key, str) and semantic_key not in text:
+        errors.append(f"{path}: semantic key is not retained in page PRD")
+
+
+def composition_rows(text: str) -> list[list[str]]:
+    start = -1
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip() in V3_COMPOSITION_HEADINGS:
+            start = index + 1
+            break
+    if start < 0:
+        return []
+    rows: list[list[str]] = []
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            break
+        if not stripped.startswith("|"):
+            continue
+        columns = [value.strip() for value in stripped.strip("|").split("|")]
+        if not columns or columns[0].lower().startswith("region order") or set(columns[0]) <= {"-", ":"}:
+            continue
+        rows.append(columns)
+    return rows
+
+
+def workflow_version(task: Path) -> int:
+    main = task / "mindflow_task.md"
+    if not main.is_file():
+        return 1
+    match = re.search(r"(?m)^workflow_version:\s*[\"']?(\d+)", main.read_text(encoding="utf-8"))
+    return int(match.group(1)) if match else 1
+
+
+def validate_v3_analysis_alignment(task: Path, index: dict, errors: list[str]) -> None:
+    try:
+        packet = json.loads((task / "analysis_packet.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        errors.append(f"analysis_packet.json is invalid: {error}")
+        return
+    if packet.get("schemaVersion") != 2:
+        errors.append("workflow-version 3 requires analysis_packet schemaVersion 2")
+        return
+    screens = {item.get("semanticKey"): item for item in packet.get("screens", []) if isinstance(item, dict)}
+    regions = {item.get("semanticKey"): item for item in packet.get("regions", []) if isinstance(item, dict)}
+    features = {item.get("semanticKey"): item for item in packet.get("features", []) if isinstance(item, dict)}
+    indexed = {item.get("semanticKey"): item for item in index.get("pages", []) if isinstance(item, dict)}
+    if set(indexed) != set(screens):
+        missing = sorted(key for key in set(indexed) - set(screens) if isinstance(key, str))
+        extra = sorted(key for key in set(screens) - set(indexed) if isinstance(key, str))
+        if missing:
+            errors.append(f"analysis packet screens missing indexed pages: {', '.join(missing)}")
+        if extra:
+            errors.append(f"analysis packet has screens missing from page index: {', '.join(extra)}")
+    for key, page in indexed.items():
+        if key not in screens or not isinstance(page.get("prdPath"), str):
+            continue
+        path = task / page["prdPath"]
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for region_key in screens[key].get("regionKeys", []):
+            if region_key not in regions or region_key not in text:
+                errors.append(f"{path}: missing analysis region {region_key}")
+                continue
+            for feature_key in regions[region_key].get("featureKeys", []):
+                if feature_key not in features or feature_key not in text:
+                    errors.append(f"{path}: missing analysis feature {feature_key}")
 
 
 def fingerprint(files: list[tuple[str, Path]]) -> str:
@@ -165,6 +271,7 @@ def main() -> int:
     parser.add_argument("--require-export", action="store_true")
     args = parser.parse_args()
     task = Path(args.task).expanduser().resolve()
+    version = workflow_version(task)
     index_path = task / "prd/page-index.json"
     try:
         index = json.loads(index_path.read_text(encoding="utf-8"))
@@ -172,12 +279,15 @@ def main() -> int:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
     errors: list[str] = []
-    if not isinstance(index, dict) or index.get("schemaVersion") != 1:
-        errors.append("page-index schemaVersion must be 1")
+    expected_index_version = 2 if version == 3 else 1
+    if not isinstance(index, dict) or index.get("schemaVersion") != expected_index_version:
+        errors.append(f"page-index schemaVersion must be {expected_index_version} for workflow version {version}")
         index = index if isinstance(index, dict) else {}
     if index.get("status") != "completed":
         errors.append("page-index status must be completed")
-    files = bundle_files(task, index, errors)
+    files = bundle_files(task, index, errors, version)
+    if version == 3:
+        validate_v3_analysis_alignment(task, index, errors)
     value = fingerprint(files)
     product = index.get("productPrd")
     if isinstance(product, dict) and product.get("fingerprint") != value:

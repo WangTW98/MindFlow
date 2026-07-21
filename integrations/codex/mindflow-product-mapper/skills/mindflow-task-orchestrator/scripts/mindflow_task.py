@@ -16,19 +16,20 @@ from pathlib import Path
 
 TASK_STATUSES = {"pending", "analyzing", "designing", "generating", "validating", "completed", "blocked"}
 LEGACY_PHASES = {"initializing", "inventory", "analyzing", "synthesizing", "designing", "generating", "validating", "delivering", "completed"}
-V2_PHASES = {
+HIERARCHICAL_PHASES = {
     "initializing", "inventory", "framework_analyzing", "product_prd", "page_prds",
     "framework_designing", "framework_generating", "page_enriching", "validating",
     "delivering", "completed",
 }
-PHASES = LEGACY_PHASES | V2_PHASES
+PHASES = LEGACY_PHASES | HIERARCHICAL_PHASES
+HIERARCHICAL_VERSIONS = {2, 3}
 CANVAS_MODES = {"documents-to-canvas", "code-to-canvas", "canvas-to-canvas-update"}
 REQUIRED_FILES = [
     "mindflow_task.md", "source_inventory.md", "requirement_ledger.md", "analysis_summary.md", "analysis_packet.json",
     "graph/graph_summary.md", "state/entity_index.md", "state/generation_state.md",
     "state/batch_plan.json", "state/checkpoints.md", "reports/semantic_validation.md", "reports/final_validation.md",
 ]
-V2_REQUIRED_FILES = [
+HIERARCHICAL_REQUIRED_FILES = [
     "prd/product-prd.md", "prd/page-index.json", "graph/framework.md", "state/page_generation.json",
 ]
 IGNORED_PARTS = {".git", ".mindflow", "node_modules", "out", "out-test", "dist", "build", "coverage", ".cache", "__pycache__"}
@@ -59,9 +60,13 @@ def init_task(args: argparse.Namespace) -> int:
     task = workspace / ".mindflow" / "tasks" / task_id
     if task.exists():
         raise ValueError(f"Task already exists: {task}")
-    workflow_version = 2 if args.mode in CANVAS_MODES else 1
+    workflow_version = args.workflow_version or (3 if args.mode in CANVAS_MODES else 1)
+    if workflow_version in HIERARCHICAL_VERSIONS and args.mode not in CANVAS_MODES:
+        raise ValueError("Workflow versions 2 and 3 require a canvas-producing mode.")
+    if workflow_version == 1 and args.mode in CANVAS_MODES:
+        raise ValueError("Canvas-producing modes require workflow version 2 or 3.")
     directories = ["analysis", "graph", "state", "reports"]
-    if workflow_version == 2:
+    if workflow_version in HIERARCHICAL_VERSIONS:
         directories.extend(["prd/pages", "graph/pages"])
     for directory in directories:
         (task / directory).mkdir(parents=True, exist_ok=True)
@@ -69,16 +74,24 @@ def init_task(args: argparse.Namespace) -> int:
     roots = args.source_root or []
     roots_yaml = "[" + ", ".join(yaml_scalar(item) for item in roots) + "]"
     target = args.target_flow or ""
-    workflow_rules = """- Complete global framework analysis, the comprehensive PRD, and every indexed page PRD before canvas generation.
+    if workflow_version == 3:
+        workflow_rules = """- Complete global framework analysis, the comprehensive PRD, and every indexed page PRD before canvas generation.
 - Draw the comprehensive-PRD framework before enriching nodes from page PRDs.
-- Never create a stored root/projectOverview-to-appSurface edge; the canvas renders that system relationship.""" if workflow_version == 2 else "- Complete all analysis partitions and synthesis before generation or deliverable handoff."
+- Never create a stored root/projectOverview-to-appSurface edge; the canvas renders that system relationship.
+- Preserve ordered visual regions and concrete UI items; do not flatten pages into capability lists."""
+    elif workflow_version == 2:
+        workflow_rules = """- Complete global framework analysis, the comprehensive PRD, and every indexed page PRD before canvas generation.
+- Draw the comprehensive-PRD framework before enriching nodes from page PRDs.
+- Never create a stored root/projectOverview-to-appSurface edge; the canvas renders that system relationship."""
+    else:
+        workflow_rules = "- Complete all analysis partitions and synthesis before generation or deliverable handoff."
     phase_checklist = """- [ ] inventory
 - [ ] global framework analysis
 - [ ] comprehensive product PRD
 - [ ] all indexed page PRDs
 - [ ] framework design and generation
 - [ ] page-by-page enrichment
-- [ ] final validation""" if workflow_version == 2 else """- [ ] inventory
+- [ ] final validation""" if workflow_version in HIERARCHICAL_VERSIONS else """- [ ] inventory
 - [ ] detailed analysis
 - [ ] cross-partition synthesis
 - [ ] requested deliverable
@@ -161,12 +174,15 @@ updated_at: {yaml_scalar(created)}
 | Requirement ID | Statement | Source/evidence | Explicit or inferred | Confidence | Conflict | Status | Canvas/deliverable mapping |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 """)
-    write(task / "analysis_packet.json", json.dumps({
-        "schemaVersion": 1, "mode": args.mode,
+    packet = {
+        "schemaVersion": 2 if workflow_version == 3 else 1, "mode": args.mode,
         "sources": [], "terminology": [], "applications": [], "domains": [], "roles": [],
         "requirements": [], "screens": [], "features": [], "states": [], "businessFlows": [],
         "dataFlows": [], "permissions": [], "constraints": [], "conflicts": [], "unresolved": []
-    }, ensure_ascii=False, indent=2))
+    }
+    if workflow_version == 3:
+        packet["regions"] = []
+    write(task / "analysis_packet.json", json.dumps(packet, ensure_ascii=False, indent=2))
     write(task / "analysis_summary.md", """# Analysis Summary
 
 synthesis_status: pending
@@ -207,31 +223,34 @@ Status: pending analysis synthesis.
 
 Record root, applications, generic hierarchy, status groups, entity counts, five edge-type counts, generation order, coordinates, unresolved items, and intentionally omitted relations here.
 """)
-    if workflow_version == 2:
+    if workflow_version in HIERARCHICAL_VERSIONS:
         assets = Path(__file__).resolve().parent.parent / "assets"
         product_template = (assets / "product-prd.template.md").read_text(encoding="utf-8")
-        product_template = product_template.replace("{{title}}", args.title)
+        product_template = product_template.replace("{{title}}", args.title).replace("{{workflow_version}}", str(workflow_version))
         write(task / "prd/product-prd.md", product_template)
-        shutil.copyfile(assets / "page-index.template.json", task / "prd/page-index.json")
-        write(task / "graph/framework.md", """# Framework Graph
+        page_index = json.loads((assets / "page-index.template.json").read_text(encoding="utf-8"))
+        page_index["schemaVersion"] = 2 if workflow_version == 3 else 1
+        write(task / "prd/page-index.json", json.dumps(page_index, ensure_ascii=False, indent=2))
+        draft_version = 2 if workflow_version == 3 else 1
+        write(task / "graph/framework.md", f"""# Framework Graph
 
 - design_status: pending
 - source: prd/product-prd.md
 
 ```json
-{
-  "schemaVersion": 1,
+{{
+  "schemaVersion": {draft_version},
   "entities": [],
   "unresolved": [],
   "staleCandidates": []
-}
+}}
 ```
 """)
-        write(task / "state/page_generation.json", """{
-  "schemaVersion": 1,
-  "framework": { "status": "pending", "revision": null },
+        write(task / "state/page_generation.json", f"""{{
+  "schemaVersion": {draft_version},
+  "framework": {{ "status": "pending", "revision": null }},
   "pages": []
-}""")
+}}""")
     write(task / "state/entity_index.md", """# Entity Index
 
 This semantic-key to MindFlow-id index is a cache. Confirm every mapping against the live canvas before resuming.
@@ -304,22 +323,22 @@ def validate_task(args: argparse.Namespace) -> int:
     main = task / "mindflow_task.md"
     data = parse_frontmatter(main.read_text(encoding="utf-8")) if main.is_file() else {}
     workflow_version = int(data.get("workflow_version", "1") or "1")
-    required_files = REQUIRED_FILES + (V2_REQUIRED_FILES if workflow_version == 2 else [])
+    required_files = REQUIRED_FILES + (HIERARCHICAL_REQUIRED_FILES if workflow_version in HIERARCHICAL_VERSIONS else [])
     for relative in required_files:
         if not (task / relative).is_file():
             errors.append(f"missing required file: {relative}")
     if main.is_file():
         text = main.read_text(encoding="utf-8")
         required = {"task_id", "title", "source_type", "mode", "output_target", "source_roots", "target_flow", "task_status", "current_phase", "current_part", "next_action", "created_at", "updated_at"}
-        if workflow_version == 2:
+        if workflow_version in HIERARCHICAL_VERSIONS:
             required.add("workflow_version")
         errors.extend(f"missing frontmatter field: {field}" for field in sorted(required - data.keys()))
         if data.get("task_status") not in TASK_STATUSES:
             errors.append(f"invalid task_status: {data.get('task_status')}")
         if data.get("current_phase") not in PHASES:
             errors.append(f"invalid current_phase: {data.get('current_phase')}")
-        if workflow_version == 2 and data.get("current_phase") not in V2_PHASES:
-            errors.append(f"invalid workflow-version 2 phase: {data.get('current_phase')}")
+        if workflow_version in HIERARCHICAL_VERSIONS and data.get("current_phase") not in HIERARCHICAL_PHASES:
+            errors.append(f"invalid workflow-version {workflow_version} phase: {data.get('current_phase')}")
         if len(text.splitlines()) > 400:
             errors.append("mindflow_task.md exceeds 400 lines")
     for file in (task / "analysis").glob("*.md") if (task / "analysis").exists() else []:
@@ -327,7 +346,7 @@ def validate_task(args: argparse.Namespace) -> int:
         if size > 20_000:
             errors.append(f"analysis partition exceeds 20000 characters: {file.name} ({size})")
     json_files = ["analysis_packet.json", "state/batch_plan.json"]
-    if workflow_version == 2:
+    if workflow_version in HIERARCHICAL_VERSIONS:
         json_files.extend(["prd/page-index.json", "state/page_generation.json"])
     for relative in json_files:
         path = task / relative
@@ -350,7 +369,7 @@ def checkpoint(args: argparse.Namespace) -> int:
         raise ValueError(f"Not a MindFlow task: {task}")
     task_data = parse_frontmatter((task / "mindflow_task.md").read_text(encoding="utf-8"))
     workflow_version = int(task_data.get("workflow_version", "1") or "1")
-    allowed = V2_PHASES if workflow_version == 2 else LEGACY_PHASES
+    allowed = HIERARCHICAL_PHASES if workflow_version in HIERARCHICAL_VERSIONS else LEGACY_PHASES
     if args.phase not in allowed:
         raise ValueError(f"Phase {args.phase} is not valid for workflow version {workflow_version}.")
     ensure_phase_ready(task, args.phase)
@@ -380,7 +399,7 @@ def ensure_phase_ready(task: Path, phase: str) -> None:
     main_data = parse_frontmatter((task / "mindflow_task.md").read_text(encoding="utf-8"))
     workflow_version = int(main_data.get("workflow_version", "1") or "1")
     guarded = {"designing", "generating", "validating", "delivering", "completed"}
-    if workflow_version == 2:
+    if workflow_version in HIERARCHICAL_VERSIONS:
         guarded |= {"product_prd", "page_prds", "framework_designing", "framework_generating", "page_enriching"}
     if phase not in guarded:
         return
@@ -394,7 +413,15 @@ def ensure_phase_ready(task: Path, phase: str) -> None:
     if not re.search(r"(?m)^synthesis_status:\s*completed\s*$", summary):
         raise ValueError("Cannot enter graph design or generation before cross-partition synthesis is completed.")
     canvas_mode = main_data.get("mode") in CANVAS_MODES
-    if workflow_version == 2 and phase in {"framework_designing", "framework_generating", "page_enriching", "validating", "delivering", "completed"}:
+    if workflow_version in HIERARCHICAL_VERSIONS and phase in {"framework_designing", "framework_generating", "page_enriching", "validating", "delivering", "completed"}:
+        if workflow_version == 3:
+            analysis_validator = Path(__file__).resolve().parent.parent.parent / "mindflow-product-analysis/scripts/validate_analysis_packet.py"
+            analysis_result = subprocess.run(
+                [sys.executable, str(analysis_validator), str(task / "analysis_packet.json")],
+                text=True, capture_output=True, check=False,
+            )
+            if analysis_result.returncode != 0:
+                raise ValueError(f"Cannot enter {phase}; UI composition analysis is incomplete:\n{analysis_result.stderr.strip()}")
         validator = Path(__file__).resolve().parent.parent.parent / "mindflow-product-analysis/scripts/validate_prd_bundle.py"
         result = subprocess.run(
             [sys.executable, str(validator), str(task), "--require-export"],
@@ -402,15 +429,15 @@ def ensure_phase_ready(task: Path, phase: str) -> None:
         )
         if result.returncode != 0:
             raise ValueError(f"Cannot enter {phase}; hierarchical PRD bundle is incomplete:\n{result.stderr.strip()}")
-    if workflow_version == 2 and phase in {"framework_generating", "page_enriching", "validating", "delivering", "completed"}:
+    if workflow_version in HIERARCHICAL_VERSIONS and phase in {"framework_generating", "page_enriching", "validating", "delivering", "completed"}:
         framework = (task / "graph/framework.md").read_text(encoding="utf-8")
         if not re.search(r"(?m)^-?\s*design_status:\s*completed\s*$", framework):
             raise ValueError("Cannot generate before framework graph design is completed.")
-    if workflow_version == 2 and phase in {"page_enriching", "validating", "delivering", "completed"}:
+    if workflow_version in HIERARCHICAL_VERSIONS and phase in {"page_enriching", "validating", "delivering", "completed"}:
         generation = json.loads((task / "state/page_generation.json").read_text(encoding="utf-8"))
         if generation.get("framework", {}).get("status") != "completed":
             raise ValueError("Cannot enrich pages before framework generation is completed.")
-    if workflow_version == 2 and phase in {"validating", "delivering", "completed"}:
+    if workflow_version in HIERARCHICAL_VERSIONS and phase in {"validating", "delivering", "completed"}:
         generation = json.loads((task / "state/page_generation.json").read_text(encoding="utf-8"))
         page_index = json.loads((task / "prd/page-index.json").read_text(encoding="utf-8"))
         expected = {page.get("semanticKey") for page in page_index.get("pages", []) if isinstance(page, dict)}
@@ -543,6 +570,7 @@ def parser() -> argparse.ArgumentParser:
     init.add_argument("--source-root", action="append")
     init.add_argument("--target-flow")
     init.add_argument("--task-id")
+    init.add_argument("--workflow-version", type=int, choices=[1, 2, 3])
     init.set_defaults(handler=init_task)
     check = commands.add_parser("validate")
     check.add_argument("--task", required=True)

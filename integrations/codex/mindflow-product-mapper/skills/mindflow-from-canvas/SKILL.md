@@ -16,7 +16,9 @@ Use `mindflow-product-analysis` and `mindflow-task-orchestrator`. This skill rea
 
 ## Reconstruct product meaning
 
-Extract root positioning and goals, applications, domains, roles, screen hierarchy, features/actions, lifecycle states, business/data flows, permissions, constraints expressed in copy, and unresolved ambiguity. Existing canvas content is evidence of the modeled design, not proof that the design is complete or correct.
+Extract root positioning and goals, applications, domains, roles, screen hierarchy, ordered feature groups/items, visible content, controls/actions, lifecycle states, business/data flows, permissions, constraints expressed in copy, and unresolved ambiguity. Existing canvas content is evidence of the modeled design, not proof that the design is complete or correct.
+
+For page-readability audits, classify a node as composition-complete only when its ordered groups communicate meaningful screen regions and its items identify visible UI blocks or controls. A single aggregate group of capability verbs is structurally legal but semantically incomplete. Do not infer invisible composition without a reason and confidence.
 
 For audits, read [references/canvas-reading-contract.md](references/canvas-reading-contract.md), then apply the product-analysis audit checklist. Separate structural facts, semantic interpretation, probable gaps, and recommendations. For downstream deliverables, populate the shared analysis packet before generating a PRD or design specification.
 

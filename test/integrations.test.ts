@@ -46,7 +46,7 @@ test("MindFlow task script creates, checkpoints, validates, and ignores recovera
     const checkpoints = await fs.readFile(path.join(task, "state/checkpoints.md"), "utf8");
     const ignore = await fs.readFile(path.join(workspace, ".gitignore"), "utf8");
     assert.ok(main.includes('task_status: "analyzing"'));
-    assert.ok(main.includes("workflow_version: 2"));
+    assert.ok(main.includes("workflow_version: 3"));
     assert.ok(main.includes('next_action: "analyze part-002"'));
     assert.ok(main.includes('mode: "code-to-canvas"'));
     assert.ok(main.includes('output_target: "canvas"'));
@@ -72,7 +72,7 @@ test("Workflow-version 2 blocks framework design until the hierarchical PRD bund
     const initialized = await run("python3", [
       script, "init", "--workspace", workspace, "--title", "Health Product",
       "--source-type", "documents", "--source-root", "docs", "--mode", "documents-to-canvas",
-      "--output-target", "canvas"
+      "--output-target", "canvas", "--workflow-version", "2"
     ], root);
     const task = initialized.stdout.trim();
     await fs.writeFile(path.join(task, "analysis/part-001-framework.md"), "# Framework\n\n- status: completed\n", "utf8");
@@ -129,8 +129,72 @@ test("Product-analysis packet validation preserves evidence and inference bounda
   const validator = path.join(sharedSkills, "mindflow-product-analysis/scripts/validate_analysis_packet.py");
   const template = path.join(sharedSkills, "mindflow-product-analysis/assets/analysis-packet.template.json");
   try {
-    await run("python3", [validator, template], root);
     const valid = JSON.parse(await fs.readFile(template, "utf8")) as Record<string, unknown>;
+    valid.screens = [{
+      semanticKey: "page:web:orders",
+      name: "Order List",
+      pageType: "page",
+      application: "app:web",
+      parent: "app:web",
+      domainKeys: [],
+      roleKeys: [],
+      regionKeys: ["region:orders:list", "region:orders:actions"],
+      origin: "explicit",
+      confidence: "high",
+      evidenceRefs: ["prd.md#orders"]
+    }];
+    valid.regions = [{
+      semanticKey: "region:orders:list",
+      screenKey: "page:web:orders",
+      name: "Order data",
+      kind: "table",
+      layout: "table",
+      order: 1,
+      featureKeys: ["feature:orders:table"],
+      origin: "explicit",
+      confidence: "high",
+      evidenceRefs: ["prd.md#orders-table"]
+    }, {
+      semanticKey: "region:orders:actions",
+      screenKey: "page:web:orders",
+      name: "Order actions",
+      kind: "actions",
+      layout: "row",
+      order: 2,
+      featureKeys: ["feature:orders:approve"],
+      origin: "explicit",
+      confidence: "high",
+      evidenceRefs: ["prd.md#order-actions"]
+    }];
+    valid.features = [{
+      semanticKey: "feature:orders:table",
+      screenKey: "page:web:orders",
+      regionKey: "region:orders:list",
+      name: "Order table",
+      uiType: "table",
+      order: 1,
+      contentSpec: ["Order number", "Applicant", "Status"],
+      origin: "explicit",
+      confidence: "high",
+      evidenceRefs: ["prd.md#orders-table"]
+    }, {
+      semanticKey: "feature:orders:approve",
+      screenKey: "page:web:orders",
+      regionKey: "region:orders:actions",
+      name: "Approve",
+      uiType: "button",
+      order: 1,
+      contentSpec: ["Approve the selected order"],
+      interaction: {
+        event: "click",
+        effect: "Mark the order approved",
+        edgeType: "statusChange",
+        targetSemanticKey: "page:web:orders"
+      },
+      origin: "explicit",
+      confidence: "high",
+      evidenceRefs: ["prd.md#approve-order"]
+    }];
     valid.requirements = [{
       semanticKey: "requirement:approve-order",
       origin: "explicit",

@@ -24,6 +24,8 @@ For each partition trace:
 - loading, empty, error, success, denied, and business states;
 - page load, timer, push, callback, and automatic transitions.
 
+Also reconstruct visible composition in rendered order: component nesting, headers and toolbars, filters, forms and field labels, table columns, list/card contents, primary/secondary actions, dialogs, feedback, and responsive alternatives that materially change functionality. Keep DOM/component order unless CSS or layout primitives prove a different visible order. Do not collapse several concrete controls into one capability label.
+
 Separate executable evidence from names/comments. Mark assumptions `origin: inferred` with reason and confidence. Use [references/code-evidence.md](references/code-evidence.md) for framework-neutral evidence rules.
 
 ## Partition and synthesize

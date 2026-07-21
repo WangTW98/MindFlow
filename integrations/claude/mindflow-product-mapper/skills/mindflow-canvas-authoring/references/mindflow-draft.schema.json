@@ -4,7 +4,7 @@
   "type": "object",
   "required": ["entities", "unresolved", "staleCandidates"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "enum": [1, 2] },
     "entities": {
       "type": "array",
       "items": {

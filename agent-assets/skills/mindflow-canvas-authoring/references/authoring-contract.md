@@ -17,4 +17,8 @@ Root-to-application membership is rendered by the canvas as a system line for ev
 
 Workflow-version 2 framework nodes may temporarily contain exactly one `框架定义 / 页面职责` feature item grounded in the comprehensive PRD. Page enrichment replaces it. Final drafts and completed canvases must contain neither that framework marker nor the default feature placeholder.
 
+Workflow-version 3 maps each analysis region to exactly one ordered feature group and each analysis feature to exactly one ordered feature item on its owning node. Group and item local references use the analysis semantic keys. Descriptions retain visible `contentSpec`, data binding, conditions, and interaction meaning. Structural validity never substitutes for this semantic coverage.
+
+A UI block stays inline unless it is reused by at least two screens, owns an independent state or subflow, has an independent permission boundary, or coordinates complex data interaction. An independent component is connected from the owning page's placement feature item by `nestedRelation`.
+
 Root summary, root goal, and application descriptions come from completed source analysis. Existing canvas copy is never evidence. Their completeness is assessed by source coverage and substantive prose, not by domain-specific keywords or a fixed application count.

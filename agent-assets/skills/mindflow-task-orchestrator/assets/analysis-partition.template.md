@@ -22,7 +22,9 @@ For each application candidate, record positioning, users, responsibilities, jou
 
 ## Independent state nodes
 
-## Feature groups and feature items
+## Ordered visual regions and UI elements
+
+Record region key, screen key, role, layout, order, and evidence. Record each UI element as a visible block or control with `uiType`, `contentSpec`, data binding, condition, interaction, origin, confidence, and evidence.
 
 ## Business events
 

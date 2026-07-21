@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "mode": "documents-to-canvas",
   "sources": [],
   "terminology": [],
@@ -8,6 +8,7 @@
   "roles": [],
   "requirements": [],
   "screens": [],
+  "regions": [],
   "features": [],
   "states": [],
   "businessFlows": [],

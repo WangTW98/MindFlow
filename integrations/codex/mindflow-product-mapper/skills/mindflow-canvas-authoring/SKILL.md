@@ -5,7 +5,7 @@ description: Convert a validated MindFlow product-analysis packet into graph dra
 
 # MindFlow Canvas Authoring
 
-Only use after `mindflow-product-analysis` and the task orchestrator record completed analysis, a valid analysis packet, and—under workflow version 2—a validated and exported comprehensive/page PRD bundle. Do not perform source analysis in this skill. Product methodology in this file is Skill policy, not an MCP server restriction.
+Only use after `mindflow-product-analysis` and the task orchestrator record completed analysis, a valid analysis packet, and—under workflow version 2 or 3—a validated and exported comprehensive/page PRD bundle. Do not perform source analysis in this skill. Product methodology in this file is Skill policy, not an MCP server restriction.
 
 ## Model nodes
 
@@ -13,6 +13,8 @@ Only use after `mindflow-product-analysis` and the task orchestrator record comp
 - Create every layout, nav, page, popup, component, and independent business state as a generic node using `mindflow_upsert_node` or a changeset `node.upsert`.
 - Require `pageType`: layout=`skeleton`, nav=`navigation`, page=`page`, popup=`popup`, component=`component`.
 - Give every new generic node explicit semantic feature groups and items. Never emit the default `基础功能 / 主要内容 / 确认按钮` placeholder. A framework-stage stub may temporarily use exactly one source-grounded `框架定义 / 页面职责` item; final validation rejects any remaining framework stub.
+- In workflow version 3, preserve page-PRD visual order: one region becomes one feature group and one UI block/control becomes one feature item. Put complex block fields or table columns in the item description/content specification instead of flattening the whole page into capability verbs.
+- Keep ordinary page sections inline. Create a component node only when it is reused by at least two screens, owns an independent state/subflow, has an independent permission boundary, or coordinates complex data interaction.
 - Treat a skeleton as a layout container with several possible children: each navigation feature may enter a top-level primary, side, tab, or bottom `navigation`; top bars, search bars, brand bars, headers, footers, and other concrete layout regions use `component`. A child navigation is reached only from its parent navigation item, never listed or connected from the skeleton as a second navigation entry.
 - Give every generic node an explicit incoming edge in the completed draft. Initial state nodes enter from the real business event that creates or opens that state; never emit an orphan test node.
 - Name state nodes `Base title · State name`; nodes in a transition share `statusGroupId`.
@@ -37,10 +39,10 @@ For generic nodes use: feature item first; feature group only when the whole gro
 
 ## Generate safely
 
-1. For workflow version 2, validate `graph/framework.md` with `--stage framework`, each page draft with `--stage page`, and the union with `--stage final --page-index <page-index.json>`. Legacy tasks may use the default final validation.
+1. For workflow version 2 or 3, validate `graph/framework.md` with `--stage framework`, each page draft with `--stage page`, and the union with `--stage final --page-index <page-index.json>`. Version 3 additionally passes `--analysis-packet <analysis_packet.json>` so region/feature coverage and ordering are checked. Legacy tasks may use the default final validation.
 2. Query existing entities and preserve matched ids and all existing coordinates.
 3. Generate the framework from the comprehensive PRD: root narratives, taxonomy, applications, skeletons, navigation/layout nodes, all indexed page/popup/state stubs, and only true structural `nestedRelation` edges. Do not emit root-to-application edges or page navigation/data/state edges at this stage.
-4. Then process page PRDs in page-index order. Replace the owning stub with complete semantic content and emit each outgoing navigation, data, status, or automatic edge exactly once from that page's feature outlet. Build small coherent batches; default each batch to at most 30 operations, 8 nodes, and 16 edges.
+4. Then process page PRDs in page-index order. Replace the owning stub with complete ordered visual regions and UI items and emit each outgoing navigation, data, status, or automatic edge exactly once from that page's concrete feature outlet. Build small coherent batches; default each batch to at most 30 operations, 8 nodes, and 16 edges.
 5. Give every batch `batchId` and `batchLabel`. Query and pin the current revision, dry-run, inspect `changeSummary`, then submit the identical batch atomically.
 6. Call `mindflow_reveal_entities` for affected cards, re-query changed ids at the returned revision, and checkpoint approval, dry-run, apply, reveal, ids, and next batch. On mismatch, reconcile before a new dry-run.
 7. Use guided mode by default: pause before first write, application milestones, and destructive batches. Continue automatically only after explicit continuous authorization; never mix destructive cleanup into constructive batches.

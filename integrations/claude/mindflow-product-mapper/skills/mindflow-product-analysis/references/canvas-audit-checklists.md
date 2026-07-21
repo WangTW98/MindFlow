@@ -21,6 +21,14 @@ Classify findings as `confirmedIssue`, `probableGap`, `suggestion`, or `unresolv
 - Check return/cancel/recovery routes, permission gates, and source feature outlets.
 - Flag ambiguous transitions as questions rather than inventing intent.
 
+## Page composition and readability
+
+- Verify each page, popup, state, and component exposes ordered visual regions rather than one aggregate capability list.
+- Check that forms retain fields and controls, tables retain columns and row actions, lists/cards retain visible content, and popups retain message and action areas when source evidence provides them.
+- Distinguish a concise UI block from a vague action label: descriptions must say what is visible, bound, required, conditional, or actionable.
+- Compare repeated copy across page cards. Treat generic shared boilerplate as a probable gap unless a global rule is explicitly referenced and the page records its own applicability.
+- Confirm every interactive cross-node effect originates from the concrete visible feature item that a user or system operates.
+
 ## Roles, domains, permissions, and data
 
 - Compare application-role, node-role, and operation-permission assignments.
