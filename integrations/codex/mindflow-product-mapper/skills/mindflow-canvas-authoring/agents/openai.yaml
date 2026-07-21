@@ -1,4 +1,4 @@
 interface:
   display_name: "MindFlow Canvas Authoring"
   short_description: "Design and generate valid MindFlow canvases"
-  default_prompt: "Design, dry-run, generate, and validate a MindFlow canvas using the current node, edge, and outlet rules."
+  default_prompt: "Generate the comprehensive-PRD framework first, then enrich nodes from page PRDs in order and validate the final MindFlow canvas using current edge and outlet rules."

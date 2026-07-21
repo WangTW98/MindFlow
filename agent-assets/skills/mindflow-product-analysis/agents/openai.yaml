@@ -1,4 +1,4 @@
 interface:
   display_name: "MindFlow Product Analysis"
   short_description: "Analyze product sources and orchestrate MindFlow deliverables"
-  default_prompt: "Analyze the supplied product sources or MindFlow canvas, preserve evidence and uncertainty, then create the requested canvas, audit, PRD, or design handoff through a controlled workflow."
+  default_prompt: "Analyze the supplied product sources or MindFlow canvas, preserve evidence and uncertainty, produce the comprehensive and page-level PRDs before canvas work, then create the requested canvas or deliverable through a controlled workflow."

@@ -63,7 +63,7 @@ For a generic node's outgoing edge, use the most specific orange outlet:
 1. featureItem for a button, menu, tab, field, link, or row action.
 2. featureGroup only when the entire group is the source.
 
-Never use a generic node card as an MCP edge source, including for containment, automatic navigation, data flow, or state changes. Root and app-surface cards remain valid sources. An app-surface entry is a nestedRelation to its unique skeleton.
+Never use a generic node card as an MCP edge source, including for containment, automatic navigation, data flow, or state changes. The canvas already renders root-to-app-surface membership as a system line, so never create a stored root/projectOverview-to-appSurface edge. An app-surface entry is a nestedRelation to its unique skeleton.
 
 A skeleton is a layout container and may have several structural children. Its navigation entries represent only top-level primary, side, tab, or bottom navigation. Use component nodes for top bars, search bars, brand bars, headers, footers, and other concrete layout regions. A child navigation has exactly one parent: the parent navigation feature item through interaction, and is never repeated as a skeleton navigation entry. Every active generic node in a completed MCP-authored flow needs an active incoming edge.
 

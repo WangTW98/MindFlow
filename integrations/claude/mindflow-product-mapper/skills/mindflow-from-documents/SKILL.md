@@ -11,7 +11,7 @@ Use `mindflow-product-analysis` and `mindflow-task-orchestrator` first. This ski
 
 1. Record each source with type, page/sheet/section/slide range, fingerprint, partition, and status.
 2. Use the appropriate document reader for the format. Only browse URLs explicitly supplied by the user.
-3. Build a global inventory of product scope, application forms, domains, roles, modules, and document sections before detailed analysis.
+3. Build a global inventory of product scope, application forms, domains, roles, modules, information architecture, and candidate page/state boundaries before detailed analysis.
 4. Partition by application, domain, route/page group, document chapter, large page, or complete business flow. Split again above 20,000 characters or 50 candidate nodes.
 
 Do not assume a fixed number or kind of applications. A source may describe one application, several applications, or no separately modeled application surface. Existing canvas entities are reconciliation targets only and must never substitute for source analysis.
@@ -31,6 +31,6 @@ For every discovered application surface, synthesize a PRD-level `appSurface.des
 
 Distinguish explicit evidence from inference. Record an inference as `origin: inferred`, with reason and confidence. Never reproduce full attachments or sensitive source content.
 
-After every partition, checkpoint it. Only after all partitions are complete, synthesize the root narratives, application descriptions, normalized terminology, requirements, conflicts, cross-partition relations, states, data direction, permissions, constraints, edge types, and feature outlets in `analysis_summary.md` and the shared `analysis_packet.json`. Validate the packet before handing off to `mindflow-canvas-authoring` or a deliverable generator.
+After every partition, checkpoint it. Only after all partitions are complete, synthesize the root narratives, application descriptions, normalized terminology, requirements, conflicts, cross-partition relations, states, data direction, permissions, constraints, edge types, and feature outlets in `analysis_summary.md` and the shared `analysis_packet.json`. For workflow-version 2 canvas tasks, next write the comprehensive PRD, lock its page index, then write one PRD for each indexed page, popup, or independent business state. Each page PRD uses the comprehensive PRD as its scope contract and retains original evidence locators. Do not draw before the complete PRD bundle validates and exports.
 
 Read [references/document-evidence.md](references/document-evidence.md) for evidence locator conventions.

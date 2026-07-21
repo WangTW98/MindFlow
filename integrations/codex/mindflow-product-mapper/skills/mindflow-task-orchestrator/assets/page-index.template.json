@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "status": "pending",
+  "productPrd": {
+    "path": "prd/product-prd.md",
+    "status": "pending",
+    "fingerprint": ""
+  },
+  "export": {
+    "path": "",
+    "status": "pending",
+    "fingerprint": ""
+  },
+  "applications": [],
+  "pages": []
+}

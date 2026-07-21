@@ -36,16 +36,17 @@ test("MindFlow task script creates, checkpoints, validates, and ignores recovera
     const task = initialized.stdout.trim();
     await run("python3", [script, "validate", "--task", task], root);
     await assert.rejects(
-      () => run("python3", [script, "checkpoint", "--task", task, "--phase", "generating", "--part", "batch-001", "--next-action", "apply batch"], root),
+      () => run("python3", [script, "checkpoint", "--task", task, "--phase", "framework_generating", "--part", "batch-001", "--next-action", "apply batch"], root),
       /before at least one analysis partition exists/
     );
-    await run("python3", [script, "checkpoint", "--task", task, "--phase", "analyzing", "--part", "part-001-orders", "--next-action", "analyze part-002"], root);
+    await run("python3", [script, "checkpoint", "--task", task, "--phase", "framework_analyzing", "--part", "part-001-orders", "--next-action", "analyze part-002"], root);
     await run("python3", [script, "validate", "--task", task], root);
 
     const main = await fs.readFile(path.join(task, "mindflow_task.md"), "utf8");
     const checkpoints = await fs.readFile(path.join(task, "state/checkpoints.md"), "utf8");
     const ignore = await fs.readFile(path.join(workspace, ".gitignore"), "utf8");
     assert.ok(main.includes('task_status: "analyzing"'));
+    assert.ok(main.includes("workflow_version: 2"));
     assert.ok(main.includes('next_action: "analyze part-002"'));
     assert.ok(main.includes('mode: "code-to-canvas"'));
     assert.ok(main.includes('output_target: "canvas"'));
@@ -54,10 +55,48 @@ test("MindFlow task script creates, checkpoints, validates, and ignores recovera
     for (const relative of [
       "source_inventory.md", "requirement_ledger.md", "analysis_summary.md", "analysis_packet.json",
       "graph/graph_summary.md", "state/entity_index.md", "state/generation_state.md", "state/batch_plan.json",
-      "reports/semantic_validation.md", "reports/final_validation.md"
+      "reports/semantic_validation.md", "reports/final_validation.md",
+      "prd/product-prd.md", "prd/page-index.json", "graph/framework.md", "state/page_generation.json"
     ]) {
       assert.equal((await fs.stat(path.join(task, relative))).isFile(), true);
     }
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("Workflow-version 2 blocks framework design until the hierarchical PRD bundle is complete and exported", async () => {
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-prd-workflow-test-"));
+  const script = path.join(sharedSkills, "mindflow-task-orchestrator/scripts/mindflow_task.py");
+  try {
+    const initialized = await run("python3", [
+      script, "init", "--workspace", workspace, "--title", "Health Product",
+      "--source-type", "documents", "--source-root", "docs", "--mode", "documents-to-canvas",
+      "--output-target", "canvas"
+    ], root);
+    const task = initialized.stdout.trim();
+    await fs.writeFile(path.join(task, "analysis/part-001-framework.md"), "# Framework\n\n- status: completed\n", "utf8");
+    await fs.writeFile(path.join(task, "analysis_summary.md"), "# Analysis Summary\n\nsynthesis_status: completed\n", "utf8");
+    await assert.rejects(
+      () => run("python3", [script, "checkpoint", "--task", task, "--phase", "framework_designing", "--part", "framework", "--next-action", "design framework"], root),
+      /hierarchical PRD bundle is incomplete/
+    );
+    await fs.writeFile(path.join(task, "prd/product-prd.md"), "# Product PRD: Health Product\n\n- status: completed\n- evidence_refs: [docs/prd.md#scope]\n", "utf8");
+    await fs.writeFile(path.join(task, "prd/pages/001-home.md"), "# Page PRD: Home\n\n- semantic_key: page:web:home\n- status: completed\n- page_type: page\n- application: app:web\n- parent: app:web\n- product_prd_refs: [product-prd.md#registry]\n- evidence_refs: [docs/prd.md#home]\n", "utf8");
+    const index = {
+      schemaVersion: 1,
+      status: "completed",
+      productPrd: { path: "prd/product-prd.md", status: "completed", fingerprint: "" },
+      export: { path: "", status: "pending", fingerprint: "" },
+      applications: ["app:web"],
+      pages: [{ order: 1, semanticKey: "page:web:home", title: "Home", pageType: "page", application: "app:web", parent: "app:web", prdPath: "prd/pages/001-home.md", status: "completed", evidenceRefs: ["docs/prd.md#home"] }]
+    };
+    await fs.writeFile(path.join(task, "prd/page-index.json"), `${JSON.stringify(index, null, 2)}\n`, "utf8");
+    const output = path.join(workspace, "docs/mindflow/health-product");
+    await run("python3", [script, "export-prd", "--task", task, "--output", output], root);
+    await run("python3", [script, "checkpoint", "--task", task, "--phase", "framework_designing", "--part", "framework", "--next-action", "design framework"], root);
+    assert.equal((await fs.readFile(path.join(output, "product-prd.md"), "utf8")).includes("Health Product"), true);
+    assert.equal((await fs.stat(path.join(output, "pages/001-home.md"))).isFile(), true);
   } finally {
     await fs.rm(workspace, { recursive: true, force: true });
   }
@@ -165,6 +204,23 @@ test("MindFlow draft validator enforces five edge types, type reasons, and orang
     const invalid = path.join(directory, "invalid.md");
     await fs.writeFile(invalid, '# Invalid\n\n```json\n{"entities":[{"entity":"edge","type":"nestedRelation","typeReason":"containment","from":{"kind":"node","nodeRef":"a"},"to":{"kind":"node","nodeRef":"b"},"cardOutletReason":"legacy"}],"unresolved":[],"staleCandidates":[]}\n```\n');
     await assert.rejects(() => run("python3", [validator, invalid], root), /featureItem or featureGroup outlet/);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("MindFlow staged draft validation rejects stored root-to-app edges and framework placeholders at final", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "mindflow-staged-draft-test-"));
+  const validator = path.join(sharedSkills, "mindflow-canvas-authoring/scripts/validate_mindflow_draft.py");
+  try {
+    const framework = path.join(directory, "framework.md");
+    await fs.writeFile(framework, '# Framework\n\n```json\n{"entities":[{"entity":"node","localRef":"home","semanticKey":"page:web:home","pageType":"page","featureGroups":[{"name":"框架定义","items":[{"name":"页面职责","description":"承载用户进入产品后的核心业务信息与操作入口。"}]}]}],"unresolved":[],"staleCandidates":[]}\n```\n', "utf8");
+    await run("python3", [validator, "--stage", "framework", framework], root);
+    await assert.rejects(() => run("python3", [validator, "--stage", "final", framework], root), /framework placeholder/);
+
+    const duplicate = path.join(directory, "duplicate-root-app.md");
+    await fs.writeFile(duplicate, '# Duplicate\n\n```json\n{"entities":[{"entity":"edge","type":"nestedRelation","typeReason":"membership","from":{"kind":"projectOverview"},"to":{"kind":"appSurface","appRef":"web"}}],"unresolved":[],"staleCandidates":[]}\n```\n', "utf8");
+    await assert.rejects(() => run("python3", [validator, "--stage", "framework", duplicate], root), /rendered system line/);
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }

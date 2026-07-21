@@ -21,7 +21,7 @@ Use this skill after `mindflow-product-analysis` selects a mode and before sourc
 
 ## Enforce phases
 
-Use this fixed order: `initializing`, `inventory`, `analyzing`, `synthesizing`, `designing`, `generating`, `validating`, `delivering`, `completed`. Do not formally generate until every planned analysis partition is complete and cross-partition synthesis is complete.
+New canvas tasks use workflow version 2 and this fixed order: `initializing`, `inventory`, `framework_analyzing`, `product_prd`, `page_prds`, `framework_designing`, `framework_generating`, `page_enriching`, `validating`, `delivering`, `completed`. Legacy tasks without `workflow_version` retain the original phase vocabulary. Do not enter framework design until every analysis partition, the comprehensive PRD, every indexed page PRD, and the one-way export are complete and valid.
 
 Task status must be one of `pending`, `analyzing`, `designing`, `generating`, `validating`, `completed`, `blocked`. Canvas save status is separate: `not_created`, `dirty`, or `saved`.
 
@@ -42,3 +42,5 @@ For every generation batch record its id/label, dry-run revision, applied revisi
 - On changed source fingerprint, invalidate only dependent partitions and graph drafts; list vanished entities as `staleCandidates` rather than deleting them.
 
 Run `python3 scripts/mindflow_task.py validate --task <task-dir>` before a phase transition. Read [references/task-contract.md](references/task-contract.md) when implementing recovery, drift, or conflict handling.
+
+For workflow-version 2, run `python3 scripts/mindflow_task.py export-prd --task <task-dir> --output <workspace>/docs/mindflow/<task-id>` after page PRDs validate. Generated exports are deliverables, never inputs to the same task.

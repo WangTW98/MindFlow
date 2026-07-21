@@ -5,14 +5,14 @@ description: Convert a validated MindFlow product-analysis packet into graph dra
 
 # MindFlow Canvas Authoring
 
-Only use after `mindflow-product-analysis` and the task orchestrator record completed analysis, synthesis, and a valid analysis packet. Do not perform source analysis in this skill. Product methodology in this file is Skill policy, not an MCP server restriction.
+Only use after `mindflow-product-analysis` and the task orchestrator record completed analysis, a valid analysis packet, and—under workflow version 2—a validated and exported comprehensive/page PRD bundle. Do not perform source analysis in this skill. Product methodology in this file is Skill policy, not an MCP server restriction.
 
 ## Model nodes
 
 - Create exactly one root and application-type nodes for application forms.
 - Create every layout, nav, page, popup, component, and independent business state as a generic node using `mindflow_upsert_node` or a changeset `node.upsert`.
 - Require `pageType`: layout=`skeleton`, nav=`navigation`, page=`page`, popup=`popup`, component=`component`.
-- Give every new generic node explicit semantic feature groups and items. Never emit the default `基础功能 / 主要内容 / 确认按钮` placeholder.
+- Give every new generic node explicit semantic feature groups and items. Never emit the default `基础功能 / 主要内容 / 确认按钮` placeholder. A framework-stage stub may temporarily use exactly one source-grounded `框架定义 / 页面职责` item; final validation rejects any remaining framework stub.
 - Treat a skeleton as a layout container with several possible children: each navigation feature may enter a top-level primary, side, tab, or bottom `navigation`; top bars, search bars, brand bars, headers, footers, and other concrete layout regions use `component`. A child navigation is reached only from its parent navigation item, never listed or connected from the skeleton as a second navigation entry.
 - Give every generic node an explicit incoming edge in the completed draft. Initial state nodes enter from the real business event that creates or opens that state; never emit an orphan test node.
 - Name state nodes `Base title · State name`; nodes in a transition share `statusGroupId`.
@@ -33,14 +33,14 @@ For each feature group/item outlet, `interaction`, `autoNavigate`, and `statusCh
 
 ## Select the orange source outlet
 
-For generic nodes use: feature item first; feature group only when the whole group triggers. Never use a generic node card as an MCP edge source, including for containment, automatic navigation, data flow, or status changes. Buttons, menus, tabs, links, fields, row/list operations, layout regions, and system events must use a feature outlet. If the outlet is missing, create the group/item before the edge. Root and application nodes may use their card outlet; an application card connects by `nestedRelation` to its unique skeleton.
+For generic nodes use: feature item first; feature group only when the whole group triggers. Never use a generic node card as an MCP edge source, including for containment, automatic navigation, data flow, or status changes. Buttons, menus, tabs, links, fields, row/list operations, layout regions, and system events must use a feature outlet. If the outlet is missing, create the group/item before the edge. The canvas renders root-to-application membership as a system line, so never create a stored root/projectOverview-to-appSurface edge. An application card connects by `nestedRelation` to its unique skeleton; query after skeleton creation and add the edge only when repair did not already create it.
 
 ## Generate safely
 
-1. Validate fenced JSON graph drafts with `python3 scripts/validate_mindflow_draft.py <graph-files...>`.
+1. For workflow version 2, validate `graph/framework.md` with `--stage framework`, each page draft with `--stage page`, and the union with `--stage final --page-index <page-index.json>`. Legacy tasks may use the default final validation.
 2. Query existing entities and preserve matched ids and all existing coordinates.
-3. Generate in order: source-grounded root narratives, taxonomy, source-discovered apps and their descriptions, skeletons, top-level navigation/layout components, child navigation, pages, business components/popups, states, features, then `nestedRelation`, `interaction`, `dataFlow`, `statusChange`, `autoNavigate`.
-4. Build ordered stages: root; taxonomy; applications; one skeleton/entry per application; coherent business slices; states/data/cross-app relations; layout. Default each batch to at most 30 operations, 8 nodes, and 16 edges; server limits are ceilings only.
+3. Generate the framework from the comprehensive PRD: root narratives, taxonomy, applications, skeletons, navigation/layout nodes, all indexed page/popup/state stubs, and only true structural `nestedRelation` edges. Do not emit root-to-application edges or page navigation/data/state edges at this stage.
+4. Then process page PRDs in page-index order. Replace the owning stub with complete semantic content and emit each outgoing navigation, data, status, or automatic edge exactly once from that page's feature outlet. Build small coherent batches; default each batch to at most 30 operations, 8 nodes, and 16 edges.
 5. Give every batch `batchId` and `batchLabel`. Query and pin the current revision, dry-run, inspect `changeSummary`, then submit the identical batch atomically.
 6. Call `mindflow_reveal_entities` for affected cards, re-query changed ids at the returned revision, and checkpoint approval, dry-run, apply, reveal, ids, and next batch. On mismatch, reconcile before a new dry-run.
 7. Use guided mode by default: pause before first write, application milestones, and destructive batches. Continue automatically only after explicit continuous authorization; never mix destructive cleanup into constructive batches.

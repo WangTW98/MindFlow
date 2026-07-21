@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate fenced JSON MindFlow graph draft records."""
+"""Validate fenced JSON MindFlow graph drafts by framework, page, or final stage."""
 
 from __future__ import annotations
 
@@ -15,9 +15,11 @@ PLACEHOLDER_COPY = {
     "暂无", "待补充", "待分析", "pending", "todo", "示例项目", "项目综述", "项目目标",
     "独立入口", "应用端独立入口",
 }
+FRAMEWORK_GROUP = "框架定义"
+FRAMEWORK_ITEM = "页面职责"
 
 
-def substantive_copy(value, minimum: int) -> bool:
+def substantive_copy(value: object, minimum: int) -> bool:
     if not isinstance(value, str):
         return False
     compact = re.sub(r"\s+", "", value).lower()
@@ -41,119 +43,184 @@ def walk(value):
             yield from walk(child)
 
 
-def validate_file(path: Path) -> list[str]:
+def load_records(paths: list[Path]) -> tuple[list[tuple[Path, dict]], list[str]]:
     errors: list[str] = []
-    try:
-        documents = list(fenced_json(path.read_text(encoding="utf-8")))
-    except (OSError, json.JSONDecodeError) as error:
-        return [f"{path}: invalid fenced JSON: {error}"]
-    if not documents:
-        return [f"{path}: no fenced JSON records"]
-    for document in documents:
-        records = list(walk(document))
-        for record in records:
-            page_type = record.get("pageType")
-            if page_type is not None and page_type not in PAGE_TYPES:
-                errors.append(f"{path}: unsupported pageType {page_type!r}")
-            edge_type = record.get("edgeType", record.get("type") if record.get("entity") == "edge" else None)
-            if edge_type is not None and edge_type not in EDGE_TYPES:
-                errors.append(f"{path}: unsupported edge type {edge_type!r}")
-            if record.get("entity") == "edge":
-                if not record.get("typeReason"):
-                    errors.append(f"{path}: edge missing typeReason")
-                if record.get("unresolved"):
-                    errors.append(f"{path}: unresolved relation must not be emitted as an edge")
-                source = record.get("from", {})
-                if source.get("kind") == "node":
-                    errors.append(f"{path}: MCP edges must use a featureItem or featureGroup outlet, not a generic node card")
-            if record.get("entity") == "node":
-                feature_groups = record.get("featureGroups")
-                if not isinstance(feature_groups, list) or not any(isinstance(group, dict) and isinstance(group.get("items"), list) and group["items"] for group in feature_groups):
-                    errors.append(f"{path}: node requires an explicit feature group with at least one feature item")
-                if len(feature_groups or []) == 1:
-                    group = feature_groups[0] if isinstance(feature_groups[0], dict) else {}
-                    item_names = {item.get("name") for item in group.get("items", []) if isinstance(item, dict)}
-                    if group.get("name") == "基础功能" and {"主要内容", "确认按钮"}.issubset(item_names):
-                        errors.append(f"{path}: node still uses the default feature placeholder")
-            if record.get("entity") == "root":
-                if not substantive_copy(record.get("summary"), 80):
-                    errors.append(f"{path}: root summary requires substantive source-grounded PRD-level copy")
-                if not substantive_copy(record.get("goal"), 40):
-                    errors.append(f"{path}: root goal requires substantive source-grounded PRD-level copy")
-            if record.get("entity") == "appSurface" and not substantive_copy(record.get("description"), 60):
-                errors.append(f"{path}: appSurface description requires substantive source-grounded PRD-level copy")
-            for obsolete in ("stableKey", "version", "replacementNodeIds", "states", "exceptions"):
-                if obsolete in record:
-                    errors.append(f"{path}: obsolete field {obsolete}")
-        node_groups = {}
-        node_types = {}
-        node_records = {}
-        for record in records:
-            if record.get("entity") != "node":
-                continue
+    records: list[tuple[Path, dict]] = []
+    for path in paths:
+        try:
+            documents = list(fenced_json(path.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError) as error:
+            errors.append(f"{path}: invalid fenced JSON: {error}")
+            continue
+        if not documents:
+            errors.append(f"{path}: no fenced JSON records")
+            continue
+        for document in documents:
+            records.extend((path, record) for record in walk(document) if isinstance(record, dict))
+    return records, errors
+
+
+def is_framework_stub(record: dict) -> bool:
+    groups = record.get("featureGroups")
+    if not isinstance(groups, list) or len(groups) != 1 or not isinstance(groups[0], dict):
+        return False
+    group = groups[0]
+    items = group.get("items")
+    return (
+        group.get("name") == FRAMEWORK_GROUP and isinstance(items, list) and len(items) == 1 and
+        isinstance(items[0], dict) and items[0].get("name") == FRAMEWORK_ITEM and
+        substantive_copy(items[0].get("description"), 12)
+    )
+
+
+def endpoint_ref(endpoint: object) -> str | None:
+    if not isinstance(endpoint, dict):
+        return None
+    return endpoint.get("nodeRef") or endpoint.get("nodeId")
+
+
+def validate(paths: list[Path], stage: str, page_index: Path | None) -> list[str]:
+    records, errors = load_records(paths)
+    node_records: dict[str, tuple[Path, dict]] = {}
+    node_groups: dict[str, object] = {}
+    node_types: dict[str, object] = {}
+    semantic_nodes: dict[str, str] = {}
+    edges: list[tuple[Path, dict]] = []
+
+    for path, record in records:
+        page_type = record.get("pageType")
+        if page_type is not None and page_type not in PAGE_TYPES:
+            errors.append(f"{path}: unsupported pageType {page_type!r}")
+        edge_type = record.get("edgeType", record.get("type") if record.get("entity") == "edge" else None)
+        if edge_type is not None and edge_type not in EDGE_TYPES:
+            errors.append(f"{path}: unsupported edge type {edge_type!r}")
+        if record.get("entity") == "edge":
+            edges.append((path, record))
+            if not record.get("typeReason"):
+                errors.append(f"{path}: edge missing typeReason")
+            if record.get("unresolved"):
+                errors.append(f"{path}: unresolved relation must not be emitted as an edge")
+            source = record.get("from", {})
+            target = record.get("to", {})
+            if isinstance(source, dict) and source.get("kind") == "node":
+                errors.append(f"{path}: MCP edges must use a featureItem or featureGroup outlet, not a generic node card")
+            if (
+                isinstance(source, dict) and source.get("kind") in {"root", "projectOverview"} and
+                isinstance(target, dict) and target.get("kind") == "appSurface"
+            ):
+                errors.append(f"{path}: root-to-appSurface membership is a rendered system line and must not be stored as an edge")
+            if stage == "framework" and record.get("type") != "nestedRelation":
+                errors.append(f"{path}: framework stage may emit only true nestedRelation edges")
+        if record.get("entity") == "node":
+            feature_groups = record.get("featureGroups")
+            if not isinstance(feature_groups, list) or not any(
+                isinstance(group, dict) and isinstance(group.get("items"), list) and group["items"]
+                for group in feature_groups
+            ):
+                errors.append(f"{path}: node requires an explicit feature group with at least one feature item")
+            if len(feature_groups or []) == 1:
+                group = feature_groups[0] if isinstance(feature_groups[0], dict) else {}
+                item_names = {item.get("name") for item in group.get("items", []) if isinstance(item, dict)}
+                if group.get("name") == "基础功能" and {"主要内容", "确认按钮"}.issubset(item_names):
+                    errors.append(f"{path}: node still uses the default feature placeholder")
+            if stage == "page" and is_framework_stub(record):
+                errors.append(f"{path}: enriched/final node still uses the framework placeholder")
             key = record.get("localRef") or record.get("nodeId") or record.get("id")
             if isinstance(key, str):
+                node_records[key] = (path, record)
                 node_groups[key] = record.get("statusGroupId")
                 node_types[key] = record.get("pageType")
-                node_records[key] = record
-        incoming = {key: [] for key in node_records}
-        limited_outlets = {}
-        for record in records:
-            if record.get("entity") != "edge":
-                continue
-            source = record.get("from", {})
-            target = record.get("to", {})
-            target_ref = target.get("nodeRef") or target.get("nodeId")
-            if target_ref in incoming:
-                incoming[target_ref].append(record)
-            edge_type = record.get("type")
-            if edge_type in {"interaction", "autoNavigate", "statusChange"} and source.get("kind") in {"featureGroup", "featureItem"}:
-                outlet = (
-                    source.get("kind"),
-                    source.get("nodeRef") or source.get("nodeId"),
-                    source.get("groupRef") or source.get("groupId"),
-                    source.get("itemRef") or source.get("itemId"),
-                )
-                if outlet in limited_outlets:
-                    errors.append(f"{path}: feature outlet {outlet} has multiple interaction/autoNavigate/statusChange targets")
-                else:
-                    limited_outlets[outlet] = record
+                semantic_key = record.get("semanticKey")
+                if isinstance(semantic_key, str):
+                    if semantic_key in semantic_nodes and semantic_nodes[semantic_key] != key:
+                        errors.append(f"{path}: duplicate node semanticKey {semantic_key}")
+                    semantic_nodes[semantic_key] = key
+        if record.get("entity") == "root":
+            if not substantive_copy(record.get("summary"), 80):
+                errors.append(f"{path}: root summary requires substantive source-grounded PRD-level copy")
+            if not substantive_copy(record.get("goal"), 40):
+                errors.append(f"{path}: root goal requires substantive source-grounded PRD-level copy")
+        if record.get("entity") == "appSurface" and not substantive_copy(record.get("description"), 60):
+            errors.append(f"{path}: appSurface description requires substantive source-grounded PRD-level copy")
+        for obsolete in ("stableKey", "version", "replacementNodeIds", "states", "exceptions"):
+            if obsolete in record:
+                errors.append(f"{path}: obsolete field {obsolete}")
+
+    incoming: dict[str, list[dict]] = {key: [] for key in node_records}
+    limited_outlets: dict[tuple, tuple[Path, dict]] = {}
+    for path, record in edges:
+        source = record.get("from", {})
+        target_ref = endpoint_ref(record.get("to", {}))
+        if target_ref in incoming:
+            incoming[target_ref].append(record)
+        edge_type = record.get("type")
+        if edge_type in {"interaction", "autoNavigate", "statusChange"} and isinstance(source, dict) and source.get("kind") in {"featureGroup", "featureItem"}:
+            outlet = (
+                source.get("kind"), endpoint_ref(source), source.get("groupRef") or source.get("groupId"),
+                source.get("itemRef") or source.get("itemId"),
+            )
+            if outlet in limited_outlets:
+                errors.append(f"{path}: feature outlet {outlet} has multiple interaction/autoNavigate/statusChange targets")
+            else:
+                limited_outlets[outlet] = (path, record)
+
+    if stage == "final":
+        for key, (path, record) in node_records.items():
+            if is_framework_stub(record):
+                errors.append(f"{path}: final node {key} still uses the framework placeholder")
         for key, node_incoming in incoming.items():
+            path, _ = node_records[key]
             if not node_incoming:
                 errors.append(f"{path}: node {key} has no incoming edge")
-            if node_types.get(key) == "navigation":
-                if len(node_incoming) != 1:
-                    errors.append(f"{path}: navigation node {key} requires exactly one hierarchy parent")
-                    continue
-                parent_edge = node_incoming[0]
-                source = parent_edge.get("from", {})
-                source_ref = source.get("nodeRef") or source.get("nodeId")
-                parent_type = node_types.get(source_ref)
-                valid = (parent_type == "skeleton" and parent_edge.get("type") == "nestedRelation") or (parent_type == "navigation" and parent_edge.get("type") == "interaction")
-                if not valid:
-                    errors.append(f"{path}: navigation node {key} must come from skeleton nestedRelation or navigation interaction")
-        for record in records:
-            if record.get("entity") != "edge" or record.get("type") != "statusChange":
-                continue
-            source = record.get("from", {})
-            target = record.get("to", {})
-            source_ref = source.get("nodeRef") or source.get("nodeId")
-            target_ref = target.get("nodeRef") or target.get("nodeId")
-            if source_ref in node_groups and target_ref in node_groups:
-                if not node_groups[source_ref] or node_groups[source_ref] != node_groups[target_ref]:
-                    errors.append(f"{path}: statusChange endpoints must share one non-empty statusGroupId")
+    for key, node_incoming in incoming.items():
+        if node_types.get(key) != "navigation" or stage == "framework" and not node_incoming:
+            continue
+        path, _ = node_records[key]
+        if stage == "final" and len(node_incoming) != 1:
+            errors.append(f"{path}: navigation node {key} requires exactly one hierarchy parent")
+            continue
+        for parent_edge in node_incoming:
+            source_ref = endpoint_ref(parent_edge.get("from", {}))
+            parent_type = node_types.get(source_ref)
+            valid = (parent_type == "skeleton" and parent_edge.get("type") == "nestedRelation") or (parent_type == "navigation" and parent_edge.get("type") == "interaction")
+            if not valid:
+                errors.append(f"{path}: navigation node {key} must come from skeleton nestedRelation or navigation interaction")
+    for path, record in edges:
+        if record.get("type") != "statusChange":
+            continue
+        source_ref = endpoint_ref(record.get("from", {}))
+        target_ref = endpoint_ref(record.get("to", {}))
+        if source_ref in node_groups and target_ref in node_groups:
+            if not node_groups[source_ref] or node_groups[source_ref] != node_groups[target_ref]:
+                errors.append(f"{path}: statusChange endpoints must share one non-empty statusGroupId")
+
+    if page_index:
+        try:
+            index = json.loads(page_index.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            errors.append(f"{page_index}: invalid page index: {error}")
+        else:
+            expected = {page.get("semanticKey") for page in index.get("pages", []) if isinstance(page, dict)}
+            missing = sorted(value for value in expected - semantic_nodes.keys() if isinstance(value, str))
+            extra = sorted(value for value in semantic_nodes.keys() - expected if isinstance(value, str) and value.startswith(("page:", "popup:", "state:")))
+            if missing:
+                errors.append(f"{page_index}: indexed pages missing from graph: {', '.join(missing)}")
+            if extra:
+                errors.append(f"{page_index}: graph pages missing from page index: {', '.join(extra)}")
     return errors
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--stage", choices=["framework", "page", "final"], default="final")
+    parser.add_argument("--page-index")
     parser.add_argument("files", nargs="+")
     args = parser.parse_args()
-    errors = [error for file in args.files for error in validate_file(Path(file))]
+    errors = validate([Path(value) for value in args.files], args.stage, Path(args.page_index) if args.page_index else None)
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
-    print(f"valid: {len(args.files)} draft file(s)")
+    print(f"valid: {len(args.files)} draft file(s), stage={args.stage}")
     return 0
 
 
