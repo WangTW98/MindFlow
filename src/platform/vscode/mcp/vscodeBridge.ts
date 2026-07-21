@@ -20,7 +20,8 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
     const document = await vscode.workspace.openTextDocument(createUntitledMindFlowDocumentOptions(flow));
     rememberUntitledFlow(document.uri);
     await vscode.commands.executeCommand("vscode.openWith", document.uri, FlowPanel.viewType);
-    return this.readSnapshot(document.uri, true);
+    const registeredUri = await this.waitForOpenEditor(document.uri);
+    return this.readSnapshot(registeredUri, true);
   }
 
   public async openFlow(flowPath: string): Promise<MindFlowEditorSnapshot> {
@@ -42,7 +43,24 @@ export class VsCodeMindFlowEditorBridge implements MindFlowEditorBridge {
     await loadMindFlowFile(authorizedPath);
     const authorizedUri = vscode.Uri.file(authorizedPath);
     await vscode.commands.executeCommand("vscode.openWith", authorizedUri, FlowPanel.viewType);
-    return this.readSnapshot(authorizedUri, true);
+    const registeredUri = await this.waitForOpenEditor(authorizedUri);
+    return this.readSnapshot(registeredUri, true);
+  }
+
+  private async waitForOpenEditor(uri: vscode.Uri, timeoutMs = 3000): Promise<vscode.Uri> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const openUri = FlowPanel.getOpenFlowUri(uri);
+      if (openUri) {
+        return openUri;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const openUri = FlowPanel.getOpenFlowUri(uri);
+    if (openUri) {
+      return openUri;
+    }
+    throw new Error(`Timed out waiting for MindFlow Custom Editor to register session for: ${uri.toString()}`);
   }
 
   public async getOpenEditors(): Promise<MindFlowEditorSnapshot[]> {

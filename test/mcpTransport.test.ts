@@ -149,6 +149,7 @@ test("global MCP Router discovers a live host and aggregates its editors", async
       jsonrpc: "2.0", id: 4, method: "tools/call",
       params: { name: "mindflow_open_flow", arguments: { flowPath: externalPath } }
     });
+    console.error("DEBUG FULL OPENED:", JSON.stringify(opened));
     assert.equal((readStructuredToolResult(opened).editor as Record<string, unknown>).path, externalPath);
     assert.deepEqual(bridge.openedPaths, [externalPath]);
 
